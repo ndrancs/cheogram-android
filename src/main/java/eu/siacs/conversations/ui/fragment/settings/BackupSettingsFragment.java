@@ -60,6 +60,7 @@ public class BackupSettingsFragment extends XmppPreferenceFragment {
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
         setPreferencesFromResource(R.xml.preferences_backup, rootKey);
         final var createOneOffBackup = findPreference(CREATE_ONE_OFF_BACKUP);
+        final var export = findPreference("export");
         final ListPreference recurringBackup = findPreference(RECURRING_BACKUP);
         final var backupDirectory = findPreference("backup_directory");
         if (createOneOffBackup == null || recurringBackup == null || backupDirectory == null) {
@@ -71,6 +72,7 @@ public class BackupSettingsFragment extends XmppPreferenceFragment {
                         R.string.pref_create_backup_summary,
                         FileBackend.getBackupDirectory(requireContext()).getAbsolutePath()));
         createOneOffBackup.setOnPreferenceClickListener(this::onBackupPreferenceClicked);
+        export.setOnPreferenceClickListener(this::onExportClicked);
         setValues(
                 recurringBackup,
                 R.array.recurring_backup_values,
@@ -146,6 +148,36 @@ public class BackupSettingsFragment extends XmppPreferenceFragment {
     private void startOneOffBackup() {
         final OneTimeWorkRequest exportBackupWorkRequest =
                 new OneTimeWorkRequest.Builder(ExportBackupWorker.class)
+                        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        .build();
+        WorkManager.getInstance(requireContext())
+                .enqueueUniqueWork(
+                        CREATE_ONE_OFF_BACKUP, ExistingWorkPolicy.KEEP, exportBackupWorkRequest);
+        final MaterialAlertDialogBuilder builder =
+                new MaterialAlertDialogBuilder(requireActivity());
+        builder.setMessage(R.string.backup_started_message);
+        builder.setPositiveButton(R.string.ok, null);
+        builder.create().show();
+    }
+
+    private boolean onExportClicked(final Preference preference) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                            requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestStorageForBackupLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            } else {
+                startExport();
+            }
+        } else {
+            startExport();
+        }
+        return true;
+    }
+
+    private void startExport() {
+        final OneTimeWorkRequest exportBackupWorkRequest =
+                new OneTimeWorkRequest.Builder(com.cheogram.android.ExportBackupService.class)
                         .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                         .build();
         WorkManager.getInstance(requireContext())

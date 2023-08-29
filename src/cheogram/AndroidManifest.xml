@@ -20,6 +20,8 @@
             </intent-filter>
         </service>
 
+        <service android:name="com.cheogram.android.ExportBackupService" />
+
         <activity
             android:name=".ui.ManageAccountActivity"
             android:label="@string/title_activity_manage_accounts"
