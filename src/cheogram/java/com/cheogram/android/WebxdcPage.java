@@ -130,7 +130,7 @@ public class WebxdcPage implements ConversationPage {
 
 	public String getName() {
 		String title = manifest == null ? null : manifest.getString("name");
-		return title == null ? "ChatApp" : title;
+		return title == null ? "Widget" : title;
 	}
 
 	public String getTitle() {
@@ -142,7 +142,7 @@ public class WebxdcPage implements ConversationPage {
 				title += ": " + lastUpdate.getDocument();
 			}
 		}
-		return title == null ? "ChatApp" : title;
+		return title == null ? "Widget" : title;
 	}
 
 	public String getNode() {
