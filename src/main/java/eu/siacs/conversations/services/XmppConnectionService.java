@@ -719,7 +719,6 @@ public class XmppConnectionService extends Service {
         if (conversation.getNextEncryption() == Message.ENCRYPTION_PGP) {
             message.setEncryption(Message.ENCRYPTION_DECRYPTED);
         }
-        if (subject.length() > 0) message.setSubject(subject);
         if (subject != null && subject.length() > 0) message.setSubject(subject);
         message.setThread(conversation.getThread());
         if (!Message.configurePrivateFileMessage(message)) {

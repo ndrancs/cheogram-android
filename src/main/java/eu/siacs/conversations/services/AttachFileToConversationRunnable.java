@@ -32,6 +32,7 @@ public class AttachFileToConversationRunnable implements Runnable, TranscoderLis
     private final XmppConnectionService mXmppConnectionService;
     private final Message message;
     private final Uri uri;
+    private final String mimeType;
     private final String type;
     private final UiCallback<Message> callback;
     private final boolean isVideoMessage;
@@ -44,7 +45,7 @@ public class AttachFileToConversationRunnable implements Runnable, TranscoderLis
         this.mXmppConnectionService = xmppConnectionService;
         this.message = message;
         this.callback = callback;
-        final String mimeType = MimeUtils.guessMimeTypeFromUriAndMime(mXmppConnectionService, uri, type);
+        mimeType = MimeUtils.guessMimeTypeFromUriAndMime(mXmppConnectionService, uri, type);
         final int autoAcceptFileSize = mXmppConnectionService.getResources().getInteger(R.integer.auto_accept_filesize);
         this.originalFileSize = FileBackend.getFileSize(mXmppConnectionService, uri);
         this.isVideoMessage = (mimeType != null && mimeType.startsWith("video/")) && originalFileSize > autoAcceptFileSize && !"uncompressed".equals(getVideoCompression());
@@ -56,7 +57,16 @@ public class AttachFileToConversationRunnable implements Runnable, TranscoderLis
 
     private void processAsFile() {
         final String path = mXmppConnectionService.getFileBackend().getOriginalPath(uri);
-        if (path != null && !FileBackend.isPathBlacklisted(path)) {
+        if ("https".equals(uri.getScheme())) {
+            message.getFileParams().url = uri.toString();
+            message.getFileParams().setMediaType(mimeType);
+            final int encryption = message.getEncryption();
+            mXmppConnectionService.getHttpConnectionManager().createNewDownloadConnection(message, false, (file) -> {
+                message.setEncryption(encryption);
+                mXmppConnectionService.sendMessage(message);
+                callback.success(message);
+            });
+        } else if (path != null && !FileBackend.isPathBlacklisted(path)) {
             message.setRelativeFilePath(path);
             mXmppConnectionService.getFileBackend().updateFileParams(message);
             if (message.getEncryption() == Message.ENCRYPTION_DECRYPTED) {
