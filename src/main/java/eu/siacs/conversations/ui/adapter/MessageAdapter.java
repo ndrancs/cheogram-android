@@ -855,8 +855,15 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         viewHolder.image.setVisibility(View.GONE);
         viewHolder.audioPlayer.setVisibility(View.GONE);
         viewHolder.download_button.setVisibility(View.VISIBLE);
+        viewHolder.download_button.setIconResource(0);
         viewHolder.download_button.setText("Open " + webxdc.getName());
         viewHolder.download_button.setOnClickListener(v -> {
+            Conversation conversation = (Conversation) message.getConversation();
+            if (!conversation.switchToSession("webxdc\0" + message.getUuid())) {
+                conversation.startWebxdc(webxdc);
+            }
+        });
+        viewHolder.image.setOnClickListener(v -> {
             Conversation conversation = (Conversation) message.getConversation();
             if (!conversation.switchToSession("webxdc\0" + message.getUuid())) {
                 conversation.startWebxdc(webxdc);
@@ -896,6 +903,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         } else {
             viewHolder.image.setVisibility(View.VISIBLE);
             viewHolder.image.setImageDrawable(d);
+            imagePreviewLayout(d.getIntrinsicWidth(), d.getIntrinsicHeight(), viewHolder.image, message.getInReplyTo() != null, true, type, viewHolder);
         }
     }
 
