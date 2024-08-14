@@ -1165,19 +1165,6 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             viewHolder.messageBody.setCustomSelectionActionModeCallback(new MessageTextActionModeCallback(this, viewHolder.messageBody));
         }
 
-        if (viewHolder.thread_identicon != null) {
-            viewHolder.thread_identicon.setVisibility(View.GONE);
-            final Element thread = message.getThread();
-            if (thread != null) {
-                final String threadId = thread.getContent();
-                if (threadId != null) {
-                    viewHolder.thread_identicon.setVisibility(View.VISIBLE);
-                    viewHolder.thread_identicon.setColor(UIHelper.getColorForName(threadId));
-                    viewHolder.thread_identicon.setHash(UIHelper.identiconHash(threadId));
-                }
-            }
-        }
-
         if (viewHolder.time != null) {
             if (message.isAttention()) {
                 viewHolder.time.setTypeface(null, Typeface.BOLD);
@@ -1200,6 +1187,20 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                 bubbleColor = BubbleColor.SECONDARY;
             } else {
                 bubbleColor = colorfulBackground ? BubbleColor.TERTIARY : BubbleColor.SURFACE_HIGH;
+            }
+        }
+
+        if (viewHolder.thread_identicon != null) {
+            viewHolder.thread_identicon.setVisibility(View.GONE);
+            final Element thread = message.getThread();
+            if (thread != null) {
+                final String threadId = thread.getContent();
+                if (threadId != null) {
+                    final var roles = MaterialColors.getColorRoles(activity, UIHelper.getColorForName(threadId));
+                    viewHolder.thread_identicon.setVisibility(View.VISIBLE);
+                    viewHolder.thread_identicon.setColor(roles.getAccent());
+                    viewHolder.thread_identicon.setHash(UIHelper.identiconHash(threadId));
+                }
             }
         }
 
