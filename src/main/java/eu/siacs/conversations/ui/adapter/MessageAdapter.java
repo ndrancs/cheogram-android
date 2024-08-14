@@ -976,7 +976,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             scaledW = (int) target;
             scaledH = (int) (h / ((double) w / target));
         }
-        final var bodyWidth = Math.max(viewHolder.messageBody.getWidth(), viewHolder.download_button.getWidth());
+        final var bodyWidth = Math.max(viewHolder.messageBody.getWidth(), viewHolder.download_button.getWidth() + (20 * metrics.density));
         var targetImageWidth = 200 * metrics.density;
         if (!otherBelow) targetImageWidth = 110 * metrics.density;
         if (bodyWidth > 0 && bodyWidth < targetImageWidth) targetImageWidth = bodyWidth;
