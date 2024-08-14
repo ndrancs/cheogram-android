@@ -35,7 +35,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="10dp"
-            android:layout_marginBottom="4sp"
+            android:layout_marginBottom="2dp"
             android:longClickable="false"
             android:visibility="gone"
             android:textAppearance="?textAppearanceBodyMedium" />
@@ -62,7 +62,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="10dp"
-            android:layout_marginTop="4dp"
+            android:paddingTop="4dp"
             android:autoLink="web"
             android:longClickable="false"
             android:textAppearance="?textAppearanceBodyMedium" />
