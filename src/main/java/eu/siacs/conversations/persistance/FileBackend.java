@@ -77,6 +77,11 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
+import org.tomlj.Toml;
+import org.tomlj.TomlTable;
 
 import io.ipfs.cid.Cid;
 
@@ -2060,6 +2065,19 @@ public class FileBackend {
                 }
             } else if (audio) {
                 fileParams.runtime = getMediaRuntime(file);
+            }
+            if ("application/xdc+zip".equals(mime)) {
+                try {
+                    final var zip = new ZipFile(file);
+                    final ZipEntry manifestEntry = zip == null ? null : zip.getEntry("manifest.toml");
+                    if (manifestEntry != null) {
+                        final var manifest = Toml.parse(zip.getInputStream(manifestEntry));
+                        if (manifest != null) {
+                            final var name = manifest.getString("name");
+                            if (name != null) fileParams.setName(name);
+                        }
+                    }
+                } catch (final IOException e2) { }
             }
             try {
                 Bitmap thumb = getThumbnailBitmap(file, mXmppConnectionService.getResources(), 100, file.getAbsolutePath() + " x 100");
