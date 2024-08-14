@@ -15,7 +15,7 @@
             app:tabGravity="fill"
             app:tabMode="scrollable" />
 
-        <androidx.viewpager.widget.ViewPager
+        <com.cheogram.android.WebviewAwareViewPager
             android:id="@+id/conversation_view_pager"
             android:layout_below="@id/tab_layout"
             android:layout_width="fill_parent"
@@ -316,7 +316,7 @@
 
             </RelativeLayout>
 
-        </androidx.viewpager.widget.ViewPager>
+        </com.cheogram.android.WebviewAwareViewPager>
 
     </RelativeLayout>
 </layout>
