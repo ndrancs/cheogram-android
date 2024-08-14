@@ -89,6 +89,7 @@ import androidx.viewpager.widget.ViewPager;
 import com.cheogram.android.BobTransfer;
 import com.cheogram.android.EmojiSearch;
 import com.cheogram.android.WebxdcPage;
+import com.cheogram.android.WebxdcStore;
 
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -217,6 +218,7 @@ public class ConversationFragment extends XmppFragment
     public static final int REQUEST_START_AUDIO_CALL = 0x213;
     public static final int REQUEST_START_VIDEO_CALL = 0x214;
     public static final int REQUEST_SAVE_STICKER = 0x215;
+    public static final int REQUEST_WEBXDC_STORE = 0x216;
     public static final int ATTACHMENT_CHOICE_CHOOSE_IMAGE = 0x0301;
     public static final int ATTACHMENT_CHOICE_TAKE_PHOTO = 0x0302;
     public static final int ATTACHMENT_CHOICE_CHOOSE_FILE = 0x0303;
@@ -1138,6 +1140,10 @@ public class ConversationFragment extends XmppFragment
 
     private void handlePositiveActivityResult(int requestCode, final Intent data) {
         switch (requestCode) {
+            case REQUEST_WEBXDC_STORE:
+                mediaPreviewAdapter.addMediaPreviews(Attachment.of(activity, data.getData(), Attachment.Type.FILE));
+                toggleInputMethod();
+                break;
             case REQUEST_SAVE_STICKER:
                 final DocumentFile df = DocumentFile.fromSingleUri(activity, data.getData());
                 final File f = savingAsSticker;
@@ -1981,6 +1987,10 @@ public class ConversationFragment extends XmppFragment
             case R.id.attach_record_voice:
             case R.id.attach_location:
                 handleAttachmentSelection(item);
+                break;
+            case R.id.attach_webxdc:
+                final Intent intent = new Intent(getActivity(), WebxdcStore.class);
+                startActivityForResult(intent, REQUEST_WEBXDC_STORE);
                 break;
             case R.id.attach_subject:
                 binding.textinputSubject.setVisibility(binding.textinputSubject.getVisibility() == View.GONE ? View.VISIBLE : View.GONE);
