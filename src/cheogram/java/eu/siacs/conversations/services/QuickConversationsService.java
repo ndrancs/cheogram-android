@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableList;
 
 import android.content.Intent;
 import android.os.SystemClock;
@@ -98,7 +99,7 @@ public class QuickConversationsService extends AbstractQuickConversationsService
 
     protected void considerSync(boolean forced) {
         ImmutableMap<String, PhoneNumberContact> allContacts = null;
-        for (final Account account : service.getAccounts()) {
+        for (final Account account : ImmutableList.copyOf(service.getAccounts())) {
             List<String> gateways = gateways(account);
             if (gateways.size() < 1) continue;
             if (allContacts == null) allContacts = PhoneNumberContact.load(service);
