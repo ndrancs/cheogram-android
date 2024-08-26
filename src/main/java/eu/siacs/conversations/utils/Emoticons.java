@@ -8,6 +8,8 @@ public class Emoticons {
     }
 
     public static boolean isOnlyEmoji(String input) {
+        if (input.trim().length() == 0) return false; // Vaccuously true but not useful
+
         return EmojiManager.removeAllEmojis(input).replaceAll("\uFE0F", "").trim().length() == 0;
     }
 }
