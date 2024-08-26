@@ -1487,6 +1487,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getReadableDatabase();
         db.beginTransaction();
         db.delete(Message.TABLENAME, "timeSent<?", args);
+        db.delete("cheogram.messages", "timeReceived<?", args);
         db.setTransactionSuccessful();
         db.endTransaction();
     }
