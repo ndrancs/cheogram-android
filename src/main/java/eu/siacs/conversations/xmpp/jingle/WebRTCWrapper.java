@@ -719,7 +719,12 @@ public class WebRTCWrapper {
     public boolean applyDtmfTone(String tone) {
         if (localAudioTrack == null || localAudioTrack.rtpSender == null) return false;
 
-        localAudioTrack.rtpSender.dtmf().insertDtmf(tone, TONE_DURATION, 100);
+        try {
+            localAudioTrack.rtpSender.dtmf().insertDtmf(tone, TONE_DURATION, 100);
+        } catch (final IllegalStateException e) {
+            // Race condition, DtmfSender has been disposed
+            return false;
+        }
         final var handler = new android.os.Handler(android.os.Looper.getMainLooper());
         handler.post(() -> {
             final var toneGenerator = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, DEFAULT_TONE_VOLUME);
