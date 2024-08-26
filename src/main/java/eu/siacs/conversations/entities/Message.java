@@ -1388,7 +1388,12 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
     }
 
     public synchronized void resetFileParams() {
+        this.oob = false;
         this.fileParams = null;
+        this.transferable = null;
+        this.payloads.removeAll(getSims());
+        clearFallbacks(Namespace.OOB);
+        setType(isPrivateMessage() ? TYPE_PRIVATE : TYPE_TEXT);
     }
 
     public synchronized void setFileParams(FileParams fileParams) {
