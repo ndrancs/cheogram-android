@@ -637,7 +637,9 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                 int end = body.getSpanEnd(mergeSeparator);
                 body.setSpan(new DividerSpan(true), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
-            boolean startsWithQuote = false;
+            if (processMarkup) StylingHelper.format(body, viewHolder.messageBody.getCurrentTextColor());
+            MyLinkify.addLinks(body, message.getConversation().getAccount(), message.getConversation().getJid());
+            boolean startsWithQuote = processMarkup ? handleTextQuotes(viewHolder.messageBody, body, bubbleColor, true) : false;
             for (final android.text.style.QuoteSpan quote : body.getSpans(0, body.length(), android.text.style.QuoteSpan.class)) {
                 int start = body.getSpanStart(quote);
                 int end = body.getSpanEnd(quote);
@@ -657,7 +659,6 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                     }
                 }
             }
-            startsWithQuote = (processMarkup ? handleTextQuotes(viewHolder.messageBody, body, bubbleColor, true) : false) || startsWithQuote;
             if (!message.isPrivateMessage()) {
                 if (hasMeCommand) {
                     body.setSpan(
@@ -748,8 +749,6 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
 
-            if (processMarkup) StylingHelper.format(body, viewHolder.messageBody.getCurrentTextColor());
-            MyLinkify.addLinks(body, message.getConversation().getAccount(), message.getConversation().getJid());
             if (highlightedTerm != null) {
                 StylingHelper.highlight(viewHolder.messageBody, body, highlightedTerm);
             }
