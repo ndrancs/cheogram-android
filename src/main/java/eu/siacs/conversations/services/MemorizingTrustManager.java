@@ -412,7 +412,7 @@ public class MemorizingTrustManager {
                     } catch (final CertificateException e) {
                         Log.d(Config.LOGTAG, "checkCertTrusted DANE failure: " + e);
                         throw e;
-                    } catch (final Exception e) {
+                    } catch (final Throwable e) {
                         Log.d(Config.LOGTAG, "checkCertTrusted DANE related failure: " + e);
                     }
                 }
