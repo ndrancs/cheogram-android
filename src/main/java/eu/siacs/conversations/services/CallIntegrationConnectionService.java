@@ -252,7 +252,7 @@ public class CallIntegrationConnectionService extends ConnectionService {
     private static void registerPhoneAccount(final Context context, final Account account) {
         try {
             registerPhoneAccountOrThrow(context, account);
-        } catch (final IllegalArgumentException e) {
+        } catch (final IllegalArgumentException | SecurityException e) {
             Log.w(
                     Config.LOGTAG,
                     "could not register phone account for " + account.getJid().asBareJid(),
@@ -300,7 +300,7 @@ public class CallIntegrationConnectionService extends ConnectionService {
             if (account.isEnabled()) {
                 try {
                     registerPhoneAccountOrThrow(context, account);
-                } catch (final IllegalArgumentException e) {
+                } catch (final IllegalArgumentException | SecurityException e) {
                     Log.w(
                             Config.LOGTAG,
                             "could not register phone account for " + account.getJid().asBareJid(),
