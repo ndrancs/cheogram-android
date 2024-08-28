@@ -1118,7 +1118,7 @@ public class ConversationFragment extends XmppFragment
             this.binding.inputLayout.setBackgroundColor(android.R.color.transparent);
         } else {
             this.binding.textInputHint.setVisibility(View.GONE);
-            this.binding.textinput.setHint(UIHelper.getMessageHint(activity, conversation));
+            if (activity != null) this.binding.textinput.setHint(UIHelper.getMessageHint(activity, conversation));
             this.binding.inputLayout.setBackground(activity.getDrawable(R.drawable.background_message_bubble));
             activity.invalidateOptionsMenu();
         }
