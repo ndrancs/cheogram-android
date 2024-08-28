@@ -98,8 +98,12 @@ public class FixedURLSpan extends URLSpan {
 		}
 
 		if ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) {
-			widget.playSoundEffect(SoundEffectConstants.CLICK);
-			BrowserHelper.launchUri(context, uri);
+			try {
+				BrowserHelper.launchUri(context, uri);
+				widget.playSoundEffect(SoundEffectConstants.CLICK);
+			} catch (ActivityNotFoundException e) {
+				Toast.makeText(context, R.string.no_application_found_to_open_link, Toast.LENGTH_SHORT).show();
+			}
 			return;
 		}
 
