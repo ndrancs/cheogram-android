@@ -64,7 +64,7 @@
 
             <item
                 android:id="@+id/attach_webxdc"
-                android:icon="@drawable/ic_help_center_24dp"
+                android:icon="@drawable/toys_and_games_24dp"
                 android:title="Choose Widget" />
 
             <item

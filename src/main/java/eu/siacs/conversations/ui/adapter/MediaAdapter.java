@@ -115,7 +115,7 @@ public class MediaAdapter extends RecyclerView.Adapter<MediaAdapter.MediaViewHol
         } else if (mime.equals("message/rfc822")) {
             return R.drawable.ic_email_48dp;
         } else {
-            return R.drawable.ic_help_center_48dp;
+            return R.drawable.toys_and_games_24dp;
         }
     }
 
