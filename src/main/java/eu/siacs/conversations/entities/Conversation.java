@@ -146,10 +146,10 @@ import eu.siacs.conversations.xmpp.chatstate.ChatState;
 import eu.siacs.conversations.xmpp.forms.Data;
 import eu.siacs.conversations.xmpp.forms.Option;
 import eu.siacs.conversations.xmpp.mam.MamReference;
-import eu.siacs.conversations.xmpp.stanzas.IqPacket;
 
 import static eu.siacs.conversations.entities.Bookmark.printableValue;
 
+import im.conversations.android.xmpp.model.stanza.Iq;
 
 public class Conversation extends AbstractEntity implements Blockable, Comparable<Conversation>, Conversational, AvatarService.Avatarable {
     public static final String TABLENAME = "conversations";
@@ -1597,7 +1597,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
             show();
             CommandSession session = new CommandSession(command.getAttribute("name"), command.getAttribute("node"), xmppConnectionService);
 
-            final IqPacket packet = new IqPacket(IqPacket.TYPE.SET);
+            final var packet = new Iq(Iq.Type.SET);
             packet.setTo(command.getAttributeAsJid("jid"));
             final Element c = packet.addChild("command", Namespace.COMMANDS);
             c.setAttribute("node", command.getAttribute("node"));
@@ -1615,7 +1615,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                             }
                         }, 1000);
                     } else {
-                        xmppConnectionService.sendIqPacket(getAccount(), packet, (a, iq) -> {
+                        xmppConnectionService.sendIqPacket(getAccount(), packet, (iq) -> {
                             session.updateWithResponse(iq);
                         }, 120L);
                     }
@@ -1642,7 +1642,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
 
         public void startMucConfig(XmppConnectionService xmppConnectionService) {
             MucConfigSession session = new MucConfigSession(xmppConnectionService);
-            final IqPacket packet = new IqPacket(IqPacket.TYPE.GET);
+            final var packet = new Iq(Iq.Type.GET);
             packet.setTo(Conversation.this.getJid().asBareJid());
             packet.addChild("query", "http://jabber.org/protocol/muc#owner");
 
@@ -1658,7 +1658,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                             }
                         }, 1000);
                     } else {
-                        xmppConnectionService.sendIqPacket(getAccount(), packet, (a, iq) -> {
+                        xmppConnectionService.sendIqPacket(getAccount(), packet, (iq) -> {
                             session.updateWithResponse(iq);
                         }, 120L);
                     }
@@ -2779,7 +2779,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
             protected Item mkItem(Element el, int pos) {
                 int viewType = TYPE_ERROR;
 
-                if (response != null && response.getType() == IqPacket.TYPE.RESULT) {
+                if (response != null && response.getType() == Iq.Type.RESULT) {
                     if (el.getName().equals("note")) {
                         viewType = TYPE_NOTE;
                     } else if (el.getNamespace().equals("jabber:x:oob")) {
@@ -2880,7 +2880,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
             protected String mTitle;
             protected String mNode;
             protected CommandPageBinding mBinding = null;
-            protected IqPacket response = null;
+            protected Iq response = null;
             protected Element responseElement = null;
             protected boolean expectingRemoval = false;
             protected List<Field> reported = null;
@@ -2890,7 +2890,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
             protected GridLayoutManager layoutManager;
             protected WebView actionToWebview = null;
             protected int fillableFieldCount = 0;
-            protected IqPacket pendingResponsePacket = null;
+            protected Iq pendingResponsePacket = null;
             protected boolean waitingForRefresh = false;
 
             CommandSession(String title, String node, XmppConnectionService xmppConnectionService) {
@@ -2909,7 +2909,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                 return mNode;
             }
 
-            public void updateWithResponse(final IqPacket iq) {
+            public void updateWithResponse(final Iq iq) {
                 if (getView() != null && getView().isAttachedToWindow()) {
                     getView().post(() -> updateWithResponseUiThread(iq));
                 } else {
@@ -2917,7 +2917,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                 }
             }
 
-            protected void updateWithResponseUiThread(final IqPacket iq) {
+            protected void updateWithResponseUiThread(final Iq iq) {
                 Timer oldTimer = this.loadingTimer;
                 this.loadingTimer = new Timer();
                 oldTimer.cancel();
@@ -2934,7 +2934,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
 
                 boolean actionsCleared = false;
                 Element command = iq.findChild("command", "http://jabber.org/protocol/commands");
-                if (iq.getType() == IqPacket.TYPE.RESULT && command != null) {
+                if (iq.getType() == Iq.Type.RESULT && command != null) {
                     if (mNode.equals("jabber:iq:register") && command.getAttribute("status") != null && command.getAttribute("status").equals("completed")) {
                         xmppConnectionService.createContact(getAccount().getRoster().getContact(iq.getFrom()), true);
                     }
@@ -3098,7 +3098,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
             public int getItemCount() {
                 if (loading) return 1;
                 if (response == null) return 0;
-                if (response.getType() == IqPacket.TYPE.RESULT && responseElement != null && responseElement.getNamespace().equals("jabber:x:data")) {
+                if (response.getType() == Iq.Type.RESULT && responseElement != null && responseElement.getNamespace().equals("jabber:x:data")) {
                     int i = 0;
                     for (Element el : responseElement.getChildren()) {
                         if (!el.getNamespace().equals("jabber:x:data")) continue;
@@ -3131,7 +3131,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                 if (items.get(position) != null) return items.get(position);
                 if (response == null) return null;
 
-                if (response.getType() == IqPacket.TYPE.RESULT && responseElement != null) {
+                if (response.getType() == Iq.Type.RESULT && responseElement != null) {
                     if (responseElement.getNamespace().equals("jabber:x:data")) {
                         int i = 0;
                         for (Element el : responseElement.getChildren()) {
@@ -3314,7 +3314,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                     return false;
                 }
 
-                final IqPacket packet = new IqPacket(IqPacket.TYPE.SET);
+                final var packet = new Iq(Iq.Type.SET);
                 packet.setTo(response.getFrom());
                 final Element c = packet.addChild("command", Namespace.COMMANDS);
                 c.setAttribute("node", mNode);
@@ -3357,7 +3357,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                 if (c.getAttribute("action") == null) c.setAttribute("action", action);
 
                 executing = true;
-                xmppConnectionService.sendIqPacket(getAccount(), packet, (a, iq) -> {
+                xmppConnectionService.sendIqPacket(getAccount(), packet, (iq) -> {
                     updateWithResponse(iq);
                 }, 120L);
 
@@ -3492,7 +3492,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                 actionsAdapter.notifyDataSetChanged();
 
                 if (pendingResponsePacket != null) {
-                    final IqPacket pending = pendingResponsePacket;
+                    final var pending = pendingResponsePacket;
                     pendingResponsePacket = null;
                     updateWithResponseUiThread(pending);
                 }
@@ -3567,7 +3567,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
             }
 
             @Override
-            protected void updateWithResponseUiThread(final IqPacket iq) {
+            protected void updateWithResponseUiThread(final Iq iq) {
                 Timer oldTimer = this.loadingTimer;
                 this.loadingTimer = new Timer();
                 oldTimer.cancel();
@@ -3583,7 +3583,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                 layoutManager.setSpanCount(1);
 
                 final Element query = iq.findChild("query", "http://jabber.org/protocol/muc#owner");
-                if (iq.getType() == IqPacket.TYPE.RESULT && query != null) {
+                if (iq.getType() == Iq.Type.RESULT && query != null) {
                     final Data form = Data.parse(query.findChild("x", "jabber:x:data"));
                     final String title = form.getTitle();
                     if (title != null) {
@@ -3602,7 +3602,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                     if (actionsAdapter.getPosition("cancel") < 0) {
                         actionsAdapter.insert(Pair.create("cancel", "cancel"), 0);
                     }
-                } else if (iq.getType() == IqPacket.TYPE.RESULT) {
+                } else if (iq.getType() == Iq.Type.RESULT) {
                     expectingRemoval = true;
                     removeSession(this);
                     return;
@@ -3616,7 +3616,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
             @Override
             public synchronized boolean execute(String action) {
                 if ("cancel".equals(action)) {
-                    final IqPacket packet = new IqPacket(IqPacket.TYPE.SET);
+                    final var packet = new Iq(Iq.Type.SET);
                     packet.setTo(response.getFrom());
                     final Element form = packet
                         .addChild("query", "http://jabber.org/protocol/muc#owner")
@@ -3628,7 +3628,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
 
                 if (!"save".equals(action)) return true;
 
-                final IqPacket packet = new IqPacket(IqPacket.TYPE.SET);
+                final var packet = new Iq(Iq.Type.SET);
                 packet.setTo(response.getFrom());
 
                 String formType = responseElement == null ? null : responseElement.getAttribute("type");
@@ -3644,7 +3644,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                 }
 
                 executing = true;
-                xmppConnectionService.sendIqPacket(getAccount(), packet, (a, iq) -> {
+                xmppConnectionService.sendIqPacket(getAccount(), packet, (iq) -> {
                     updateWithResponse(iq);
                 }, 120L);
 

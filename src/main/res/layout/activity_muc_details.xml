@@ -189,6 +189,7 @@
                                 android:layout_centerVertical="true"
                                 android:layout_gravity="center_horizontal"
                                 android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/edit_configuration"
                                 android:padding="@dimen/image_button_padding"
                                 android:src="@drawable/ic_settings_24dp" />
                         </RelativeLayout>
@@ -356,6 +357,7 @@
                                 android:layout_alignParentEnd="true"
                                 android:layout_centerVertical="true"
                                 android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/edit_nick"
                                 android:padding="@dimen/image_button_padding"
                                 android:src="@drawable/ic_edit_24dp" />
                         </RelativeLayout>
@@ -383,6 +385,7 @@
                                 android:layout_centerVertical="true"
                                 android:layout_gravity="center_horizontal"
                                 android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="@string/change_notification_settings"
                                 android:padding="@dimen/image_button_padding"
                                 android:src="@drawable/ic_notifications_24dp" />
                         </RelativeLayout>

@@ -111,8 +111,13 @@ public class RecordingActivity extends BaseActivity implements View.OnClickListe
 
     private boolean startRecording() {
         mRecorder = new MediaRecorder();
-        mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         final String userChosenCodec = getPreferences().getString("voice_message_codec", "");
+        try {
+            mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        } catch (final RuntimeException e) {
+            Log.e(Config.LOGTAG,"could not set audio source", e);
+            return false;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             mRecorder.setPrivacySensitive(true);
         }

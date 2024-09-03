@@ -158,28 +158,39 @@ public class ConferenceDetailsActivity extends XmppActivity implements OnConvers
         }
     };
 
-    private final OnClickListener mChangeConferenceSettings = new OnClickListener() {
-        @Override
-        public void onClick(View v) {
-            final MucOptions mucOptions = mConversation.getMucOptions();
-            final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ConferenceDetailsActivity.this);
-            MucConfiguration configuration = MucConfiguration.get(ConferenceDetailsActivity.this, mAdvancedMode, mucOptions);
-            builder.setTitle(configuration.title);
-            final boolean[] values = configuration.values;
-            builder.setMultiChoiceItems(configuration.names, values, (dialog, which, isChecked) -> values[which] = isChecked);
-            builder.setNegativeButton(R.string.cancel, null);
-            builder.setPositiveButton(R.string.confirm, (dialog, which) -> {
-                final Bundle options = configuration.toBundle(values);
-                options.putString("muc#roomconfig_persistentroom", "1");
-                options.putString("{http://prosody.im/protocol/muc}roomconfig_allowmemberinvites", options.getString("muc#roomconfig_allowinvites"));
-                xmppConnectionService.pushConferenceConfiguration(mConversation,
-                        options,
-                        ConferenceDetailsActivity.this);
-            });
-            builder.create().show();
-        }
-    };
-
+    private final OnClickListener mChangeConferenceSettings =
+            new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final MucOptions mucOptions = mConversation.getMucOptions();
+                    final MaterialAlertDialogBuilder builder =
+                            new MaterialAlertDialogBuilder(ConferenceDetailsActivity.this);
+                    MucConfiguration configuration =
+                            MucConfiguration.get(
+                                    ConferenceDetailsActivity.this, mAdvancedMode, mucOptions);
+                    builder.setTitle(configuration.title);
+                    final boolean[] values = configuration.values;
+                    builder.setMultiChoiceItems(
+                            configuration.names,
+                            values,
+                            (dialog, which, isChecked) -> values[which] = isChecked);
+                    builder.setNegativeButton(R.string.cancel, null);
+                    builder.setPositiveButton(
+                            R.string.confirm,
+                            (dialog, which) -> {
+                                final Bundle options = configuration.toBundle(values);
+                                options.putString("muc#roomconfig_persistentroom", "1");
+                                if (options.containsKey("muc#roomconfig_allowinvites")) {
+                                    options.putString(
+                                            "{http://prosody.im/protocol/muc}roomconfig_allowmemberinvites",
+                                            options.getString("muc#roomconfig_allowinvites"));
+                                }
+                                xmppConnectionService.pushConferenceConfiguration(
+                                        mConversation, options, ConferenceDetailsActivity.this);
+                            });
+                    builder.create().show();
+                }
+            };
 
     @Override
     public void onConversationUpdate() {
@@ -256,6 +267,7 @@ public class ConferenceDetailsActivity extends XmppActivity implements OnConvers
             popupMenu.show();
             return true;
         });
+        this.binding.editMucNameButton.setContentDescription(getString(R.string.edit_name_and_topic));
         this.binding.editMucNameButton.setOnClickListener(this::onMucEditButtonClicked);
         this.binding.mucEditTitle.addTextChangedListener(this);
         this.binding.mucEditSubject.addTextChangedListener(this);
@@ -343,6 +355,7 @@ public class ConferenceDetailsActivity extends XmppActivity implements OnConvers
             this.binding.mucEditor.setVisibility(View.VISIBLE);
             this.binding.mucDisplay.setVisibility(View.GONE);
             this.binding.editMucNameButton.setImageResource(R.drawable.ic_cancel_24dp);
+            this.binding.editMucNameButton.setContentDescription(getString(R.string.cancel));
             final String name = mucOptions.getName();
             this.binding.mucEditTitle.setText("");
             final boolean owner = mucOptions.getSelf().getAffiliation().ranks(MucOptions.Affiliation.OWNER);
@@ -417,6 +430,7 @@ public class ConferenceDetailsActivity extends XmppActivity implements OnConvers
         this.binding.mucEditor.setVisibility(View.GONE);
         this.binding.mucDisplay.setVisibility(View.VISIBLE);
         this.binding.editMucNameButton.setImageResource(R.drawable.ic_edit_24dp);
+        this.binding.editMucNameButton.setContentDescription(getString(R.string.edit_name_and_topic));
     }
 
     private void onMucInfoUpdated(String subject, String name) {
@@ -776,8 +790,10 @@ public class ConferenceDetailsActivity extends XmppActivity implements OnConvers
             final Bookmark bookmark = mConversation.getBookmark();
             if (subjectChanged || nameChanged || (bookmark != null && mConversation.getAccount().getXmppConnection().getFeatures().bookmarks2())) {
                 this.binding.editMucNameButton.setImageResource(R.drawable.ic_save_24dp);
+                this.binding.editMucNameButton.setContentDescription(getString(R.string.save));
             } else {
                 this.binding.editMucNameButton.setImageResource(R.drawable.ic_cancel_24dp);
+                this.binding.editMucNameButton.setContentDescription(getString(R.string.cancel));
             }
         }
     }
