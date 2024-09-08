@@ -28,6 +28,7 @@ import android.util.DisplayMetrics;
 import android.util.LruCache;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -50,6 +51,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.core.widget.ImageViewCompat;
+import androidx.databinding.DataBindingUtil;
 
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.shape.CornerFamily;
@@ -58,6 +60,7 @@ import com.google.android.material.shape.ShapeAppearanceModel;
 import com.cheogram.android.BobTransfer;
 import com.cheogram.android.MessageTextActionModeCallback;
 import com.cheogram.android.SwipeDetector;
+import com.cheogram.android.Util;
 import com.cheogram.android.WebxdcPage;
 import com.cheogram.android.WebxdcUpdate;
 
@@ -90,6 +93,7 @@ import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
+import eu.siacs.conversations.databinding.LinkDescriptionBinding;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
@@ -110,6 +114,7 @@ import eu.siacs.conversations.ui.ConversationsActivity;
 import eu.siacs.conversations.ui.XmppActivity;
 import eu.siacs.conversations.ui.service.AudioPlayer;
 import eu.siacs.conversations.ui.text.DividerSpan;
+import eu.siacs.conversations.ui.text.FixedURLSpan;
 import eu.siacs.conversations.ui.text.QuoteSpan;
 import eu.siacs.conversations.ui.util.Attachment;
 import eu.siacs.conversations.ui.util.AvatarWorkerTask;
@@ -1117,6 +1122,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                     viewHolder.inReplyToQuote = view.findViewById(R.id.in_reply_to_quote);
                     viewHolder.indicatorReceived = view.findViewById(R.id.indicator_received);
                     viewHolder.audioPlayer = view.findViewById(R.id.audio_player);
+                    viewHolder.link_descriptions = view.findViewById(R.id.link_descriptions);
                     viewHolder.thread_identicon = view.findViewById(R.id.thread_identicon);
                     break;
                 case RECEIVED:
@@ -1139,6 +1145,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                     viewHolder.encryption = view.findViewById(R.id.message_encryption);
                     viewHolder.audioPlayer = view.findViewById(R.id.audio_player);
                     viewHolder.commands_list = view.findViewById(R.id.commands_list);
+                    viewHolder.link_descriptions = view.findViewById(R.id.link_descriptions);
                     viewHolder.thread_identicon = view.findViewById(R.id.thread_identicon);
                     break;
                 case STATUS:
@@ -1151,6 +1158,16 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                     break;
                 default:
                     throw new AssertionError("Unknown view type");
+            }
+            if (viewHolder.link_descriptions != null) {
+                viewHolder.link_descriptions.setOnItemClickListener((adapter, v, pos, id) -> {
+                    final var desc = (Element) adapter.getItemAtPosition(pos);
+                    var url = desc.findChildContent("url", "https://ogp.me/ns#");
+                    // should we prefer about? Maybe, it's the real original link, but it's not what we show the user
+                    if (url == null || url.length() < 1) url = desc.getAttribute("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about");
+                    if (url == null || url.length() < 1) return;
+                    new FixedURLSpan(url).onClick(v);
+                });
             }
             view.setTag(viewHolder);
         } else {
@@ -1523,6 +1540,19 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                 viewHolder.inReplyToQuote.setOnClickListener((v) -> mConversationFragment.jumpTo(message.getInReplyTo()));
                 setTextColor(viewHolder.inReplyTo, bubbleColor);
             }
+
+            final var descriptions = message.getLinkDescriptions();
+            viewHolder.link_descriptions.setAdapter(new ArrayAdapter<>(activity, 0, descriptions) {
+                @Override
+                public View getView(int position, View view, @NonNull ViewGroup parent) {
+                    final LinkDescriptionBinding binding = DataBindingUtil.inflate(LayoutInflater.from(parent.getContext()), R.layout.link_description, parent, false);
+                    binding.title.setText(getItem(position).findChildContent("title", "https://ogp.me/ns#"));
+                    binding.description.setText(getItem(position).findChildContent("description", "https://ogp.me/ns#"));
+                    binding.url.setText(getItem(position).findChildContent("url", "https://ogp.me/ns#"));
+                    return binding.getRoot();
+                }
+            });
+            Util.justifyListViewHeightBasedOnChildren(viewHolder.link_descriptions, (int)(metrics.density * 100), true);
         }
 
         displayStatus(viewHolder, message, type, bubbleColor);
@@ -1750,6 +1780,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         protected TextView status_message;
         protected TextView encryption;
         protected ListView commands_list;
+        protected ListView link_descriptions;
         protected GithubIdenticonView thread_identicon;
     }
 
