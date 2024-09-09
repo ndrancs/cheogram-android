@@ -2169,6 +2169,10 @@ public class XmppConnectionService extends Service {
         sendMessage(message, true, false, delay);
     }
 
+    public void resendMessage(final Message message, final boolean delay, final boolean previewedLinks) {
+        sendMessage(message, true, previewedLinks, delay);
+    }
+
     public Pair<Account,Account> onboardingIncomplete() {
         if (getAccounts().size() != 2) return null;
         Account onboarding = null;
