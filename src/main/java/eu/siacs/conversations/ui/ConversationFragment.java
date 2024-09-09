@@ -83,6 +83,7 @@ import androidx.core.view.inputmethod.InputConnectionCompat;
 import androidx.core.view.inputmethod.InputContentInfoCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.documentfile.provider.DocumentFile;
+import androidx.recyclerview.widget.RecyclerView.Adapter;
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 
@@ -94,7 +95,16 @@ import com.cheogram.android.WebxdcStore;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.base.Optional;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Ordering;
+
+import com.otaliastudios.autocomplete.Autocomplete;
+import com.otaliastudios.autocomplete.AutocompleteCallback;
+import com.otaliastudios.autocomplete.AutocompletePresenter;
+import com.otaliastudios.autocomplete.CharPolicy;
+import com.otaliastudios.autocomplete.RecyclerViewPresenter;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -110,12 +120,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
@@ -146,6 +158,7 @@ import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.ui.adapter.CommandAdapter;
 import eu.siacs.conversations.ui.adapter.MediaPreviewAdapter;
 import eu.siacs.conversations.ui.adapter.MessageAdapter;
+import eu.siacs.conversations.ui.adapter.UserAdapter;
 import eu.siacs.conversations.ui.util.ActivityResult;
 import eu.siacs.conversations.ui.util.Attachment;
 import eu.siacs.conversations.ui.util.ConversationMenuConfigurator;
@@ -969,18 +982,6 @@ public class ConversationFragment extends XmppFragment
                 body.delete(0, 6);
                 while (body.length() > 0 && Character.isWhitespace(body.charAt(0))) body.delete(0, 1);
             }
-            if (Pattern.compile("\\A@mods\\s.*").matcher(body).find()) {
-                body.delete(0, 5);
-                final var mods = new StringBuffer();
-                for (final var user : conversation.getMucOptions().getUsers()) {
-                    if (user.getRole().ranks(MucOptions.Role.MODERATOR)) {
-                        if (mods.length() > 0) mods.append(", ");
-                        mods.append(user.getNick());
-                    }
-                }
-                mods.append(":");
-                body.insert(0, mods.toString());
-            }
             if (conversation.getReplyTo() != null) {
                 if (Emoticons.isEmoji(body.toString().replaceAll("\\s", ""))) {
                     message = conversation.getReplyTo().react(body.toString().replaceAll("\\s", ""));
@@ -1494,6 +1495,104 @@ public class ConversationFragment extends XmppFragment
             newThreadTutorialToast("Cleared thread");
             return true;
         });
+
+        Autocomplete.<MucOptions.User>on(binding.textinput)
+            .with(activity.getDrawable(R.drawable.background_message_bubble))
+            .with(new CharPolicy('@'))
+            .with(new RecyclerViewPresenter<MucOptions.User>(activity) {
+                protected UserAdapter adapter;
+
+                @Override
+                protected Adapter instantiateAdapter() {
+                    adapter = new UserAdapter(false) {
+                        @Override
+                        public void onBindViewHolder(UserAdapter.ViewHolder viewHolder, int position) {
+                            super.onBindViewHolder(viewHolder, position);
+                            final var item = getItem(position);
+                            viewHolder.binding.getRoot().setOnClickListener(v -> {
+                                dispatchClick(item);
+                            });
+                        }
+                    };
+                    return adapter;
+                }
+
+                @Override
+                protected void onQuery(@Nullable CharSequence query) {
+                    getRecyclerView().getItemAnimator().endAnimations();
+                    final var allUsers = conversation.getMucOptions().getUsers();
+                    if (!conversation.getMucOptions().getUsersByRole(MucOptions.Role.MODERATOR).isEmpty()) {
+                        final var u = new MucOptions.User(conversation.getMucOptions(), null, "\0role:moderator", "Notify active moderators", new HashSet<>());
+                        u.setRole("participant");
+                        allUsers.add(u);
+                    }
+                    if (!allUsers.isEmpty()) {
+                        final var u = new MucOptions.User(conversation.getMucOptions(), null, "\0attention", "Notify active participants", new HashSet<>());
+                        u.setRole("participant");
+                        allUsers.add(u);
+                    }
+                    final String needle = query.toString().toLowerCase(Locale.getDefault());
+                    adapter.submitList(
+                        Ordering.natural().immutableSortedCopy(Collections2.filter(
+                            allUsers,
+                            user -> {
+                                if ("mods".contains(needle) && "\0role:moderator".equals(user.getOccupantId())) return true;
+                                if ("here".contains(needle) && "\0attention".equals(user.getOccupantId())) return true;
+                                final String name = user.getNick();
+                                if (name == null) return false;
+                                for (final var hat : user.getHats()) {
+                                    if (hat.toString().toLowerCase(Locale.getDefault()).contains(needle)) return true;
+                                }
+                                for (final var hat : user.getPseudoHats(activity)) {
+                                    if (hat.toString().toLowerCase(Locale.getDefault()).contains(needle)) return true;
+                                }
+                                final Contact contact = user.getContact();
+                                return name.toLowerCase(Locale.getDefault()).contains(needle)
+                                    || contact != null
+                                    && contact.getDisplayName().toLowerCase(Locale.getDefault()).contains(needle);
+                            })));
+                }
+
+                @Override
+                protected AutocompletePresenter.PopupDimensions getPopupDimensions() {
+                    final var dim = new AutocompletePresenter.PopupDimensions();
+                    dim.width = displayMetrics.widthPixels * 4/5;
+                    return dim;
+                }
+            })
+            .with(new AutocompleteCallback<MucOptions.User>() {
+                @Override
+                public boolean onPopupItemClicked(Editable editable, MucOptions.User user) {
+                    int[] range = com.otaliastudios.autocomplete.CharPolicy.getQueryRange(editable);
+                    if (range == null) return false;
+                    range[0] -= 1;
+                    if ("\0attention".equals(user.getOccupantId())) {
+	                    editable.delete(Math.max(0, range[0]), Math.min(editable.length(), range[1]));
+                        editable.insert(0, "@here ");
+                        return true;
+                    }
+                    int colon = editable.toString().indexOf(':');
+                    final var beforeColon = range[0] < colon;
+                    String prefix = "";
+                    String suffix = " ";
+                    if (beforeColon) suffix = ", ";
+                    if (colon < 0 && range[0] == 0) suffix = ": ";
+                    if (colon > 0 && colon == range[0] - 2) {
+                        prefix = ", ";
+                        suffix = ": ";
+                        range[0] -= 2;
+                    }
+                    var insert = user.getNick();
+                    if ("\0role:moderator".equals(user.getOccupantId())) {
+                        insert = conversation.getMucOptions().getUsersByRole(MucOptions.Role.MODERATOR).stream().map(MucOptions.User::getNick).collect(Collectors.joining(", "));
+                    }
+                    editable.replace(Math.max(0, range[0]), Math.min(editable.length(), range[1]), prefix + insert + suffix);
+                    return true;
+                }
+
+                @Override
+                public void onPopupVisibilityChanged(boolean shown) {}
+            }).build();
 
         final Pattern lastColonPattern = Pattern.compile("(?<!\\w):");
         emojiSearchBinding = DataBindingUtil.inflate(inflater, R.layout.emoji_search, null, false);
