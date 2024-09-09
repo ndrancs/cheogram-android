@@ -45,6 +45,7 @@ public class AppSettings {
     public static final String SEND_CRASH_REPORTS = "send_crash_reports";
     public static final String COLORFUL_CHAT_BUBBLES = "use_green_background";
     public static final String LARGE_FONT = "large_font";
+    public static final String SHOW_LINK_PREVIEWS = "show_link_previews";
 
     private static final String ACCEPT_INVITES_FROM_STRANGERS = "accept_invites_from_strangers";
     private static final String INSTALLATION_ID = "im.conversations.android.install_id";
@@ -106,6 +107,10 @@ public class AppSettings {
 
     public boolean isLargeFont() {
         return getBooleanPreference(LARGE_FONT, R.bool.large_font);
+    }
+
+    public boolean showLinkPreviews() {
+        return getBooleanPreference(SHOW_LINK_PREVIEWS, R.bool.show_link_previews);
     }
 
     public boolean isUseTor() {
