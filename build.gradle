@@ -124,6 +124,7 @@ dependencies {
     implementation 'me.xdrop:fuzzywuzzy:1.4.0'
     implementation 'net.fellbaum:jemoji:1.4.1'
     implementation 'com.github.natario1:Autocomplete:v1.1.0'
+    implementation 'com.mikepenz:materialdrawer:9.0.1'
 }
 
 ext {

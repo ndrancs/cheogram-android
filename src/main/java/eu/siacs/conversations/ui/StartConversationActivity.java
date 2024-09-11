@@ -123,6 +123,7 @@ public class StartConversationActivity extends XmppActivity
             "contact_list_integration_consent";
 
     public static final String EXTRA_INVITE_URI = "eu.siacs.conversations.invite_uri";
+    public static final String EXTRA_ACCOUNT_FILTER = "account_filter";
 
     private final int REQUEST_SYNC_CONTACTS = 0x28cf;
     private final int REQUEST_CREATE_CONFERENCE = 0x39da;
@@ -278,8 +279,22 @@ public class StartConversationActivity extends XmppActivity
     }
 
     public static void launch(Context context) {
+        launch(context, null);
+    }
+
+    public static void launch(Context context, final Account account) {
         final Intent intent = new Intent(context, StartConversationActivity.class);
+        if (account != null) {
+            intent.putExtra(
+                EXTRA_ACCOUNT_FILTER,
+                account.getJid().asBareJid().toEscapedString());
+        }
         context.startActivity(intent);
+    }
+
+    @Override
+    public boolean colorCodeAccounts() {
+        return mActivatedAccounts.size() > 1;
     }
 
     private static Intent createLauncherIntent(Context context) {
@@ -361,9 +376,10 @@ public class StartConversationActivity extends XmppActivity
 
         if (intent.getBooleanExtra("init", false)) {
             pendingViewIntent.push(intent);
-        }
-
-        if (isViewIntent(intent)) {
+        } else if(intent.hasExtra(EXTRA_ACCOUNT_FILTER)) {
+            pendingViewIntent.push(intent);
+            setIntent(intent);
+        } else if (isViewIntent(intent)) {
             pendingViewIntent.push(intent);
             createdByViewIntent = true;
             setIntent(createLauncherIntent(this));
@@ -1093,10 +1109,16 @@ public class StartConversationActivity extends XmppActivity
                     mPostponedActivityResult.first, RESULT_OK, mPostponedActivityResult.second);
             this.mPostponedActivityResult = null;
         }
+        var intent = pendingViewIntent.pop();
+        if (intent == null) intent = getIntent();
         this.mActivatedAccounts.clear();
-        this.mActivatedAccounts.addAll(AccountUtils.getEnabledAccounts(xmppConnectionService));
+        final String accountFilterJid = intent == null ? null : intent.getStringExtra(EXTRA_ACCOUNT_FILTER);
+        if (accountFilterJid == null) {
+            this.mActivatedAccounts.addAll(AccountUtils.getEnabledAccounts(xmppConnectionService));
+        } else {
+            this.mActivatedAccounts.add(accountFilterJid);
+        }
         configureHomeButton();
-        Intent intent = pendingViewIntent.pop();
 
         final boolean onboardingCancel = xmppConnectionService.getPreferences().getString("onboarding_action", "").equals("cancel");
         if (onboardingCancel) xmppConnectionService.getPreferences().edit().remove("onboarding_action").commit();
@@ -1286,36 +1308,37 @@ public class StartConversationActivity extends XmppActivity
     protected void filterContacts(String needle) {
         this.contacts.clear();
         ArrayList<ListItem.Tag> tags = new ArrayList<>();
-        final List<Account> accounts = xmppConnectionService.getAccounts();
+        final var accounts = new ArrayList<Account>();
+        for (final var account : xmppConnectionService.getAccounts()) {
+            if (mActivatedAccounts.contains(account.getJid().asBareJid().toEscapedString())) accounts.add(account);
+        }
         boolean foundSopranica = false;
         for (final Account account : accounts) {
-            if (account.isEnabled()) {
-                for (Contact contact : account.getRoster().getContacts()) {
-                    Presence.Status s = contact.getShownStatus();
-                    if (contact.showInContactList()
-                            && contact.match(this, needle)
-                            && (!this.mHideOfflineContacts
-                                    || (needle != null && !needle.trim().isEmpty())
-                                    || s.compareTo(Presence.Status.OFFLINE) < 0)) {
-                        this.contacts.add(contact);
-                        tags.addAll(contact.getTags(this));
-                    }
+            for (Contact contact : account.getRoster().getContacts()) {
+                Presence.Status s = contact.getShownStatus();
+                if (contact.showInContactList()
+                    && contact.match(this, needle)
+                    && (!this.mHideOfflineContacts
+                        || (needle != null && !needle.trim().isEmpty())
+                        || s.compareTo(Presence.Status.OFFLINE) < 0)) {
+                    this.contacts.add(contact);
+                    tags.addAll(contact.getTags(this));
                 }
+            }
 
-                final Contact self = new Contact(account.getSelfContact());
-                self.setSystemName("Note to Self");
-                if (self.match(this, needle)) {
-                    this.contacts.add(self);
-                }
+            final Contact self = new Contact(account.getSelfContact());
+            self.setSystemName("Note to Self");
+            if (self.match(this, needle)) {
+                this.contacts.add(self);
+            }
 
-                for (Bookmark bookmark : account.getBookmarks()) {
-                    if (bookmark.match(this, needle)) {
-                        if (bookmark.getJid().toString().equals("discuss@conference.soprani.ca")) {
-                            foundSopranica = true;
-                        }
-                        this.contacts.add(bookmark);
-                        tags.addAll(bookmark.getTags(this));
+            for (Bookmark bookmark : account.getBookmarks()) {
+                if (bookmark.match(this, needle)) {
+                    if (bookmark.getJid().toString().equals("discuss@conference.soprani.ca")) {
+                        foundSopranica = true;
                     }
+                    this.contacts.add(bookmark);
+                    tags.addAll(bookmark.getTags(this));
                 }
             }
         }
