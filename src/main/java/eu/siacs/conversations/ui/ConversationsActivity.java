@@ -191,6 +191,8 @@ public class ConversationsActivity extends XmppActivity implements OnConversatio
         refreshForNewCaps = false;
         newCapsJids.clear();
 
+        if (accountHeader == null) return;
+
         final var accounts = xmppConnectionService.getAccounts();
         final var inHeader = new HashSet<>();
         for (final var p : ImmutableList.copyOf(accountHeader.getProfiles())) {
