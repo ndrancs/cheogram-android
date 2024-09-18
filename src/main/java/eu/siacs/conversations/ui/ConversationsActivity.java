@@ -333,7 +333,7 @@ public class ConversationsActivity extends XmppActivity implements OnConversatio
         }
         showDialogsIfMainIsOverview();
 
-        if (accountHeader != null) {
+        if (accountHeader != null || binding == null || binding.drawer == null) {
             refreshUiReal();
             return;
         }
