@@ -325,6 +325,7 @@ public class ConversationsActivity extends XmppActivity implements OnConversatio
             handleActivityResult(activityResult);
         }
 
+        invalidateActionBarTitle();
         if (binding.secondaryFragment != null && ConversationFragment.getConversation(this) == null) {
             Conversation conversation = ConversationsOverviewFragment.getSuggestion(this);
             if (conversation != null) {
