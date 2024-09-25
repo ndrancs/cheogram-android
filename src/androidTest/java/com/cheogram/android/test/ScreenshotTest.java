@@ -111,7 +111,6 @@ public class ScreenshotTest {
 		conversation.getContact().setPhotoUri("android.resource://" + pkg + "/" + String.valueOf(R.drawable.pepper));
 
 		Message voicemail = new Message(conversation, "", 0, Message.STATUS_RECEIVED);
-		voicemail.setOob("https://example.com/thing.mp3");
 		voicemail.setFileParams(new Message.FileParams("https://example.com/thing.mp3|5000|0|0|10000"));
 		voicemail.setType(Message.TYPE_FILE);
 		voicemail.setSubject("Voicemail Recording");
@@ -120,7 +119,7 @@ public class ScreenshotTest {
 		transcript.setSubject("Voicemail Transcription");
 
 		Message picture = new Message(conversation, "", 0, Message.STATUS_SEND_RECEIVED);
-		picture.setOob("https://example.com/thing.webp");
+		picture.setFileParams(new Message.FileParams("https://example.com/thing.webp"));
 		picture.setType(Message.TYPE_FILE);
 		xmppConnectionService.getFileBackend().copyFileToPrivateStorage(
 			picture,
