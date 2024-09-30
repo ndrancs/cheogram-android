@@ -1087,7 +1087,7 @@ public class ConversationsActivity extends XmppActivity implements OnConversatio
                     }
                     return true;
                 } else {
-                    binding.drawer.getDrawerLayout().openDrawer(binding.drawer);
+                    if (binding.drawer != null) binding.drawer.getDrawerLayout().openDrawer(binding.drawer);
                     return true;
                 }
             case R.id.action_scan_qr_code:
@@ -1238,7 +1238,7 @@ public class ConversationsActivity extends XmppActivity implements OnConversatio
         ToolbarUtils.resetActionBarOnClickListeners(binding.toolbar);
         ToolbarUtils.setActionBarOnClickListener(
                 binding.toolbar,
-                (v) -> { binding.drawer.getDrawerLayout().openDrawer(binding.drawer); }
+                (v) -> { if (binding.drawer != null) binding.drawer.getDrawerLayout().openDrawer(binding.drawer); }
         );
     }
 
