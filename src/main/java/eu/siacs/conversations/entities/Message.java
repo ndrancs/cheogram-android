@@ -1354,6 +1354,10 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
         return result;
     }
 
+    public synchronized void clearLinkDescriptions() {
+        this.payloads.removeAll(getLinkDescriptions());
+    }
+
     public String getMimeType() {
         String extension;
         if (relativeFilePath != null) {
