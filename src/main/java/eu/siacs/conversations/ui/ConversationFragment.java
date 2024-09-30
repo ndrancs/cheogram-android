@@ -1863,6 +1863,7 @@ public class ConversationFragment extends XmppFragment
             }
             if (!showError
                     && relevantForCorrection.getType() == Message.TYPE_TEXT
+                    && relevantForCorrection.isEditable()
                     && !m.isGeoUri()
                     && m.getConversation() instanceof Conversation) {
                 correctMessage.setVisible(true);
@@ -1870,10 +1871,6 @@ public class ConversationFragment extends XmppFragment
             }
             if (relevantForCorrection.getStatus() == Message.STATUS_WAITING) {
                 correctMessage.setVisible(true);
-                retractMessage.setVisible(true);
-            }
-            if (relevantForCorrection.getReactions() != null) {
-                correctMessage.setVisible(false);
                 retractMessage.setVisible(true);
             }
             if (conversation.getMode() == Conversation.MODE_MULTI && m.getServerMsgId() != null && m.getModerated() == null && conversation.getMucOptions().getSelf().getRole().ranks(MucOptions.Role.MODERATOR) && conversation.getMucOptions().hasFeature("urn:xmpp:message-moderate:0")) {
