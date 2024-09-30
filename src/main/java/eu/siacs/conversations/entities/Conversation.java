@@ -519,6 +519,17 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
         return null;
     }
 
+    public Message findMessageWithUuidOrRemoteId(final String id) {
+        synchronized (this.messages) {
+            for (final Message message : this.messages) {
+                if (id.equals(message.getUuid()) || id.equals(message.getRemoteMsgId())) {
+                    return message;
+                }
+            }
+        }
+        return null;
+    }
+
     public Message findMessageWithRemoteIdAndCounterpart(String id, Jid counterpart) {
         synchronized (this.messages) {
             for (int i = this.messages.size() - 1; i >= 0; --i) {
@@ -602,7 +613,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
                 if (reactor != null && message.getCounterpart() == null) continue;
                 if (reactor != null && !(message.getCounterpart().equals(reactor) || message.getCounterpart().asBareJid().equals(reactor))) continue;
 
-                final Element r = message.getReactions();
+                final Element r = message.getReactionsEl();
                 if (r != null && r.getAttribute("id") != null && id.equals(r.getAttribute("id"))) {
                     return message;
                 }
@@ -628,7 +639,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
     public Set<String> findReactionsTo(String id, Jid reactor) {
         Set<String> reactionEmoji = new HashSet<>();
         Message reactM = findMessageReactingTo(id, reactor);
-        Element reactions = reactM == null ? null : reactM.getReactions();
+        Element reactions = reactM == null ? null : reactM.getReactionsEl();
         if (reactions != null) {
             for (Element el : reactions.getChildren()) {
                 if (el.getName().equals("reaction") && el.getNamespace().equals("urn:xmpp:reactions:0")) {
@@ -696,7 +707,7 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
             } else if (getLockThread() && mthread != null) {
                 Element reply = m.getReply();
                 if (reply != null && reply.getAttribute("id") != null) extraIds.add(reply.getAttribute("id"));
-                Element reactions = m.getReactions();
+                Element reactions = m.getReactionsEl();
                 if (reactions != null && reactions.getAttribute("id") != null) extraIds.add(reactions.getAttribute("id"));
             }
         }

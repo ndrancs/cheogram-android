@@ -704,7 +704,7 @@ public class ConferenceDetailsActivity extends XmppActivity implements OnConvers
             final ImmutableList.Builder<Integer> viewIdBuilder = new ImmutableList.Builder<>();
             for (final ListItem.Tag tag : tagList) {
                 final String name = tag.getName();
-                final TextView tv = (TextView) inflater.inflate(R.layout.list_item_tag, binding.tags, false);
+                final TextView tv = (TextView) inflater.inflate(R.layout.item_tag, binding.tags, false);
                 tv.setText(name);
                 tv.setBackgroundTintList(ColorStateList.valueOf(MaterialColors.harmonizeWithPrimary(this,XEP0392Helper.rgbFromNick(name))));
                 final int id = ViewCompat.generateViewId();

@@ -35,7 +35,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.databinding.DataBindingUtil;
@@ -610,7 +609,7 @@ public class ContactDetailsActivity extends OmemoActivity implements OnAccountUp
             final ImmutableList.Builder<Integer> viewIdBuilder = new ImmutableList.Builder<>();
             for (final ListItem.Tag tag : tagList) {
                 final String name = tag.getName();
-                final TextView tv = (TextView) inflater.inflate(R.layout.list_item_tag, binding.tags, false);
+                final TextView tv = (TextView) inflater.inflate(R.layout.item_tag, binding.tags, false);
                 tv.setText(name);
                 tv.setBackgroundTintList(ColorStateList.valueOf(MaterialColors.harmonizeWithPrimary(this,XEP0392Helper.rgbFromNick(name))));
                 final int id = ViewCompat.generateViewId();
@@ -622,7 +621,7 @@ public class ContactDetailsActivity extends OmemoActivity implements OnAccountUp
                 final TextView tv =
                         (TextView)
                                 inflater.inflate(
-                                        R.layout.list_item_tag, binding.tags, false);
+                                        R.layout.item_tag, binding.tags, false);
                 tv.setText(R.string.blocked);
                 tv.setBackgroundTintList(ColorStateList.valueOf(MaterialColors.harmonizeWithPrimary(tv.getContext(), ContextCompat.getColor(tv.getContext(),R.color.gray_800))));
                 final int id = ViewCompat.generateViewId();
@@ -635,7 +634,7 @@ public class ContactDetailsActivity extends OmemoActivity implements OnAccountUp
                     final TextView tv =
                             (TextView)
                                     inflater.inflate(
-                                            R.layout.list_item_tag, binding.tags, false);
+                                            R.layout.item_tag, binding.tags, false);
                     UIHelper.setStatus(tv, status);
                     final int id = ViewCompat.generateViewId();
                     tv.setId(id);

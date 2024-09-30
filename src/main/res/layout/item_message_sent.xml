@@ -2,20 +2,18 @@
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <RelativeLayout
-        android:layout_width="fill_parent"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:paddingHorizontal="8dp"
         android:paddingVertical="4dp">
-
 
         <LinearLayout
             android:id="@+id/message_photo_box"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentBottom="true"
+            app:layout_constraintBottom_toBottomOf="@id/message_box"
+            app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginStart="0dp"
             android:orientation="vertical">
 
@@ -27,18 +25,20 @@
                 app:shapeAppearance="@style/ShapeAppearanceOverlay.Photo" />
         </LinearLayout>
 
-
         <LinearLayout
             android:id="@+id/message_box"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:layout_toStartOf="@+id/message_photo_box"
             android:background="@drawable/message_bubble_sent"
             android:backgroundTint="?colorSecondaryContainer"
             android:longClickable="true"
+            android:minHeight="48dp"
             android:paddingRight="7dp"
-            android:minHeight="48dp">
+            app:layout_constrainedWidth="true"
+            app:layout_constraintEnd_toStartOf="@id/message_photo_box"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
             <LinearLayout
                 android:id="@+id/message_box_inner"
@@ -130,5 +130,26 @@
                 </com.wefika.flowlayout.FlowLayout>
             </LinearLayout>
         </LinearLayout>
-    </RelativeLayout>
+
+        <Space
+            android:id="@+id/reactions_anchor"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginBottom="4dp"
+            app:layout_constraintBottom_toBottomOf="@+id/message_box"
+            app:layout_constraintEnd_toEndOf="@+id/message_box" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/reactions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:orientation="horizontal"
+            android:visibility="visible"
+            app:chipSpacingHorizontal="4dp"
+            app:layout_constraintEnd_toEndOf="@+id/message_box"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintTop_toBottomOf="@+id/reactions_anchor" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

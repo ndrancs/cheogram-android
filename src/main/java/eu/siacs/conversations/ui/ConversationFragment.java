@@ -1803,6 +1803,7 @@ public class ConversationFragment extends XmppFragment
                                     || t instanceof HttpDownloadConnection);
             activity.getMenuInflater().inflate(R.menu.message_context, menu);
             final MenuItem reportAndBlock = menu.findItem(R.id.action_report_and_block);
+            final MenuItem addReaction = menu.findItem(R.id.action_add_reaction);
             MenuItem openWith = menu.findItem(R.id.open_with);
             MenuItem copyMessage = menu.findItem(R.id.copy_message);
             MenuItem quoteMessage = menu.findItem(R.id.quote_message);
@@ -1838,6 +1839,14 @@ public class ConversationFragment extends XmppFragment
                 }
             }
             if (!encrypted && !m.getBody().equals("")) {
+                addReaction.setVisible(!showError && !m.isDeleted());
+            }
+            if (!m.isFileOrImage()
+                    && !encrypted
+                    && !m.isGeoUri()
+                    && !m.treatAsDownloadable()
+                    && !unInitiatedButKnownSize
+                    && t == null) {
                 copyMessage.setVisible(true);
             }
             quoteMessage.setVisible(!encrypted && !showError);
@@ -1945,10 +1954,10 @@ public class ConversationFragment extends XmppFragment
                             activity.xmppConnectionService.deleteMessage(message);
                             return;
                         }
-                        Element reactions = message.getReactions();
+                        Element reactions = message.getReactionsEl();
                         if (reactions != null) {
                             final Message previousReaction = conversation.findMessageReactingTo(reactions.getAttribute("id"), null);
-                            if (previousReaction != null) reactions = previousReaction.getReactions();
+                            if (previousReaction != null) reactions = previousReaction.getReactionsEl();
                             for (Element el : reactions.getChildren()) {
                                 if (message.getRawBody().endsWith(el.getContent())) {
                                     reactions.removeChild(el);
@@ -2052,6 +2061,9 @@ public class ConversationFragment extends XmppFragment
                 return true;
             case R.id.action_report_and_block:
                 reportMessage(selectedMessage);
+                return true;
+            case R.id.action_add_reaction:
+                addReaction(selectedMessage);
                 return true;
             default:
                 return onOptionsItemSelected(item);
@@ -2873,6 +2885,10 @@ public class ConversationFragment extends XmppFragment
                     activity.xmppConnectionService.getFileBackend().getFile(message);
             ViewUtil.view(activity, file);
         }
+    }
+
+    private void addReaction(final Message message) {
+        activity.addReaction(message, reactions -> activity.xmppConnectionService.sendReactions(message, reactions));
     }
 
     private void reportMessage(final Message message) {

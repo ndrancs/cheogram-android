@@ -60,6 +60,7 @@ import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.ImmutableSet;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -75,15 +76,16 @@ import eu.siacs.conversations.BuildConfig;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.PgpEngine;
+import eu.siacs.conversations.databinding.DialogAddReactionBinding;
 import eu.siacs.conversations.databinding.DialogQuickeditBinding;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.Presences;
+import eu.siacs.conversations.entities.Reaction;
 import eu.siacs.conversations.services.AvatarService;
 import eu.siacs.conversations.services.BarcodeProvider;
-import eu.siacs.conversations.services.EmojiInitializationService;
 import eu.siacs.conversations.services.QuickConversationsService;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.services.XmppConnectionService.XmppConnectionBinder;
@@ -103,8 +105,11 @@ import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
 
 public abstract class XmppActivity extends ActionBarActivity {
 
@@ -199,9 +204,11 @@ public abstract class XmppActivity extends ActionBarActivity {
     }
 
     protected void hideToast() {
-        if (mToast != null) {
-            mToast.cancel();
+        final var toast = this.mToast;
+        if (toast == null) {
+            return;
         }
+        toast.cancel();
     }
 
     protected void replaceToast(String msg) {
@@ -286,27 +293,64 @@ public abstract class XmppActivity extends ActionBarActivity {
                             XmppConnectionService.class));
                     finish();
                 });
-        builder.setPositiveButton(getString(R.string.install),
+        builder.setPositiveButton(
+                getString(R.string.install),
                 (dialog, which) -> {
-                    Uri uri = Uri
-                            .parse("market://details?id=org.sufficientlysecure.keychain");
-                    Intent marketIntent = new Intent(Intent.ACTION_VIEW,
-                            uri);
-                    PackageManager manager = getApplicationContext()
-                            .getPackageManager();
-                    List<ResolveInfo> infos = manager
-                            .queryIntentActivities(marketIntent, 0);
-                    if (infos.size() > 0) {
-                        startActivity(marketIntent);
+                    final Uri uri =
+                            Uri.parse("market://details?id=org.sufficientlysecure.keychain");
+                    Intent marketIntent = new Intent(Intent.ACTION_VIEW, uri);
+                    PackageManager manager = getApplicationContext().getPackageManager();
+                    final var infos = manager.queryIntentActivities(marketIntent, 0);
+                    if (infos.isEmpty()) {
+                        final var website = Uri.parse("http://www.openkeychain.org/");
+                        final Intent browserIntent = new Intent(Intent.ACTION_VIEW, website);
+                        try {
+                            startActivity(browserIntent);
+                        } catch (final ActivityNotFoundException e) {
+                            Toast.makeText(
+                                            this,
+                                            R.string.application_found_to_open_website,
+                                            Toast.LENGTH_LONG)
+                                    .show();
+                        }
                     } else {
-                        uri = Uri.parse("http://www.openkeychain.org/");
-                        Intent browserIntent = new Intent(
-                                Intent.ACTION_VIEW, uri);
-                        startActivity(browserIntent);
+                        startActivity(marketIntent);
                     }
                     finish();
                 });
         builder.create().show();
+    }
+
+    public void addReaction(final Message message, Consumer<Collection<String>> callback) {
+        final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
+        final var layoutInflater = this.getLayoutInflater();
+        final DialogAddReactionBinding viewBinding =
+                DataBindingUtil.inflate(layoutInflater, R.layout.dialog_add_reaction, null, false);
+        builder.setView(viewBinding.getRoot());
+        final var dialog = builder.create();
+        for (final String emoji : Reaction.SUGGESTIONS) {
+            final Button button =
+                    (Button)
+                            layoutInflater.inflate(
+                                    R.layout.item_emoji_button, viewBinding.emojis, false);
+            viewBinding.emojis.addView(button);
+            button.setText(emoji);
+            button.setOnClickListener(
+                    v -> {
+                        final var aggregated = message.getAggregatedReactions();
+                        if (aggregated.ourReactions.contains(emoji)) {
+                            callback.accept(aggregated.ourReactions);
+                        } else {
+                            final ImmutableSet.Builder<String> reactionBuilder =
+                                    new ImmutableSet.Builder<>();
+                            reactionBuilder.addAll(aggregated.ourReactions);
+                            reactionBuilder.add(emoji);
+                            callback.accept(reactionBuilder.build());
+                        }
+                        dialog.dismiss();
+                    });
+        }
+        dialog.show();
     }
 
     protected void deleteAccount(final Account account) {
@@ -508,7 +552,6 @@ public abstract class XmppActivity extends ActionBarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         metrics = getResources().getDisplayMetrics();
-        EmojiInitializationService.execute(this);
         this.isCameraFeatureAvailable = getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY);
         this.mCustomColors = ThemeHelper.applyCustomColors(this);
     }

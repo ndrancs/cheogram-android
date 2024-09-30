@@ -30,10 +30,12 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListAdapter;
@@ -64,11 +66,17 @@ import com.cheogram.android.Util;
 import com.cheogram.android.WebxdcPage;
 import com.cheogram.android.WebxdcUpdate;
 
+import androidx.emoji2.emojipicker.EmojiViewItem;
+import androidx.emoji2.emojipicker.RecentEmojiProvider;
+
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.color.MaterialColors;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.lelloman.identicon.view.GithubIdenticonView;
 
@@ -94,6 +102,7 @@ import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
 import eu.siacs.conversations.databinding.LinkDescriptionBinding;
+import eu.siacs.conversations.databinding.DialogAddReactionBinding;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
@@ -109,6 +118,7 @@ import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.services.MessageArchiveService;
 import eu.siacs.conversations.services.NotificationService;
 import eu.siacs.conversations.ui.Activities;
+import eu.siacs.conversations.ui.BindingAdapters;
 import eu.siacs.conversations.ui.ConversationFragment;
 import eu.siacs.conversations.ui.ConversationsActivity;
 import eu.siacs.conversations.ui.XmppActivity;
@@ -132,12 +142,14 @@ import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.mam.MamReference;
 import eu.siacs.conversations.xml.Element;
+import kotlin.coroutines.Continuation;
 
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -1126,6 +1138,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                     viewHolder.audioPlayer = view.findViewById(R.id.audio_player);
                     viewHolder.link_descriptions = view.findViewById(R.id.link_descriptions);
                     viewHolder.thread_identicon = view.findViewById(R.id.thread_identicon);
+                    viewHolder.reactions = view.findViewById(R.id.reactions);
                     break;
                 case RECEIVED:
                     view = activity.getLayoutInflater().inflate(R.layout.item_message_received, parent, false);
@@ -1149,6 +1162,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                     viewHolder.commands_list = view.findViewById(R.id.commands_list);
                     viewHolder.link_descriptions = view.findViewById(R.id.link_descriptions);
                     viewHolder.thread_identicon = view.findViewById(R.id.thread_identicon);
+                    viewHolder.reactions = view.findViewById(R.id.reactions);
                     break;
                 case STATUS:
                     view =
@@ -1518,6 +1532,16 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                             CryptoHelper.encryptionTypeToText(message.getEncryption()));
                 }
             }
+            BindingAdapters.setReactionsOnReceived(
+                    viewHolder.reactions,
+                    message.getAggregatedReactions(),
+                    reactions -> sendReactions(message, reactions),
+                    () -> addReaction(message));
+        } else if (type == SENT) {
+            BindingAdapters.setReactionsOnSent(
+                    viewHolder.reactions,
+                    message.getAggregatedReactions(),
+                    reactions -> sendReactions(message, reactions));
         }
 
         if (type == RECEIVED || type == SENT) {
@@ -1583,6 +1607,17 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         });
 
         return view;
+    }
+
+    private void sendReactions(final Message message, final Collection<String> reactions) {
+        if (activity.xmppConnectionService.sendReactions(message, reactions)) {
+            return;
+        }
+        Toast.makeText(activity, R.string.could_not_add_reaction, Toast.LENGTH_LONG).show();
+    }
+
+    private void addReaction(final Message message) {
+        activity.addReaction(message, reactions -> activity.xmppConnectionService.sendReactions(message,reactions));
     }
 
     private void promptOpenKeychainInstall(View view) {
@@ -1792,6 +1827,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         protected ListView commands_list;
         protected ListView link_descriptions;
         protected GithubIdenticonView thread_identicon;
+        protected ChipGroup reactions;
     }
 
     class ThumbnailTask extends AsyncTask<DownloadableFile, Void, Drawable[]> {

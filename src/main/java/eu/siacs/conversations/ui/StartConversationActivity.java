@@ -1832,7 +1832,7 @@ public class StartConversationActivity extends XmppActivity
 
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {
-            View view = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.list_item_tag, null);
+            View view = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.item_tag, null);
             return new ViewHolder(view);
         }
 
