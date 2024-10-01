@@ -39,8 +39,8 @@ public class Reaction {
                     "\uD83D\uDC4D",
                     "\uD83D\uDC4E",
                     "\uD83D\uDE02",
-                    "\uD83D\uDE2E",
-                    "\uD83D\uDE22");
+                    "\u2757",
+                    "\u2753");
 
     private static final Gson GSON;
 
