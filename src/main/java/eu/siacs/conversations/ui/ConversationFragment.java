@@ -1851,7 +1851,7 @@ public class ConversationFragment extends XmppFragment
                     reportAndBlock.setVisible(true);
                 }
             }
-            if (!encrypted && !m.getBody().equals("")) {
+            if (!encrypted) {
                 addReaction.setVisible(!showError && !m.isDeleted());
             }
             if (!m.isFileOrImage()
