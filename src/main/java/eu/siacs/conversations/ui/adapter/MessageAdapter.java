@@ -1534,13 +1534,13 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             }
             BindingAdapters.setReactionsOnReceived(
                     viewHolder.reactions,
-                    message.getAggregatedReactions(),
+                    conversation instanceof Conversation ? ((Conversation) conversation).aggregatedReactionsFor(message) : message.getAggregatedReactions(),
                     reactions -> sendReactions(message, reactions),
                     () -> addReaction(message));
         } else if (type == SENT) {
             BindingAdapters.setReactionsOnReceived(
                     viewHolder.reactions,
-                    message.getAggregatedReactions(),
+                    conversation instanceof Conversation ? ((Conversation) conversation).aggregatedReactionsFor(message) : message.getAggregatedReactions(),
                     reactions -> sendReactions(message, reactions),
                     () -> addReaction(message));
         }
