@@ -5288,7 +5288,8 @@ public class XmppConnectionService extends Service {
                                 false,
                                 self.getFullJid(),
                                 conversation.getAccount().getJid(),
-                                occupantId);
+                                occupantId,
+                                null);
             } else {
                 if (message.isCarbon() || message.getStatus() == Message.STATUS_RECEIVED) {
                     reactToId = message.getRemoteMsgId();
@@ -5300,7 +5301,8 @@ public class XmppConnectionService extends Service {
                                 message.getReactions(),
                                 reactions,
                                 false,
-                                conversation.getAccount().getJid());
+                                conversation.getAccount().getJid(),
+                                null);
             }
             if (Strings.isNullOrEmpty(reactToId)) {
                 return false;
