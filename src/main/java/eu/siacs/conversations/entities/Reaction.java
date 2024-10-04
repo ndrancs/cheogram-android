@@ -2,6 +2,9 @@ package eu.siacs.conversations.entities;
 
 import androidx.annotation.NonNull;
 
+import com.cheogram.android.EmojiSearch;
+import com.cheogram.android.GetThumbnailForCid;
+
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
@@ -19,6 +22,8 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
+import io.ipfs.cid.Cid;
+
 import eu.siacs.conversations.xmpp.Jid;
 
 import java.io.IOException;
@@ -30,6 +35,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 public class Reaction {
 
@@ -45,7 +51,7 @@ public class Reaction {
     private static final Gson GSON;
 
     static {
-        GSON = new GsonBuilder().registerTypeAdapter(Jid.class, new JidTypeAdapter()).create();
+        GSON = new GsonBuilder().registerTypeAdapter(Jid.class, new JidTypeAdapter()).registerTypeAdapter(Cid.class, new CidTypeAdapter()).create();
     }
 
     public final String reaction;
@@ -53,14 +59,17 @@ public class Reaction {
     public final Jid from;
     public final Jid trueJid;
     public final String occupantId;
+    public final Cid cid;
 
     public Reaction(
             final String reaction,
+            final Cid cid,
             boolean received,
             final Jid from,
             final Jid trueJid,
             final String occupantId) {
         this.reaction = reaction;
+        this.cid = cid;
         this.received = received;
         this.from = from;
         this.trueJid = trueJid;
@@ -93,7 +102,7 @@ public class Reaction {
         builder.addAll(existing);
         builder.addAll(
                 Collections2.transform(
-                        reactions, r -> new Reaction(r, received, from, trueJid, occupantId)));
+                        reactions, r -> new Reaction(r, null, received, from, trueJid, occupantId)));
         return builder.build();
     }
 
@@ -108,7 +117,7 @@ public class Reaction {
         builder.addAll(Collections2.filter(existing, e -> !occupantId.equals(e.occupantId)));
         builder.addAll(
                 Collections2.transform(
-                        reactions, r -> new Reaction(r, received, from, trueJid, occupantId)));
+                        reactions, r -> new Reaction(r, null, received, from, trueJid, occupantId)));
         return builder.build();
     }
 
@@ -116,7 +125,8 @@ public class Reaction {
     @Override
     public String toString() {
         return MoreObjects.toStringHelper(this)
-                .add("reaction", reaction)
+                .add("reaction", cid == null ? reaction : null)
+                .add("cid", cid)
                 .add("received", received)
                 .add("from", from)
                 .add("trueJid", trueJid)
@@ -144,7 +154,7 @@ public class Reaction {
                 Collections2.filter(existing, e -> !from.asBareJid().equals(e.from.asBareJid())));
         builder.addAll(
                 Collections2.transform(
-                        reactions, r -> new Reaction(r, received, from, null, null)));
+                        reactions, r -> new Reaction(r, null, received, from, null, null)));
         return builder.build();
     }
 
@@ -171,31 +181,58 @@ public class Reaction {
         }
     }
 
+    private static class CidTypeAdapter extends TypeAdapter<Cid> {
+        @Override
+        public void write(final JsonWriter out, final Cid value) throws IOException {
+            if (value == null) {
+                out.nullValue();
+            } else {
+                out.value(value.toString());
+            }
+        }
+
+        @Override
+        public Cid read(final JsonReader in) throws IOException {
+            if (in.peek() == JsonToken.NULL) {
+                in.nextNull();
+                return null;
+            } else if (in.peek() == JsonToken.STRING) {
+                final String value = in.nextString();
+                return Cid.decode(value);
+            }
+            throw new IOException("Unexpected token");
+        }
+    }
+
     public static Aggregated aggregated(final Collection<Reaction> reactions) {
-        final Map<String, Integer> aggregatedReactions =
+        return aggregated(reactions, (r) -> null);
+    }
+
+    public static Aggregated aggregated(final Collection<Reaction> reactions, Function<Reaction, GetThumbnailForCid> thumbnailer) {
+        final Map<EmojiSearch.Emoji, Integer> aggregatedReactions =
                 Maps.transformValues(
-                        Multimaps.index(reactions, r -> r.reaction).asMap(), Collection::size);
-        final List<Map.Entry<String, Integer>> sortedList =
+                        Multimaps.index(reactions, r -> r.cid == null ? new EmojiSearch.Emoji(r.reaction, 0) : new EmojiSearch.CustomEmoji(r.reaction, r.cid.toString(), thumbnailer.apply(r).getThumbnail(r.cid), null)).asMap(), Collection::size);
+        final List<Map.Entry<EmojiSearch.Emoji, Integer>> sortedList =
                 Ordering.from(
                                 Comparator.comparingInt(
-                                        (Map.Entry<String, Integer> o) -> o.getValue()))
+                                        (Map.Entry<EmojiSearch.Emoji, Integer> o) -> o.getValue()))
                         .reverse()
                         .immutableSortedCopy(aggregatedReactions.entrySet());
         return new Aggregated(
                 sortedList,
                 ImmutableSet.copyOf(
                         Collections2.transform(
-                                Collections2.filter(reactions, r -> !r.received),
+                                Collections2.filter(reactions, r -> r.cid == null && !r.received),
                                 r -> r.reaction)));
     }
 
     public static final class Aggregated {
 
-        public final List<Map.Entry<String, Integer>> reactions;
+        public final List<Map.Entry<EmojiSearch.Emoji, Integer>> reactions;
         public final Set<String> ourReactions;
 
         private Aggregated(
-                final List<Map.Entry<String, Integer>> reactions, Set<String> ourReactions) {
+                final List<Map.Entry<EmojiSearch.Emoji, Integer>> reactions, Set<String> ourReactions) {
             this.reactions = reactions;
             this.ourReactions = ourReactions;
         }
