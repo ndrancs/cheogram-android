@@ -1262,7 +1262,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
 
     public List<URI> getLinks() {
         SpannableStringBuilder text = new SpannableStringBuilder(
-            getBody().replaceAll("^>.*", "") // Remove quotes
+            getBody(true).replaceAll("^>.*", "") // Remove quotes
         );
         return MyLinkify.extractLinks(text).stream().map((url) -> {
             try {
