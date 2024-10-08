@@ -312,7 +312,8 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
     public String findMostRecentRemoteDisplayableId() {
         final boolean multi = mode == Conversation.MODE_MULTI;
         synchronized (this.messages) {
-            for (final Message message : Lists.reverse(this.messages)) {
+            for (int i = messages.size() - 1; i >= 0; --i) {
+                final Message message = messages.get(i);
                 if (message.getSubject() != null && !message.isOOb() && (message.getRawBody() == null || message.getRawBody().length() == 0)) continue;
                 if ((message.getRawBody() == null || "".equals(message.getRawBody()) || " ".equals(message.getRawBody())) && message.getReply() != null && message.edited() && message.getHtml() != null) continue;
                 if (asReaction(message) != null) continue;
@@ -342,7 +343,8 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
 
     public Message getLastEditableMessage() {
         synchronized (this.messages) {
-            for (final Message message : Lists.reverse(this.messages)) {
+            for (int i = messages.size() - 1; i >= 0; --i) {
+                final Message message = messages.get(i);
                 if (message.isEditable()) {
                     if (message.isGeoUri() || message.getType() != Message.TYPE_TEXT) {
                         return null;
@@ -882,7 +884,15 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
 
     public long getSortableTime() {
         Draft draft = getDraft();
-        long messageTime = getLatestMessage().getTimeReceived();
+        final long messageTime;
+        synchronized (this.messages) {
+            if (this.messages.size() == 0) {
+                messageTime = Math.max(getCreated(), getLastClearHistory().getTimestamp());
+            } else {
+                messageTime = this.messages.get(this.messages.size() - 1).getTimeReceived();
+            }
+        }
+
         if (draft == null) {
             return messageTime;
         } else {
@@ -953,19 +963,20 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
 
     public Message getLatestMessage() {
         synchronized (this.messages) {
-            for(final Message message : Lists.reverse(this.messages)) {
+            for (int i = messages.size() - 1; i >= 0; --i) {
+                final Message message = messages.get(i);
                 if (message.getSubject() != null && !message.isOOb() && (message.getRawBody() == null || message.getRawBody().length() == 0)) continue;
-                if (asReaction(message) != null) continue;
                 if ((message.getRawBody() == null || "".equals(message.getRawBody()) || " ".equals(message.getRawBody())) && message.getReply() != null && message.edited() && message.getHtml() != null) continue;
+                if (asReaction(message) != null) continue;
                 return message;
             }
-
-            Message message = new Message(this, "", Message.ENCRYPTION_NONE);
-            message.setType(Message.TYPE_STATUS);
-            message.setTime(Math.max(getCreated(), getLastClearHistory().getTimestamp()));
-            message.setTimeReceived(Math.max(getCreated(), getLastClearHistory().getTimestamp()));
-            return message;
         }
+
+        Message message = new Message(this, "", Message.ENCRYPTION_NONE);
+        message.setType(Message.TYPE_STATUS);
+        message.setTime(Math.max(getCreated(), getLastClearHistory().getTimestamp()));
+        message.setTimeReceived(Math.max(getCreated(), getLastClearHistory().getTimestamp()));
+        return message;
     }
 
     public @NonNull
@@ -1127,7 +1138,15 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
     public @Nullable
     Draft getDraft() {
         long timestamp = getLongAttribute(ATTRIBUTE_NEXT_MESSAGE_TIMESTAMP, 0);
-        if (timestamp > getLatestMessage().getTimeSent()) {
+        final long messageTime;
+        synchronized (this.messages) {
+            if (this.messages.size() == 0) {
+                messageTime = Math.max(getCreated(), getLastClearHistory().getTimestamp());
+            } else {
+                messageTime = this.messages.get(this.messages.size() - 1).getTimeSent();
+            }
+        }
+        if (timestamp > messageTime) {
             String message = getAttribute(ATTRIBUTE_NEXT_MESSAGE);
             if (!TextUtils.isEmpty(message) && timestamp != 0) {
                 return new Draft(message, timestamp);
@@ -1424,7 +1443,8 @@ public class Conversation extends AbstractEntity implements Blockable, Comparabl
     public int unreadCount(XmppConnectionService xmppConnectionService) {
         synchronized (this.messages) {
             int count = 0;
-            for(final Message message : Lists.reverse(this.messages)) {
+            for (int i = messages.size() - 1; i >= 0; --i) {
+                final Message message = messages.get(i);
                 if (message.getSubject() != null && !message.isOOb() && (message.getRawBody() == null || message.getRawBody().length() == 0)) continue;
                 if (asReaction(message) != null) continue;
                 if ((message.getRawBody() == null || "".equals(message.getRawBody()) || " ".equals(message.getRawBody())) && message.getReply() != null && message.edited() && message.getHtml() != null) continue;
