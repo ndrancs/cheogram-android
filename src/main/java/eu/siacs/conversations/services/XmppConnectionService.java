@@ -1448,7 +1448,7 @@ public class XmppConnectionService extends Service {
         }
         updateMemorizingTrustManager();
         final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
-        final int cacheSize = maxMemory / 15;
+        final int cacheSize = maxMemory / 7;
         this.mDrawableCache = new LruCache<String, Drawable>(cacheSize) {
             @Override
             protected int sizeOf(final String key, final Drawable drawable) {
