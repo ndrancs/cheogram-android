@@ -1,0 +1,10 @@
+* Iniitial link preview UI
+* Many link preview metadata fixes
+* More traditional reactions UI
+* Add navigation drawer with account and tag filters
+* @mention autocomplete UI
+* Nicer emoji autocomplete UI
+* Android 15 related fixes
+* Support /me in replies
+* Show banned channel members to admins (so they can unban)
+* Allow correcting any message, not just most recent
