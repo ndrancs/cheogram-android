@@ -55,4 +55,5 @@
     <bool name="show_link_previews">true</bool>
     <bool name="compose_rich_text">true</bool>
     <bool name="auto_accept_unmetered">true</bool>
+    <string name="default_chat_requests">spam</string>
 </resources>
