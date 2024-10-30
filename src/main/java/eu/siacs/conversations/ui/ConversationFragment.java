@@ -89,6 +89,7 @@ import androidx.viewpager.widget.ViewPager;
 
 import com.cheogram.android.BobTransfer;
 import com.cheogram.android.EmojiSearch;
+import com.cheogram.android.EditMessageSelectionActionModeCallback;
 import com.cheogram.android.WebxdcPage;
 import com.cheogram.android.WebxdcStore;
 
@@ -1469,6 +1470,8 @@ public class ConversationFragment extends XmppFragment
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             this.binding.textinput.setCustomInsertionActionModeCallback(
                     new EditMessageActionModeCallback(this.binding.textinput));
+            this.binding.textinput.setCustomSelectionActionModeCallback(
+                    new EditMessageSelectionActionModeCallback(this.binding.textinput));
         }
 
         messageListAdapter.setOnMessageBoxClicked(message -> {
