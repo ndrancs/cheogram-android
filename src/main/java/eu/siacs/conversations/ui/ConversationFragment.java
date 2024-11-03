@@ -1370,6 +1370,7 @@ public class ConversationFragment extends XmppFragment
         final MenuItem menuOngoingCall = menu.findItem(R.id.action_ongoing_call);
         final MenuItem menuVideoCall = menu.findItem(R.id.action_video_call);
         final MenuItem menuTogglePinned = menu.findItem(R.id.action_toggle_pinned);
+        final MenuItem menuArchiveChat = menu.findItem(R.id.action_archive);
 
         if (conversation != null) {
             if (conversation.getMode() == Conversation.MODE_MULTI) {
@@ -1381,6 +1382,7 @@ public class ConversationFragment extends XmppFragment
                                 : R.string.channel_details);
                 menuCall.setVisible(false);
                 menuOngoingCall.setVisible(false);
+                menuArchiveChat.setTitle("Leave " + (conversation.getMucOptions().isPrivateAndNonAnonymous() ? "group chat" : "Channel"));
             } else {
                 final XmppConnectionService service =
                         activity == null ? null : activity.xmppConnectionService;
@@ -1407,6 +1409,7 @@ public class ConversationFragment extends XmppFragment
                 menuInviteContact.setVisible(
                         service != null
                                 && service.findConferenceServer(conversation.getAccount()) != null);
+                menuArchiveChat.setTitle(R.string.action_archive_chat);
             }
             if (conversation.isMuted()) {
                 menuMute.setVisible(false);

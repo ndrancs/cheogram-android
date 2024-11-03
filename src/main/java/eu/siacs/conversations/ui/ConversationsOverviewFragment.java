@@ -331,6 +331,7 @@ public class ConversationsOverviewFragment extends XmppFragment {
 		final MenuItem menuUnmute = menu.findItem(R.id.action_unmute);
 		final MenuItem menuOngoingCall = menu.findItem(R.id.action_ongoing_call);
 		final MenuItem menuTogglePinned = menu.findItem(R.id.action_toggle_pinned);
+		final MenuItem menuArchiveChat = menu.findItem(R.id.action_archive);
 
 		if (menuInfo == null) return;
 		int pos = ((AdapterContextMenuInfo) menuInfo).position;
@@ -341,6 +342,7 @@ public class ConversationsOverviewFragment extends XmppFragment {
 				menuContactDetails.setVisible(false);
 				menuMucDetails.setTitle(conversation.getMucOptions().isPrivateAndNonAnonymous() ? R.string.action_muc_details : R.string.channel_details);
 				menuOngoingCall.setVisible(false);
+				menuArchiveChat.setTitle("Leave " + (conversation.getMucOptions().isPrivateAndNonAnonymous() ? "group chat" : "Channel"));
 			} else {
 				final XmppConnectionService service = activity == null ? null : activity.xmppConnectionService;
 				final Optional<OngoingRtpSession> ongoingRtpSession = service == null ? Optional.absent() : service.getJingleConnectionManager().getOngoingRtpConnection(conversation.getContact());
@@ -351,6 +353,7 @@ public class ConversationsOverviewFragment extends XmppFragment {
 				}
 				menuContactDetails.setVisible(!conversation.withSelf());
 				menuMucDetails.setVisible(false);
+				menuArchiveChat.setTitle(R.string.action_archive_chat);
 			}
 			if (conversation.isMuted()) {
 				menuMute.setVisible(false);
