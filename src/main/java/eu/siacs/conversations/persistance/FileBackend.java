@@ -749,6 +749,8 @@ public class FileBackend {
             } catch (IOException e) {
                 throw new FileWriterException(file);
             }
+        } catch (final IllegalArgumentException e) {
+            throw new FileCopyException(R.string.error_file_not_found);
         } catch (final FileNotFoundException e) {
             throw new FileCopyException(R.string.error_file_not_found);
         } catch (final FileWriterException e) {
