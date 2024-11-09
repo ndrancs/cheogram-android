@@ -4,6 +4,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.graphics.drawable.Drawable;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.text.Html;
 import android.text.SpannableStringBuilder;
@@ -58,6 +59,7 @@ import eu.siacs.conversations.ui.util.QuoteHelper;
 import eu.siacs.conversations.utils.CryptoHelper;
 import eu.siacs.conversations.utils.Emoticons;
 import eu.siacs.conversations.utils.GeoHelper;
+import eu.siacs.conversations.utils.Patterns;
 import eu.siacs.conversations.utils.MessageUtils;
 import eu.siacs.conversations.utils.MimeUtils;
 import eu.siacs.conversations.utils.StringUtils;
@@ -163,6 +165,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
     private Collection<Reaction> reactions = Collections.emptyList();
 
     private Boolean isGeoUri = null;
+    private Uri wholeIsKnownURI = null;
     private Boolean isEmojisOnly = null;
     private Boolean treatAsDownloadable = null;
     private FileParams fileParams = null;
@@ -631,6 +634,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
     private synchronized void setBodyPreserveXHTML(String body) {
         this.body = body;
         this.isGeoUri = null;
+        this.wholeIsKnownURI = null;
         this.isEmojisOnly = null;
         this.treatAsDownloadable = null;
     }
@@ -651,6 +655,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
     public synchronized void appendBody(String append) {
         this.body += append;
         this.isGeoUri = null;
+        this.wholeIsKnownURI = null;
         this.isEmojisOnly = null;
         this.treatAsDownloadable = null;
     }
@@ -1419,6 +1424,16 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
             isGeoUri = GeoHelper.GEO_URI.matcher(body).matches();
         }
         return isGeoUri;
+    }
+
+    public synchronized Uri wholeIsKnownURI() {
+        if (wholeIsKnownURI != null) return wholeIsKnownURI;
+
+        if (Patterns.BITCOIN_URI.matcher(body).matches() ||Patterns.BITCOINCASH_URI.matcher(body).matches() || Patterns.MONERO_URI.matcher(body).matches()) {
+            wholeIsKnownURI = Uri.parse(body.replace(":", "://")); // hack to make query parser work
+        }
+
+        return wholeIsKnownURI;
     }
 
     protected List<Element> getSims() {
