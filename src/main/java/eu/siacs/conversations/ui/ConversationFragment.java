@@ -1539,7 +1539,6 @@ public class ConversationFragment extends XmppFragment
                 protected void onQuery(@Nullable CharSequence query) {
                     if (!activity.xmppConnectionService.getBooleanPreference("message_autocomplete", R.bool.message_autocomplete)) return;
 
-                    getRecyclerView().getItemAnimator().endAnimations();
                     final var allUsers = conversation.getMucOptions().getUsers();
                     if (!conversation.getMucOptions().getUsersByRole(MucOptions.Role.MODERATOR).isEmpty()) {
                         final var u = new MucOptions.User(conversation.getMucOptions(), null, "\0role:moderator", "Notify active moderators", new HashSet<>());
@@ -1632,7 +1631,6 @@ public class ConversationFragment extends XmppFragment
                 @Override
                 protected void onViewHidden() {
                     if (getRecyclerView() == null) return;
-                    try { getRecyclerView().getItemAnimator().endAnimations(); } catch (final Exception e) { }
                     super.onViewHidden();
                 }
 
@@ -1643,6 +1641,7 @@ public class ConversationFragment extends XmppFragment
                     emojiDebounce.removeCallbacksAndMessages(null);
                     emojiDebounce.postDelayed(() -> {
                         if (getRecyclerView() == null) return;
+                        getRecyclerView().setItemAnimator(null);
                         adapter.search(activity, getRecyclerView(), query.toString());
                     }, 100L);
                 }
