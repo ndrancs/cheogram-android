@@ -1319,7 +1319,7 @@ public class StartConversationActivity extends XmppActivity
 
     protected void filter(String needle) {
         if (xmppConnectionServiceBound) {
-            this.filterContacts(needle);
+            synchronized(this.contacts) { this.filterContacts(needle); }
             this.filterConferences(needle);
         }
     }
