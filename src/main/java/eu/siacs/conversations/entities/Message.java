@@ -53,6 +53,7 @@ import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
 import eu.siacs.conversations.http.URL;
 import eu.siacs.conversations.services.AvatarService;
+import eu.siacs.conversations.ui.text.FixedURLSpan;
 import eu.siacs.conversations.ui.util.MyLinkify;
 import eu.siacs.conversations.ui.util.PresenceSelector;
 import eu.siacs.conversations.ui.util.QuoteHelper;
@@ -1144,6 +1145,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
             int i = spannable.length();
             while(--i >= 0 && Character.isWhitespace(spannable.charAt(i))) { }
             spannableBody = (SpannableStringBuilder) spannable.subSequence(0, i+1);
+            FixedURLSpan.fix(spannableBody);
         }
 
         if (includeReplyTo && getInReplyTo() != null && getModerated() == null) {
