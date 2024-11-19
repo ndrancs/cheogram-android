@@ -142,7 +142,7 @@
     <string name="send_presence_updates">Send presence updates</string>
     <string name="receive_presence_updates">Receive presence updates</string>
     <string name="ask_for_presence_updates">Ask for presence updates</string>
-    <string name="attach_choose_picture">Choose picture</string>
+    <string name="attach_choose_picture">Choose media</string>
     <string name="attach_take_picture">Take picture</string>
     <string name="preemptively_grant">Preemptively grant subscription request</string>
     <string name="error_not_an_image_file">The file you selected is not an image</string>
@@ -526,7 +526,7 @@
     <string name="notify_never">Notifications disabled</string>
     <string name="notify_paused">Notifications paused</string>
     <string name="pref_picture_compression">Image Compression</string>
-    <string name="pref_picture_compression_summary">Hint: Use ‘Choose file’ instead of ‘Choose picture’ to send individual images uncompressed regardless of this setting.</string>
+    <string name="pref_picture_compression_summary">Hint: Use ‘Choose file’ instead of ‘Choose media’ to send individual images uncompressed regardless of this setting.</string>
     <string name="always">Always</string>
     <string name="large_images_only">Large images only</string>
     <string name="battery_optimizations_enabled">Battery optimizations enabled</string>

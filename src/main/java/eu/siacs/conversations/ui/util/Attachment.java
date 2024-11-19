@@ -202,7 +202,7 @@ public class Attachment implements Parcelable {
                     final Uri uri = clipData.getItemAt(i).getUri();
                     final String mime =
                             MimeUtils.guessMimeTypeFromUriAndMime(context, uri, contentType);
-                    uris.add(new Attachment(uri, type, mime));
+                    uris.add(new Attachment(uri, type != Type.IMAGE || mime.startsWith("image/") ? type : Type.FILE, mime));
                 }
             }
         } else {

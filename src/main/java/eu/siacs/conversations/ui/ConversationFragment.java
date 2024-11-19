@@ -2109,8 +2109,8 @@ public class ConversationFragment extends XmppFragment
                 handleEncryptionSelection(item);
                 break;
             case R.id.attach_choose_picture:
-            case R.id.attach_take_picture:
-            case R.id.attach_record_video:
+            //case R.id.attach_take_picture:
+            //case R.id.attach_record_video:
             case R.id.attach_choose_file:
             case R.id.attach_record_voice:
             case R.id.attach_location:
@@ -2394,12 +2394,12 @@ public class ConversationFragment extends XmppFragment
             case R.id.attach_choose_picture:
                 attachFile(ATTACHMENT_CHOICE_CHOOSE_IMAGE);
                 break;
-            case R.id.attach_take_picture:
+            /*case R.id.attach_take_picture:
                 attachFile(ATTACHMENT_CHOICE_TAKE_PHOTO);
                 break;
             case R.id.attach_record_video:
                 attachFile(ATTACHMENT_CHOICE_RECORD_VIDEO);
-                break;
+                break;*/
             case R.id.attach_choose_file:
                 attachFile(ATTACHMENT_CHOICE_CHOOSE_FILE);
                 break;
@@ -2757,31 +2757,39 @@ public class ConversationFragment extends XmppFragment
 
     protected void invokeAttachFileIntent(final int attachmentChoice) {
         Intent intent = new Intent();
-        boolean chooser = false;
+
+        final var takePhotoIntent = new Intent();
+        final Uri takePhotoUri = activity.xmppConnectionService.getFileBackend().getTakePhotoUri();
+        pendingTakePhotoUri.push(takePhotoUri);
+        takePhotoIntent.putExtra(MediaStore.EXTRA_OUTPUT, takePhotoUri);
+        takePhotoIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        takePhotoIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        takePhotoIntent.setAction(MediaStore.ACTION_IMAGE_CAPTURE);
+
+        final var takeVideoIntent = new Intent();
+        takeVideoIntent.setAction(MediaStore.ACTION_VIDEO_CAPTURE);
+
         switch (attachmentChoice) {
             case ATTACHMENT_CHOICE_CHOOSE_IMAGE:
                 intent.setAction(Intent.ACTION_GET_CONTENT);
                 intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-                intent.setType("image/*");
-                chooser = true;
+                intent.setType("*/*");
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"image/*", "video/*"});
+                intent = Intent.createChooser(intent, getString(R.string.perform_action_with));
+                intent.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { takePhotoIntent, takeVideoIntent });
                 break;
             case ATTACHMENT_CHOICE_RECORD_VIDEO:
-                intent.setAction(MediaStore.ACTION_VIDEO_CAPTURE);
+                intent = takeVideoIntent;
                 break;
             case ATTACHMENT_CHOICE_TAKE_PHOTO:
-                final Uri uri = activity.xmppConnectionService.getFileBackend().getTakePhotoUri();
-                pendingTakePhotoUri.push(uri);
-                intent.putExtra(MediaStore.EXTRA_OUTPUT, uri);
-                intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                intent.setAction(MediaStore.ACTION_IMAGE_CAPTURE);
+                intent = takePhotoIntent;
                 break;
             case ATTACHMENT_CHOICE_CHOOSE_FILE:
-                chooser = true;
-                intent.setType("*/*");
-                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setAction(Intent.ACTION_GET_CONTENT);
+                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                intent.setType("*/*");
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent = Intent.createChooser(intent, getString(R.string.perform_action_with));
                 break;
             case ATTACHMENT_CHOICE_RECORD_VOICE:
                 intent = new Intent(getActivity(), RecordingActivity.class);
@@ -2795,13 +2803,7 @@ public class ConversationFragment extends XmppFragment
             return;
         }
         try {
-            if (chooser) {
-                startActivityForResult(
-                        Intent.createChooser(intent, getString(R.string.perform_action_with)),
-                        attachmentChoice);
-            } else {
-                startActivityForResult(intent, attachmentChoice);
-            }
+            startActivityForResult(intent, attachmentChoice);
         } catch (final ActivityNotFoundException e) {
             Toast.makeText(context, R.string.no_application_found, Toast.LENGTH_LONG).show();
         }
