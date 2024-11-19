@@ -11,6 +11,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
@@ -29,6 +30,7 @@ import com.google.common.primitives.Longs;
 
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
+import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.worker.ExportBackupWorker;
 
@@ -131,6 +133,23 @@ public class BackupSettingsFragment extends XmppPreferenceFragment {
     }
 
     private boolean onBackupPreferenceClicked(final Preference preference) {
+        new AlertDialog.Builder(requireActivity())
+            .setTitle("Disable accounts")
+            .setMessage("Do you want to disable your accounts before making a backup (recommended)?")
+            .setPositiveButton(R.string.yes, (dialog, whichButton) -> {
+                for (final var account : requireService().getAccounts()) {
+                    account.setOption(Account.OPTION_DISABLED, true);
+                    if (!requireService().updateAccount(account)) {
+                        Toast.makeText(requireActivity(), R.string.unable_to_update_account, Toast.LENGTH_SHORT).show();
+                    }
+                }
+                aboutToStartOneOffBackup();
+            })
+            .setNegativeButton(R.string.no, (dialog, whichButton) -> aboutToStartOneOffBackup()).show();
+        return true;
+    }
+
+    private void aboutToStartOneOffBackup() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                             requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -142,7 +161,6 @@ public class BackupSettingsFragment extends XmppPreferenceFragment {
         } else {
             startOneOffBackup();
         }
-        return true;
     }
 
     private void startOneOffBackup() {
