@@ -443,7 +443,7 @@ public class ConversationsActivity extends XmppActivity implements OnConversatio
         accountHeader = new com.mikepenz.materialdrawer.widget.AccountHeaderView(this);
         final var manageAccount = new com.mikepenz.materialdrawer.model.ProfileSettingDrawerItem();
         manageAccount.setIdentifier(DRAWER_MANAGE_ACCOUNT);
-        com.mikepenz.materialdrawer.model.interfaces.NameableKt.setNameText(manageAccount, xmppConnectionService.getAccounts().size() > 1 ? "Manage Accounts" : "Manage Account");
+        com.mikepenz.materialdrawer.model.interfaces.NameableKt.setNameText(manageAccount, "Manage Accounts");
         com.mikepenz.materialdrawer.model.interfaces.IconableKt.setIconRes(manageAccount, R.drawable.ic_settings_24dp);
         accountHeader.addProfiles(manageAccount);
 
@@ -569,12 +569,7 @@ public class ConversationsActivity extends XmppActivity implements OnConversatio
             if (isCurrent) return false; // Ignore switching to already selected profile
 
             if (id == DRAWER_MANAGE_ACCOUNT) {
-                final Account account = (Account) accountHeader.getActiveProfile().getTag();
-                if (account == null) {
-                    AccountUtils.launchManageAccounts(this);
-                } else {
-                    switchToAccount(account);
-                }
+                AccountUtils.launchManageAccounts(this);
                 return false;
             }
 
@@ -588,14 +583,6 @@ public class ConversationsActivity extends XmppActivity implements OnConversatio
                 requestPermissions(permissions, REQUEST_MICROPHONE);
                 return false;
             }
-
-            // Clicked on an actual profile
-            if (profile.getTag() == null) {
-                com.mikepenz.materialdrawer.model.interfaces.NameableKt.setNameText(manageAccount, "Manage Accounts");
-            } else {
-                com.mikepenz.materialdrawer.model.interfaces.NameableKt.setNameText(manageAccount, "Manage Account");
-            }
-            accountHeader.updateProfile(manageAccount);
 
             final var fm = getFragmentManager();
             while (fm.getBackStackEntryCount() > 0) {
