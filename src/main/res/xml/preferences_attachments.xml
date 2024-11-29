@@ -32,6 +32,12 @@
             android:key="auto_accept_unmetered"
             android:title="Always Accept When Unmetered"
             android:summary="Don't use the above size limit on unmetered networks" />
+        <SwitchPreferenceCompat
+            android:defaultValue="@bool/default_nomedia"
+            android:icon="@drawable/browse_24dp"
+            android:key="nomedia"
+            android:title="Hide media in gallery"
+            android:summary="Hide received and sent media from system gallery views" />
     </PreferenceCategory>
     <PreferenceCategory android:title="Advanced">
         <Preference
