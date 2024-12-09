@@ -493,7 +493,11 @@ public class Resolver {
                     final Question question = new Question(dnsName, Record.TYPE.getType(type));
                     if (!DNSSECLESS_TLDS.contains(dnsName.getLabels()[0].toString())) {
                         for (int i = 0; i < 5; i++) {
-                            if (System.currentTimeMillis() - start > 5000) break;
+                            if (System.currentTimeMillis() - start > 5000) {
+                                Log.d(Config.LOGTAG, "DNS taking too long, abort DNSSEC retries after " + i + " for " + type.getSimpleName() + " " + dnsName);
+                                break;
+                            }
+                            Log.d(Config.LOGTAG, "DNSSEC try " + i + " for " + type.getSimpleName() + " " + dnsName);
                             try {
                                 ResolverResult<D> result = DnssecResolverApi.INSTANCE.resolve(question);
                                 if (result.wasSuccessful() && !result.isAuthenticData()) {
@@ -501,8 +505,9 @@ public class Resolver {
                                 }
                                 return result;
                             } catch (DnssecValidationFailedException e) {
-                                Log.d(Config.LOGTAG, Resolver.class.getSimpleName() + ": error resolving " + type.getSimpleName() + " with DNSSEC. Trying DNS instead.", e);
+                                Log.d(Config.LOGTAG, Resolver.class.getSimpleName() + ": error resolving " + type.getSimpleName() + " " + dnsName + " with DNSSEC. Try: " + i, e);
                                 // Try again, may be transient DNSSEC failure https://github.com/MiniDNS/minidns/issues/132
+                                if ("CNAME".equals(type.getSimpleName())) break; // CNAME failure on NXDOMAIN is common don't retry?
                             } catch (Throwable throwable) {
                                 Log.d(Config.LOGTAG, Resolver.class.getSimpleName() + ": error resolving " + type.getSimpleName() + " with DNSSEC. Trying DNS instead.", throwable);
                                 break;
