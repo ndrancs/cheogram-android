@@ -36,6 +36,13 @@ public class MainSettingsFragment extends PreferenceFragmentCompat {
         if (ConnectionSettingsFragment.hideChannelDiscovery()) {
             connection.setSummary(R.string.pref_connection_summary);
         }
+        findPreference("extensions").setOnPreferenceClickListener((p) -> {
+            getFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, new com.cheogram.android.ExtensionSettingsFragment())
+                .addToBackStack(null)
+                .commit();
+            return true;
+        });
     }
 
     @Override
