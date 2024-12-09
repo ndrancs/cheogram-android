@@ -234,6 +234,7 @@ public class Resolver {
         DnsClient.removeDNSServerLookupMechanism(AndroidUsingExec.INSTANCE);
         DnsClient.addDnsServerLookupMechanism(AndroidUsingExecLowPriority.INSTANCE);
         DnsClient.addDnsServerLookupMechanism(new AndroidUsingLinkProperties(service));
+        DnsClient.addDnsServerLookupMechanism(new com.cheogram.android.DnsFallback());
         final AbstractDnsClient client = ResolverApi.INSTANCE.getClient();
         if (client instanceof ReliableDnsClient) {
             ((ReliableDnsClient) client).setUseHardcodedDnsServers(false);
