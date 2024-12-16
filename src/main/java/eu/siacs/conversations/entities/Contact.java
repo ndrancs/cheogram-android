@@ -526,8 +526,8 @@ public class Contact implements ListItem, Blockable {
             return getJid().compareTo(another.getJid());
         }
 
-        return this.getDisplayName().compareToIgnoreCase(
-                another.getDisplayName());
+        final var anotherName = another.getDisplayName();
+        return this.getDisplayName().compareToIgnoreCase(anotherName == null ? "" : anotherName);
     }
 
     public String getServer() {
