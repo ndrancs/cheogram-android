@@ -1,0 +1,13 @@
+* Fix inbound dialler integration on Android 15
+* Fix infinite loop when notification permission is denied
+* Fix DNS resolver initialization
+* Chat Requests feature to hide possible SPAM, with option to report all
+* Some payment links on profiles show with icons now
+* Initial B and I options in text selection menu for message formatting
+* When reporting a chat as SPAM, report the most recent message if none selected
+* Upgrade MiniDNS
+* Use DNS from active network at highest priority
+* Use cache more often if authoritative nameserver is down
+* Retry DNSSEC a few times on hash failure
+* Say "contacts" not "roster"
+* Say "leave" not "archive" when it's a group chat or channel
