@@ -3,6 +3,7 @@ package com.cheogram.android;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.view.ActionMode;
 import android.view.Menu;
@@ -29,8 +30,12 @@ public class EditMessageSelectionActionModeCallback implements ActionMode.Callba
 
 	@Override
 	public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+		final var p = PreferenceManager.getDefaultSharedPreferences(editMessage.getContext());
+		final var richText = p.getBoolean("compose_rich_text", editMessage.getContext().getResources().getBoolean(R.bool.compose_rich_text));
 		menu.findItem(R.id.bold).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
 		menu.findItem(R.id.italic).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+		menu.findItem(R.id.bold).setVisible(richText);
+		menu.findItem(R.id.italic).setVisible(richText);
 		return true;
 	}
 
