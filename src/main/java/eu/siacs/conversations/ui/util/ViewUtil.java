@@ -20,12 +20,13 @@ import eu.siacs.conversations.persistance.FileBackend;
 public class ViewUtil {
 
     public static void view(Context context, Attachment attachment) {
+        // TODO: accept displayName
         File file = new File(attachment.getUri().getPath());
         final String mime = attachment.getMime() == null ? "*/*" : attachment.getMime();
-        view(context, file, mime);
+        view(context, file, mime, file.getName());
     }
 
-    public static void view (Context context, DownloadableFile file) {
+    public static void view (Context context, DownloadableFile file, final String displayName) {
         if (!file.exists()) {
             Toast.makeText(context, R.string.file_deleted, Toast.LENGTH_SHORT).show();
             return;
@@ -34,15 +35,15 @@ public class ViewUtil {
         if (mime == null) {
             mime = "*/*";
         }
-        view(context, file, mime);
+        view(context, file, mime, displayName);
     }
 
-    private static void view(Context context, File file, String mime) {
+    private static void view(Context context, File file, String mime, final String displayName) {
         Log.d(Config.LOGTAG,"viewing "+file.getAbsolutePath()+" "+mime);
         final Intent openIntent = new Intent(Intent.ACTION_VIEW);
         final Uri uri;
         try {
-            uri = FileBackend.getUriForFile(context, file);
+            uri = FileBackend.getUriForFile(context, file, displayName);
         } catch (SecurityException e) {
             Log.d(Config.LOGTAG, "No permission to access " + file.getAbsolutePath(), e);
             Toast.makeText(context, context.getString(R.string.no_permission_to_access_x, file.getAbsolutePath()), Toast.LENGTH_SHORT).show();
@@ -50,6 +51,7 @@ public class ViewUtil {
         }
         openIntent.setDataAndType(uri, mime);
         openIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
         try {
             context.startActivity(openIntent);
         } catch (final ActivityNotFoundException e) {
