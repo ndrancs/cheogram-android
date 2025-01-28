@@ -7,6 +7,7 @@ import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.core.graphics.ColorUtils;
+import androidx.annotation.NonNull;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -340,11 +341,12 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
         this.password = password;
     }
 
+    @NonNull
     public String getHostname() {
         return Strings.nullToEmpty(this.hostname);
     }
 
-    public void setHostname(String hostname) {
+    public void setHostname(final String hostname) {
         this.hostname = hostname;
     }
 
@@ -432,7 +434,8 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
     }
 
     public HashedToken getFastMechanism() {
-        final HashedToken.Mechanism fastMechanism = HashedToken.Mechanism.ofOrNull(this.fastMechanism);
+        final HashedToken.Mechanism fastMechanism =
+                HashedToken.Mechanism.ofOrNull(this.fastMechanism);
         final String token = this.fastToken;
         if (fastMechanism == null || Strings.isNullOrEmpty(token)) {
             return null;
@@ -841,11 +844,12 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
 
     public enum State {
         DISABLED(false, false),
-        LOGGED_OUT(false,false),
+        LOGGED_OUT(false, false),
         OFFLINE(false),
         CONNECTING(false),
         ONLINE(false),
         NO_INTERNET(false),
+        CONNECTION_TIMEOUT,
         UNAUTHORIZED,
         TEMPORARY_AUTH_FAILURE,
         SERVER_NOT_FOUND,
@@ -915,6 +919,8 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
                     return R.string.account_status_not_found;
                 case NO_INTERNET:
                     return R.string.account_status_no_internet;
+                case CONNECTION_TIMEOUT:
+                    return R.string.account_status_connection_timeout;
                 case REGISTRATION_FAILED:
                     return R.string.account_status_regis_fail;
                 case REGISTRATION_WEB:

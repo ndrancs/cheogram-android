@@ -65,6 +65,7 @@
             android:paddingTop="4dp"
             android:autoLink="web"
             android:longClickable="false"
+            android:breakStrategy="simple"
             android:textAppearance="?textAppearanceBodyMedium" />
 
         <com.google.android.material.button.MaterialButton

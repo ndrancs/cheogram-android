@@ -21,6 +21,7 @@
     <bool name="large_font">false</bool>
     <string name="quick_action">none</string>
     <bool name="show_dynamic_tags">true</bool>
+    <bool name="show_avatars">true</bool>
     <bool name="btbv">true</bool>
     <integer name="automatic_message_deletion">0</integer>
     <bool name="trust_system_ca_store">true</bool>
@@ -59,4 +60,6 @@
     <bool name="default_custom_tab">true</bool>
     <bool name="default_nomedia">true</bool>
     <bool name="show_muc_pm">false</bool>
+    <bool name="call_integration">true</bool>
+    <bool name="align_start">false</bool>
 </resources>

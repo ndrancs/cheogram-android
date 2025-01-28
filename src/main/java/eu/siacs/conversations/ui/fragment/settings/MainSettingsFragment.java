@@ -18,7 +18,8 @@ public class MainSettingsFragment extends PreferenceFragmentCompat {
         setPreferencesFromResource(R.xml.preferences_main, rootKey);
         final var about = findPreference("about");
         final var connection = findPreference("connection");
-        if (about == null || connection == null) {
+        final var up = findPreference("up");
+        if (about == null || connection == null || up == null) {
             throw new IllegalStateException(
                     "The preference resource file is missing some preferences");
         }
@@ -43,6 +44,8 @@ public class MainSettingsFragment extends PreferenceFragmentCompat {
                 .commit();
             return true;
         });
+
+        up.setVisible(!Strings.isNullOrEmpty(getString(R.string.default_push_server)));
     }
 
     @Override

@@ -1,5 +1,7 @@
 package eu.siacs.conversations.entities;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 
 import com.cheogram.android.EmojiSearch;
@@ -13,21 +15,22 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
-import com.google.gson.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.TypeAdapter;
+import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
 import io.ipfs.cid.Cid;
 
+import eu.siacs.conversations.Config;
+import eu.siacs.conversations.utils.Emoticons;
 import eu.siacs.conversations.xmpp.Jid;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -79,6 +82,10 @@ public class Reaction {
         this.envelopeId = envelopeId;
     }
 
+    public String normalizedReaction() {
+        return Emoticons.normalizeToVS16(this.reaction);
+    }
+
     public static String toString(final Collection<Reaction> reactions) {
         return (reactions == null || reactions.isEmpty()) ? null : GSON.toJson(reactions);
     }
@@ -88,8 +95,9 @@ public class Reaction {
             return Collections.emptyList();
         }
         try {
-            return GSON.fromJson(asString, new TypeToken<ArrayList<Reaction>>() {}.getType());
-        } catch (final JsonSyntaxException e) {
+            return GSON.fromJson(asString, new TypeToken<List<Reaction>>() {}.getType());
+        } catch (final IllegalArgumentException | JsonSyntaxException e) {
+            Log.e(Config.LOGTAG, "could not restore reactions", e);
             return Collections.emptyList();
         }
     }
@@ -228,7 +236,7 @@ public class Reaction {
                 ImmutableSet.copyOf(
                         Collections2.transform(
                                 Collections2.filter(reactions, r -> r.cid == null && !r.received),
-                                r -> r.reaction)));
+                                Reaction::normalizedReaction)));
     }
 
     public static final class Aggregated {

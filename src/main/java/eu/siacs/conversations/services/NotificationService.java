@@ -47,7 +47,6 @@ import androidx.core.app.RemoteInput;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.pm.ShortcutInfoCompat;
 import androidx.core.graphics.drawable.IconCompat;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
@@ -55,7 +54,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
-
 import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
@@ -81,7 +79,6 @@ import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.jingle.AbstractJingleConnection;
 import eu.siacs.conversations.xmpp.jingle.Media;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -95,6 +92,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -131,7 +129,7 @@ public class NotificationService {
     private static final String INCOMING_CALLS_NOTIFICATION_CHANNEL = "incoming_calls_channel";
     private static final String INCOMING_CALLS_NOTIFICATION_CHANNEL_PREFIX =
             "incoming_calls_channel#";
-    private static final String MESSAGES_NOTIFICATION_CHANNEL = "messages";
+    public static final String MESSAGES_NOTIFICATION_CHANNEL = "messages";
 
     NotificationService(final XmppConnectionService service) {
         this.mXmppConnectionService = service;
@@ -246,25 +244,8 @@ public class NotificationService {
         missedCallsChannel.setGroup("calls");
         notificationManager.createNotificationChannel(missedCallsChannel);
 
-        final NotificationChannel messagesChannel =
-                new NotificationChannel(
-                        MESSAGES_NOTIFICATION_CHANNEL,
-                        c.getString(R.string.messages_channel_name),
-                        NotificationManager.IMPORTANCE_HIGH);
-        messagesChannel.setShowBadge(true);
-        messagesChannel.setSound(
-                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
-                new AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                        .build());
-        messagesChannel.setLightColor(LED_COLOR);
-        final int dat = 70;
-        final long[] pattern = {0, 3 * dat, dat, dat};
-        messagesChannel.setVibrationPattern(pattern);
-        messagesChannel.enableVibration(true);
-        messagesChannel.enableLights(true);
-        messagesChannel.setGroup("chats");
+        final var messagesChannel =
+                prepareMessagesChannel(mXmppConnectionService, MESSAGES_NOTIFICATION_CHANNEL);
         notificationManager.createNotificationChannel(messagesChannel);
         final NotificationChannel silentMessagesChannel =
                 new NotificationChannel(
@@ -293,6 +274,41 @@ public class NotificationService {
                         .build());
         deliveryFailedChannel.setGroup("chats");
         notificationManager.createNotificationChannel(deliveryFailedChannel);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    public static void createConversationChannel(
+            final Context context, final ShortcutInfoCompat shortcut) {
+        final var messagesChannel = prepareMessagesChannel(context, UUID.randomUUID().toString());
+        messagesChannel.setName(shortcut.getShortLabel());
+        messagesChannel.setConversationId(MESSAGES_NOTIFICATION_CHANNEL, shortcut.getId());
+        final var notificationManager = context.getSystemService(NotificationManager.class);
+        notificationManager.createNotificationChannel(messagesChannel);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private static NotificationChannel prepareMessagesChannel(
+            final Context context, final String id) {
+        final NotificationChannel messagesChannel =
+                new NotificationChannel(
+                        id,
+                        context.getString(R.string.messages_channel_name),
+                        NotificationManager.IMPORTANCE_HIGH);
+        messagesChannel.setShowBadge(true);
+        messagesChannel.setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .build());
+        messagesChannel.setLightColor(LED_COLOR);
+        final int dat = 70;
+        final long[] pattern = {0, 3 * dat, dat, dat};
+        messagesChannel.setVibrationPattern(pattern);
+        messagesChannel.enableVibration(true);
+        messagesChannel.enableLights(true);
+        messagesChannel.setGroup("chats");
+        return messagesChannel;
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -562,7 +578,8 @@ public class NotificationService {
             Log.d(
                     Config.LOGTAG,
                     message.getConversation().getAccount().getJid().asBareJid()
-                            + ": suppressing failed delivery notification because conversation is open");
+                            + ": suppressing failed delivery notification because conversation is"
+                            + " open");
             return;
         }
         final PendingIntent pendingIntent = createContentIntent(conversation);
@@ -639,7 +656,7 @@ public class NotificationService {
                         mXmppConnectionService, channelId);
         final Contact contact = id.getContact();
         builder.addPerson(getPerson(contact));
-        ShortcutInfoCompat info = mXmppConnectionService.getShortcutService().getShortcutInfoCompat(contact);
+        ShortcutInfoCompat info = mXmppConnectionService.getShortcutService().getShortcutInfo(contact);
         builder.setShortcutInfo(info);
         if (Build.VERSION.SDK_INT >= 30) {
             mXmppConnectionService.getSystemService(ShortcutManager.class).pushDynamicShortcut(info.toShortcutInfo());
@@ -710,10 +727,11 @@ public class NotificationService {
                         .build());
         modifyIncomingCall(builder, id.account);
         final Notification notification = builder.build();
-        notification.audioAttributes = new AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                .build();
+        notification.audioAttributes =
+                new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .build();
         notification.flags = notification.flags | Notification.FLAG_INSISTENT;
         notify(INCOMING_CALL_NOTIFICATION_ID, notification);
     }
@@ -795,7 +813,8 @@ public class NotificationService {
         if (jingleRtpConnection == null) {
             return false;
         }
-        final var notificationManager = mXmppConnectionService.getSystemService(NotificationManager.class);
+        final var notificationManager =
+                mXmppConnectionService.getSystemService(NotificationManager.class);
         if (Iterables.any(
                 Arrays.asList(notificationManager.getActiveNotifications()),
                 n -> n.getId() == INCOMING_CALL_NOTIFICATION_ID)) {
@@ -909,7 +928,8 @@ public class NotificationService {
                         Log.d(
                                 Config.LOGTAG,
                                 conversational.getAccount().getJid().asBareJid()
-                                        + ": dismissed missed call because call was picked up on other device");
+                                        + ": dismissed missed call because call was picked up on"
+                                        + " other device");
                         iterator.remove();
                     }
                 }
@@ -1458,12 +1478,15 @@ public class NotificationService {
             if (systemAccount != null) {
                 notificationBuilder.addPerson(systemAccount.toString());
             }
-            info = mXmppConnectionService.getShortcutService().getShortcutInfoCompat(contact);
+            info =
+                    mXmppConnectionService
+                            .getShortcutService()
+                            .getShortcutInfo(contact, conversation.getUuid());
         } else {
             info =
                     mXmppConnectionService
                             .getShortcutService()
-                            .getShortcutInfoCompat(conversation.getMucOptions());
+                            .getShortcutInfo(conversation.getMucOptions());
         }
         notificationBuilder.setWhen(conversation.getLatestMessage().getTimeSent());
         notificationBuilder.setSmallIcon(R.drawable.ic_notification);
@@ -1498,16 +1521,16 @@ public class NotificationService {
             }
             final BigPictureStyle bigPictureStyle = new NotificationCompat.BigPictureStyle();
             bigPictureStyle.bigPicture(bitmap);
-            if (tmp.size() > 0) {
-                CharSequence text = getMergedBodies(tmp);
-                bigPictureStyle.setSummaryText(text);
-                builder.setContentText(text);
-                builder.setTicker(text);
-            } else {
+            if (tmp.isEmpty()) {
                 final String description =
                         UIHelper.getFileDescriptionString(mXmppConnectionService, message);
                 builder.setContentText(description);
                 builder.setTicker(description);
+            } else {
+                final CharSequence text = getMergedBodies(tmp);
+                bigPictureStyle.setSummaryText(text);
+                builder.setContentText(text);
+                builder.setTicker(text);
             }
             builder.setStyle(bigPictureStyle);
         } catch (final IOException e) {

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:right="7dp" android:bottom="0dp">
+    <item android:right="@dimen/bubble_avatar_distance" android:bottom="0dp">
         <shape android:shape="rectangle">
             <corners
                 android:radius="0dp"
@@ -17,7 +17,7 @@
             <solid android:color="?colorSurface" />
         </shape>
     </item>
-    <item android:bottom="0dp" android:gravity="bottom|right" android:width="7dp" android:height="7dp">
+    <item android:bottom="0dp" android:gravity="bottom|right" android:width="@dimen/bubble_avatar_distance" android:height="@dimen/bubble_avatar_distance">
         <vector
            android:width="24dp"
            android:height="24dp"
