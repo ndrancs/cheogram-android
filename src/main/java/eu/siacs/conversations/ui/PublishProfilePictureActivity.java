@@ -64,8 +64,7 @@ public class PublishProfilePictureActivity extends XmppActivity
                                         getApplicationContext(), StartConversationActivity.class);
                         StartConversationActivity.addInviteUri(intent, getIntent());
                         intent.putExtra("init", true);
-                        intent.putExtra(
-                                EXTRA_ACCOUNT, account.getJid().asBareJid().toEscapedString());
+                        intent.putExtra(EXTRA_ACCOUNT, account.getJid().asBareJid().toString());
                         startActivity(intent);
                     }
                     Toast.makeText(
@@ -119,8 +118,7 @@ public class PublishProfilePictureActivity extends XmppActivity
                         intent.putExtra("init", true);
                         StartConversationActivity.addInviteUri(intent, getIntent());
                         if (account != null) {
-                            intent.putExtra(
-                                    EXTRA_ACCOUNT, account.getJid().asBareJid().toEscapedString());
+                            intent.putExtra(EXTRA_ACCOUNT, account.getJid().asBareJid().toString());
                         }
                         startActivity(intent);
                     }

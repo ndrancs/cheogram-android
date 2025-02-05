@@ -11,12 +11,10 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.StringRes;
 import androidx.core.content.ContextCompat;
 import androidx.databinding.DataBindingUtil;
-
 import com.google.common.base.Strings;
 
 import com.cheogram.android.DownloadDefaultStickers;
@@ -38,17 +36,11 @@ import eu.siacs.conversations.utils.ProvisioningUtils;
 import eu.siacs.conversations.utils.SignupUtils;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.Jid;
-
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.HttpUrl;
 import okhttp3.Request;
 import okhttp3.Response;
-
-import java.io.IOException;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class UriHandlerActivity extends BaseActivity {
 
@@ -68,7 +60,8 @@ public class UriHandlerActivity extends BaseActivity {
     }
 
     public static void scan(final Activity activity, final boolean provisioning) {
-        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
             final Intent intent = new Intent(activity, UriHandlerActivity.class);
             intent.setAction(UriHandlerActivity.ACTION_SCAN_QR_CODE);
             if (provisioning) {
@@ -178,7 +171,7 @@ public class UriHandlerActivity extends BaseActivity {
             final String preAuth = xmppUri.getParameter(XmppUri.PARAMETER_PRE_AUTH);
             final Jid jid = xmppUri.getJid();
             if (xmppUri.isAction(XmppUri.ACTION_REGISTER)) {
-                if (jid.getEscapedLocal() != null && accounts.contains(jid.asBareJid())) {
+                if (jid.getLocal() != null && accounts.contains(jid.asBareJid())) {
                     showError(R.string.account_already_exists);
                     return false;
                 }
@@ -227,7 +220,7 @@ public class UriHandlerActivity extends BaseActivity {
                     intent = new Intent(this, StartConversationActivity.class);
                     intent.setAction(Intent.ACTION_VIEW);
                     intent.setData(uri);
-                    intent.putExtra("account", accounts.get(0).toEscapedString());
+                    intent.putExtra("account", accounts.get(0).toString());
                 }
             } else {
                 intent = new Intent(this, ShareWithActivity.class);
@@ -258,8 +251,8 @@ public class UriHandlerActivity extends BaseActivity {
     private void checkForLinkHeader(final HttpUrl url) {
         Log.d(Config.LOGTAG, "checking for link header on " + url);
         this.call =
-                HttpConnectionManager.okHttpClient(this).newCall(
-                        new Request.Builder().url(url).head().build());
+                HttpConnectionManager.okHttpClient(this)
+                        .newCall(new Request.Builder().url(url).head().build());
         this.call.enqueue(
                 new Callback() {
                     @Override
@@ -301,7 +294,7 @@ public class UriHandlerActivity extends BaseActivity {
     }
 
     private void showErrorOnUiThread(@StringRes int error) {
-        runOnUiThread(()-> showError(error));
+        runOnUiThread(() -> showError(error));
     }
 
     private static Class<?> findShareViaAccountClass() {

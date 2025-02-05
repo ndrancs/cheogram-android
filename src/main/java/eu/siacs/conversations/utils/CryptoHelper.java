@@ -5,7 +5,6 @@ import static eu.siacs.conversations.utils.Random.SECURE_RANDOM;
 import android.os.Bundle;
 import android.util.Base64;
 import android.util.Pair;
-
 import androidx.annotation.StringRes;
 
 import org.bouncycastle.asn1.x500.X500Name;
@@ -15,6 +14,11 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 
 import java.io.InputStream;
 import java.io.IOException;
+import eu.siacs.conversations.Config;
+import eu.siacs.conversations.R;
+import eu.siacs.conversations.entities.Account;
+import eu.siacs.conversations.entities.Message;
+import eu.siacs.conversations.xmpp.Jid;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -42,13 +46,15 @@ import eu.siacs.conversations.xmpp.Jid;
 
 public final class CryptoHelper {
 
-    public static final Pattern UUID_PATTERN = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
-    final public static byte[] ONE = new byte[]{0, 0, 0, 1};
-    private static final char[] CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789+-/#$!?".toCharArray();
+    public static final Pattern UUID_PATTERN =
+            Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
+    public static final byte[] ONE = new byte[] {0, 0, 0, 1};
+    private static final char[] CHARS =
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789+-/#$!?".toCharArray();
     private static final int PW_LENGTH = 25;
     private static final char[] VOWELS = "aeiou".toCharArray();
     private static final char[] CONSONANTS = "bcfghjklmnpqrstvwxyz".toCharArray();
-    private final static char[] hexArray = "0123456789abcdef".toCharArray();
+    private static final char[] hexArray = "0123456789abcdef".toCharArray();
 
     public static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
@@ -73,7 +79,10 @@ public final class CryptoHelper {
         char[] output = new char[rand * 2 + (5 - rand)];
         boolean vowel = SECURE_RANDOM.nextBoolean();
         for (int i = 0; i < output.length; ++i) {
-            output[i] = vowel ? VOWELS[SECURE_RANDOM.nextInt(VOWELS.length)] : CONSONANTS[SECURE_RANDOM.nextInt(CONSONANTS.length)];
+            output[i] =
+                    vowel
+                            ? VOWELS[SECURE_RANDOM.nextInt(VOWELS.length)]
+                            : CONSONANTS[SECURE_RANDOM.nextInt(CONSONANTS.length)];
             vowel = !vowel;
         }
         return String.valueOf(output);
@@ -83,8 +92,10 @@ public final class CryptoHelper {
         int len = hexString.length();
         byte[] array = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            array[i / 2] = (byte) ((Character.digit(hexString.charAt(i), 16) << 4) + Character
-                    .digit(hexString.charAt(i + 1), 16));
+            array[i / 2] =
+                    (byte)
+                            ((Character.digit(hexString.charAt(i), 16) << 4)
+                                    + Character.digit(hexString.charAt(i + 1), 16));
         }
         return array;
     }
@@ -100,9 +111,7 @@ public final class CryptoHelper {
         return result;
     }
 
-    /**
-     * Escapes usernames or passwords for SASL.
-     */
+    /** Escapes usernames or passwords for SASL. */
     public static String saslEscape(final String s) {
         final StringBuilder sb = new StringBuilder((int) (s.length() * 1.1));
         for (int i = 0; i < s.length(); i++) {
@@ -154,7 +163,8 @@ public final class CryptoHelper {
     }
 
     public static String[] getOrderedCipherSuites(final String[] platformSupportedCipherSuites) {
-        final Collection<String> cipherSuites = new LinkedHashSet<>(Arrays.asList(Config.ENABLED_CIPHERS));
+        final Collection<String> cipherSuites =
+                new LinkedHashSet<>(Arrays.asList(Config.ENABLED_CIPHERS));
         final List<String> platformCiphers = Arrays.asList(platformSupportedCipherSuites);
         cipherSuites.retainAll(platformCiphers);
         cipherSuites.addAll(platformCiphers);
@@ -177,7 +187,10 @@ public final class CryptoHelper {
         }
     }
 
-    public static Pair<Jid, String> extractJidAndName(X509Certificate certificate) throws CertificateEncodingException, IllegalArgumentException, CertificateParsingException {
+    public static Pair<Jid, String> extractJidAndName(X509Certificate certificate)
+            throws CertificateEncodingException,
+                    IllegalArgumentException,
+                    CertificateParsingException {
         Collection<List<?>> alternativeNames = certificate.getSubjectAlternativeNames();
         List<String> emails = new ArrayList<>();
         if (alternativeNames != null) {
@@ -190,9 +203,15 @@ public final class CryptoHelper {
         }
         X500Name x500name = new JcaX509CertificateHolder(certificate).getSubject();
         if (emails.size() == 0 && x500name.getRDNs(BCStyle.EmailAddress).length > 0) {
-            emails.add(IETFUtils.valueToString(x500name.getRDNs(BCStyle.EmailAddress)[0].getFirst().getValue()));
+            emails.add(
+                    IETFUtils.valueToString(
+                            x500name.getRDNs(BCStyle.EmailAddress)[0].getFirst().getValue()));
         }
-        String name = x500name.getRDNs(BCStyle.CN).length > 0 ? IETFUtils.valueToString(x500name.getRDNs(BCStyle.CN)[0].getFirst().getValue()) : null;
+        String name =
+                x500name.getRDNs(BCStyle.CN).length > 0
+                        ? IETFUtils.valueToString(
+                                x500name.getRDNs(BCStyle.CN)[0].getFirst().getValue())
+                        : null;
         if (emails.size() >= 1) {
             return new Pair<>(Jid.of(emails.get(0)), name);
         } else if (name != null) {
@@ -214,26 +233,33 @@ public final class CryptoHelper {
             JcaX509CertificateHolder holder = new JcaX509CertificateHolder(certificate);
             X500Name subject = holder.getSubject();
             try {
-                information.putString("subject_cn", subject.getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+                information.putString(
+                        "subject_cn",
+                        subject.getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
             } catch (Exception e) {
-                //ignored
+                // ignored
             }
             try {
-                information.putString("subject_o", subject.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
+                information.putString(
+                        "subject_o",
+                        subject.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
             } catch (Exception e) {
-                //ignored
+                // ignored
             }
 
             X500Name issuer = holder.getIssuer();
             try {
-                information.putString("issuer_cn", issuer.getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+                information.putString(
+                        "issuer_cn",
+                        issuer.getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
             } catch (Exception e) {
-                //ignored
+                // ignored
             }
             try {
-                information.putString("issuer_o", issuer.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
+                information.putString(
+                        "issuer_o", issuer.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
             } catch (Exception e) {
-                //ignored
+                // ignored
             }
             try {
                 information.putString("sha1", getFingerprintCert(certificate.getEncoded()));
@@ -253,7 +279,7 @@ public final class CryptoHelper {
     }
 
     public static String getFingerprint(Jid jid, String androidId) {
-        return getFingerprint(jid.toEscapedString() + "\00" + androidId);
+        return getFingerprint(jid.toString() + "\00" + androidId);
     }
 
     public static String getAccountFingerprint(Account account, String androidId) {
@@ -273,8 +299,9 @@ public final class CryptoHelper {
         return switch (encryption) {
             case Message.ENCRYPTION_OTR -> R.string.encryption_choice_otr;
             case Message.ENCRYPTION_AXOLOTL,
-                    Message.ENCRYPTION_AXOLOTL_NOT_FOR_THIS_DEVICE,
-                    Message.ENCRYPTION_AXOLOTL_FAILED -> R.string.encryption_choice_omemo;
+                            Message.ENCRYPTION_AXOLOTL_NOT_FOR_THIS_DEVICE,
+                            Message.ENCRYPTION_AXOLOTL_FAILED ->
+                    R.string.encryption_choice_omemo;
             case Message.ENCRYPTION_PGP -> R.string.encryption_choice_pgp;
             default -> R.string.encryption_choice_unencrypted;
         };
@@ -285,7 +312,9 @@ public final class CryptoHelper {
             return false;
         }
         final String u = url.toLowerCase();
-        return !u.contains(" ") && (u.startsWith("https://") || u.startsWith("http://") || u.startsWith("p1s3://")) && u.endsWith(".pgp");
+        return !u.contains(" ")
+                && (u.startsWith("https://") || u.startsWith("http://") || u.startsWith("p1s3://"))
+                && u.endsWith(".pgp");
     }
 
     public static String multihashAlgo(Multihash.Type type) throws NoSuchAlgorithmException {

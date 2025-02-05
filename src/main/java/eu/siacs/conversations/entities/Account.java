@@ -306,7 +306,7 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
     }
 
     public String getUsername() {
-        return jid.getEscapedLocal();
+        return jid.getLocal();
     }
 
     public boolean setJid(final Jid next) {
@@ -330,7 +330,7 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
     }
 
     public String getServer() {
-        return jid.getDomain().toEscapedString();
+        return jid.getDomain().toString();
     }
 
     public String getPassword() {
@@ -546,7 +546,7 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
         final ContentValues values = new ContentValues();
         values.put(UUID, uuid);
         values.put(USERNAME, jid.getLocal());
-        values.put(SERVER, jid.getDomain().toEscapedString());
+        values.put(SERVER, jid.getDomain().toString());
         values.put(PASSWORD, password);
         values.put(OPTIONS, options);
         synchronized (this.keys) {
@@ -768,11 +768,11 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
 
     public String getShareableUri() {
         List<XmppUri.Fingerprint> fingerprints = this.getFingerprints();
-        String uri = "xmpp:" + Uri.encode(getJid().asBareJid().toEscapedString(), "@/+");
-        if (fingerprints.size() > 0) {
-            return XmppUri.getFingerprintUri(uri, fingerprints, ';');
-        } else {
+        final String uri = "xmpp:" + Uri.encode(this.getJid().asBareJid().toString(), "@/+");
+        if (fingerprints.isEmpty()) {
             return uri;
+        } else {
+            return XmppUri.getFingerprintUri(uri, fingerprints, ';');
         }
     }
 
@@ -780,11 +780,11 @@ public class Account extends AbstractEntity implements AvatarService.Avatarable 
         List<XmppUri.Fingerprint> fingerprints = this.getFingerprints();
         String uri =
                 "https://conversations.im/i/"
-                        + XmppUri.lameUrlEncode(this.getJid().asBareJid().toEscapedString());
-        if (fingerprints.size() > 0) {
-            return XmppUri.getFingerprintUri(uri, fingerprints, '&');
-        } else {
+                        + XmppUri.lameUrlEncode(this.getJid().asBareJid().toString());
+        if (fingerprints.isEmpty()) {
             return uri;
+        } else {
+            return XmppUri.getFingerprintUri(uri, fingerprints, '&');
         }
     }
 

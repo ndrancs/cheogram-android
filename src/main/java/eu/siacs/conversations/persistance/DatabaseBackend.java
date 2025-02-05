@@ -69,7 +69,6 @@ import eu.siacs.conversations.utils.CursorUtils;
 import eu.siacs.conversations.utils.FtsUtils;
 import eu.siacs.conversations.utils.MimeUtils;
 import eu.siacs.conversations.utils.Resolver;
-import eu.siacs.conversations.xmpp.InvalidJid;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.mam.MamReference;
 import java.io.ByteArrayInputStream;
@@ -1340,7 +1339,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                                         cursor.getString(cursor.getColumnIndex(Account.SERVER)),
                                         null)
                                 .getDomain()
-                                .toEscapedString();
+                                .toString();
             } catch (IllegalArgumentException ignored) {
                 Log.e(
                         Config.LOGTAG,
@@ -1647,7 +1646,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                         selectionArgs);
         while (cursor.moveToNext()) {
             final Conversation conversation = Conversation.fromCursor(cursor);
-            if (conversation.getJid() instanceof InvalidJid) {
+            if (conversation.getJid() instanceof Jid.Invalid) {
                 continue;
             }
             list.add(conversation);
@@ -2032,7 +2031,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
             }
             cursor.moveToFirst();
             final Conversation conversation = Conversation.fromCursor(cursor);
-            if (conversation.getJid() instanceof InvalidJid) {
+            if (conversation.getJid() instanceof Jid.Invalid) {
                 return null;
             }
             return conversation;
@@ -2065,11 +2064,33 @@ public class DatabaseBackend extends SQLiteOpenHelper {
             }
             cursor.moveToFirst();
             final Conversation conversation = Conversation.fromCursor(cursor);
-            if (conversation.getJid() instanceof InvalidJid) {
+            if (conversation.getJid() instanceof Jid.Invalid) {
                 return null;
             }
             conversation.setAccount(account);
             return conversation;
+        }
+    }
+
+    public String findConversationUuid(final Jid account, final Jid jid) {
+        final SQLiteDatabase db = this.getReadableDatabase();
+        final String[] selectionArgs = {
+            account.getLocal(),
+            account.getDomain().toString(),
+            jid.asBareJid().toString() + "/%",
+            jid.asBareJid().toString()
+        };
+        try (final Cursor cursor =
+                db.rawQuery(
+                        "SELECT conversations.uuid FROM conversations JOIN accounts ON"
+                            + " conversations.accountUuid=accounts.uuid WHERE accounts.username=?"
+                            + " AND accounts.server=? AND (contactJid=? OR contactJid LIKE ?)",
+                        selectionArgs)) {
+            if (cursor.getCount() == 0) {
+                return null;
+            }
+            cursor.moveToFirst();
+            return cursor.getString(0);
         }
     }
 

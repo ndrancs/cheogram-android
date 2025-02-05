@@ -16,7 +16,6 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-
 import com.google.common.base.Strings;
 
 import org.json.JSONArray;
@@ -88,10 +87,21 @@ public class Contact implements ListItem, Blockable {
         setAccount(other.getAccount());
     }
 
-    public Contact(final String account, final String systemName, final String serverName, final String presenceName,
-                   final Jid jid, final int subscription, final String photoUri,
-                   final Uri systemAccount, final String keys, final String avatar, final long lastseen,
-                   final String presence, final String groups, final RtpCapability.Capability rtpCapability) {
+    public Contact(
+            final String account,
+            final String systemName,
+            final String serverName,
+            final String presenceName,
+            final Jid jid,
+            final int subscription,
+            final String photoUri,
+            final Uri systemAccount,
+            final String keys,
+            final String avatar,
+            final long lastseen,
+            final String presence,
+            final String groups,
+            final RtpCapability.Capability rtpCapability) {
         this.accountUuid = account;
         this.systemName = systemName;
         this.serverName = serverName;
@@ -110,7 +120,7 @@ public class Contact implements ListItem, Blockable {
         if (avatar != null) {
             this.avatar = new Avatar();
             this.avatar.sha1sum = avatar;
-            this.avatar.origin = Avatar.Origin.VCARD; //always assume worst
+            this.avatar.origin = Avatar.Origin.VCARD; // always assume worst
         }
         try {
             this.groups = (groups == null ? new JSONArray() : new JSONArray(groups));
@@ -141,7 +151,8 @@ public class Contact implements ListItem, Blockable {
         } catch (Exception e) {
             systemAccount = null;
         }
-        return new Contact(cursor.getString(cursor.getColumnIndex(ACCOUNT)),
+        return new Contact(
+                cursor.getString(cursor.getColumnIndex(ACCOUNT)),
                 cursor.getString(cursor.getColumnIndex(SYSTEMNAME)),
                 cursor.getString(cursor.getColumnIndex(SERVERNAME)),
                 cursor.getString(cursor.getColumnIndex(PRESENCE_NAME)),
@@ -154,7 +165,8 @@ public class Contact implements ListItem, Blockable {
                 cursor.getLong(cursor.getColumnIndex(LAST_TIME)),
                 cursor.getString(cursor.getColumnIndex(LAST_PRESENCE)),
                 cursor.getString(cursor.getColumnIndex(GROUPS)),
-                RtpCapability.Capability.of(cursor.getString(cursor.getColumnIndex(RTP_CAPABILITY))));
+                RtpCapability.Capability.of(
+                        cursor.getString(cursor.getColumnIndex(RTP_CAPABILITY))));
     }
 
     public String getDisplayName() {
@@ -175,12 +187,14 @@ public class Contact implements ListItem, Blockable {
         ListItem bookmark = account.getBookmark(jid);
         if (bookmark != null) {
             return bookmark.getDisplayName();
+        } else if (!TextUtils.isEmpty(this.presenceName) && mutualPresenceSubscription()) {
+            return this.presenceName;
         } else if (!TextUtils.isEmpty(this.presenceName)) {
             return this.presenceName + (mutualPresenceSubscription() ? "" : " (" + jid + ")");
         } else if (jid.getLocal() != null) {
             return JidHelper.localPartOrFallback(jid);
         } else {
-            return jid.getDomain().toEscapedString();
+            return jid.getDomain().toString();
         }
     }
 
@@ -190,7 +204,7 @@ public class Contact implements ListItem, Blockable {
         } else if (jid.getLocal() != null) {
             return JidHelper.localPartOrFallback(jid);
         } else {
-            return jid.getDomain().toEscapedString();
+            return jid.getDomain().toString();
         }
     }
 
@@ -242,8 +256,9 @@ public class Contact implements ListItem, Blockable {
                     getDisplayName().toLowerCase(Locale.US).contains(parts[0]) ||
                     matchInTag(context, parts[0]);
         } else {
-            return jid.toString().contains(needle) ||
-                    getDisplayName().toLowerCase(Locale.US).contains(needle);
+            return jid.toString().contains(needle)
+                    || getDisplayName().toLowerCase(Locale.US).contains(needle)
+                    || matchInTag(context, needle);
         }
     }
 
@@ -437,8 +452,8 @@ public class Contact implements ListItem, Blockable {
     }
 
     public boolean showInRoster() {
-        return (this.getOption(Contact.Options.IN_ROSTER) && (!this
-                .getOption(Contact.Options.DIRTY_DELETE)))
+        return (this.getOption(Contact.Options.IN_ROSTER)
+                        && (!this.getOption(Contact.Options.DIRTY_DELETE)))
                 || (this.getOption(Contact.Options.DIRTY_PUSH));
     }
 
@@ -530,21 +545,25 @@ public class Contact implements ListItem, Blockable {
     }
 
     public String getServer() {
-        return getJid().getDomain().toEscapedString();
+        return getJid().getDomain().toString();
     }
 
-    public void setAvatar(Avatar avatar) {
-        setAvatar(avatar, false);
+    public boolean setAvatar(final Avatar avatar) {
+        return setAvatar(avatar, false);
     }
 
-    public void setAvatar(Avatar avatar, boolean previouslyOmittedPepFetch) {
+    public boolean setAvatar(final Avatar avatar, final boolean previouslyOmittedPepFetch) {
         if (this.avatar != null && this.avatar.equals(avatar)) {
-            return;
+            return false;
         }
-        if (!previouslyOmittedPepFetch && this.avatar != null && this.avatar.origin == Avatar.Origin.PEP && avatar.origin == Avatar.Origin.VCARD) {
-            return;
+        if (!previouslyOmittedPepFetch
+                && this.avatar != null
+                && this.avatar.origin == Avatar.Origin.PEP
+                && avatar.origin == Avatar.Origin.VCARD) {
+            return false;
         }
         this.avatar = avatar;
+        return true;
     }
 
     public String getAvatarFilename() {
@@ -720,7 +739,8 @@ public class Contact implements ListItem, Blockable {
 
     @Override
     public int getAvatarBackgroundColor() {
-        return UIHelper.getColorForName(jid != null ? jid.asBareJid().toString() : getDisplayName());
+        return UIHelper.getColorForName(
+                jid != null ? jid.asBareJid().toString() : getDisplayName());
     }
 
     @Override

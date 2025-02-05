@@ -18,17 +18,10 @@ import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.LruCache;
-
 import androidx.annotation.ColorInt;
 import androidx.annotation.Nullable;
 import androidx.core.content.res.ResourcesCompat;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-
+import com.google.common.base.Strings;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.entities.Account;
@@ -46,6 +39,11 @@ import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.OnAdvancedStreamFeaturesLoaded;
 import eu.siacs.conversations.xmpp.XmppConnection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public class AvatarService implements OnAdvancedStreamFeaturesLoaded {
 
@@ -99,7 +97,7 @@ public class AvatarService implements OnAdvancedStreamFeaturesLoaded {
 		if (conversation != null) {
 			return get(conversation,size,cacheOnly);
 		}
-		return get(CHANNEL_SYMBOL, room != null ? room.asBareJid().toEscapedString() : result.getName(), size, cacheOnly);
+		return get(CHANNEL_SYMBOL, room != null ? room.asBareJid().toString() : result.getName(), size, cacheOnly);
 	}
 
 	private Drawable get(final Contact contact, final int size, boolean cachedOnly) {
@@ -287,7 +285,7 @@ public class AvatarService implements OnAdvancedStreamFeaturesLoaded {
 
 	public Drawable get(ListItem item, int size, boolean cachedOnly) {
 		if (item instanceof RawBlockable) {
-			return get(item.getDisplayName(), item.getJid().toEscapedString(), size, cachedOnly);
+			return get(item.getDisplayName(), item.getJid().toString(), size, cachedOnly);
 		} else if (item instanceof Contact) {
 			return get((Contact) item, size, cachedOnly);
 		} else if (item instanceof Bookmark) {
@@ -472,7 +470,7 @@ public class AvatarService implements OnAdvancedStreamFeaturesLoaded {
 		avatar = mXmppConnectionService.getFileBackend().getAvatar(account.getAvatar(), size);
 		if (avatar == null) {
 			final String displayName = account.getDisplayName();
-			final String jid = account.getJid().asBareJid().toEscapedString();
+			final String jid = account.getJid().asBareJid().toString();
 			if (QuickConversationsService.isQuicksy() && !TextUtils.isEmpty(displayName)) {
 				avatar = get(displayName, jid, size, false);
 			} else {
@@ -551,7 +549,7 @@ public class AvatarService implements OnAdvancedStreamFeaturesLoaded {
 	}
 
 	public static Drawable get(final Jid jid, final int size) {
-		return getImpl(jid.asBareJid().toEscapedString(), null, size);
+		return getImpl(jid.asBareJid().toString(), null, size);
 	}
 
 	private static Drawable getImpl(final String name, final String seed, final int size) {

@@ -1,7 +1,6 @@
 package eu.siacs.conversations.ui;
 
 import static eu.siacs.conversations.utils.PermissionUtils.getFirstDenied;
-
 import static java.util.Arrays.asList;
 
 import android.Manifest;
@@ -25,13 +24,11 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.StringRes;
 import androidx.databinding.DataBindingUtil;
-
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -77,16 +74,6 @@ import eu.siacs.conversations.xmpp.jingle.Media;
 import eu.siacs.conversations.xmpp.jingle.OngoingRtpSession;
 import eu.siacs.conversations.xmpp.jingle.RtpCapability;
 import eu.siacs.conversations.xmpp.jingle.RtpEndUserState;
-
-import org.webrtc.RendererCommon;
-import org.webrtc.SurfaceViewRenderer;
-import org.webrtc.VideoTrack;
-
-import java.lang.ref.WeakReference;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
 
 public class RtpSessionActivity extends XmppActivity
         implements XmppConnectionService.OnJingleRtpConnectionUpdate,
@@ -350,7 +337,7 @@ public class RtpSessionActivity extends XmppActivity
         final String action = intent.getAction();
         final String lastAction = intent.getStringExtra(EXTRA_LAST_ACTION);
         final Account account = extractAccount(intent);
-        final Jid with = Jid.ofEscaped(intent.getStringExtra(EXTRA_WITH));
+        final Jid with = Jid.of(intent.getStringExtra(EXTRA_WITH));
         final String state = intent.getStringExtra(EXTRA_LAST_REPORTED_STATE);
         if (!Intent.ACTION_VIEW.equals(action)
                 || state == null
@@ -554,7 +541,7 @@ public class RtpSessionActivity extends XmppActivity
         Log.d(Config.LOGTAG, "initializeWithIntent(" + event + "," + action + ")");
         final Account account = extractAccount(intent);
         final var extraWith = intent.getStringExtra(EXTRA_WITH);
-        final Jid with = Strings.isNullOrEmpty(extraWith) ? null : Jid.ofEscaped(extraWith);
+        final Jid with = Strings.isNullOrEmpty(extraWith) ? null : Jid.of(extraWith);
         if (with == null || account == null) {
             Log.e(Config.LOGTAG, "intent is missing extras (account or with)");
             return;
@@ -623,7 +610,7 @@ public class RtpSessionActivity extends XmppActivity
         binding.with.setText(contact.getDisplayName());
         if (Arrays.asList(RtpEndUserState.INCOMING_CALL, RtpEndUserState.ACCEPTING_CALL)
                 .contains(state)) {
-            binding.withJid.setText(contact.getJid().asBareJid().toEscapedString());
+            binding.withJid.setText(contact.getJid().asBareJid().toString());
             binding.withJid.setVisibility(View.VISIBLE);
         } else {
             binding.withJid.setVisibility(View.GONE);
@@ -825,9 +812,9 @@ public class RtpSessionActivity extends XmppActivity
                             .getJingleConnectionManager()
                             .getTerminalSessionState(with, sessionId);
             if (terminatedRtpSession == null) {
-                Log.e(Config.LOGTAG, "failed to initialize activity with running rtp session. session not found");
-                finish();
-                return true;
+                throw new IllegalStateException(
+                        "failed to initialize activity with running rtp session. session not"
+                                + " found");
             }
             initializeWithTerminatedSessionState(account, with, terminatedRtpSession);
             return true;
@@ -888,8 +875,8 @@ public class RtpSessionActivity extends XmppActivity
 
     private void resetIntent(final Account account, final Jid with, final String sessionId) {
         final Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.putExtra(EXTRA_ACCOUNT, account.getJid().toEscapedString());
-        intent.putExtra(EXTRA_WITH, with.toEscapedString());
+        intent.putExtra(EXTRA_ACCOUNT, account.getJid().toString());
+        intent.putExtra(EXTRA_WITH, with.toString());
         intent.putExtra(EXTRA_SESSION_ID, sessionId);
         setIntent(intent);
     }
@@ -946,10 +933,12 @@ public class RtpSessionActivity extends XmppActivity
             case RETRACTED -> setTitle(R.string.rtp_state_retracted);
             case APPLICATION_ERROR -> setTitle(R.string.rtp_state_application_failure);
             case SECURITY_ERROR -> setTitle(R.string.rtp_state_security_error);
-            case ENDED -> throw new IllegalStateException(
-                    "Activity should have called finishAndReleaseWakeLock();");
-            default -> throw new IllegalStateException(
-                    String.format("State %s has not been handled in UI", state));
+            case ENDED ->
+                    throw new IllegalStateException(
+                            "Activity should have called finishAndReleaseWakeLock();");
+            default ->
+                    throw new IllegalStateException(
+                            String.format("State %s has not been handled in UI", state));
         }
     }
 
@@ -983,9 +972,7 @@ public class RtpSessionActivity extends XmppActivity
             final Account account = contact == null ? getWith().getAccount() : contact.getAccount();
             binding.usingAccount.setVisibility(View.VISIBLE);
             binding.usingAccount.setText(
-                    getString(
-                            R.string.using_account,
-                            account.getJid().asBareJid().toEscapedString()));
+                    getString(R.string.using_account, account.getJid().asBareJid().toString()));
         } else {
             binding.usingAccount.setVisibility(View.GONE);
             binding.contactPhoto.setVisibility(View.GONE);
@@ -1481,12 +1468,12 @@ public class RtpSessionActivity extends XmppActivity
     private void retry(final View view) {
         final Intent intent = getIntent();
         final Account account = extractAccount(intent);
-        final Jid with = Jid.ofEscaped(intent.getStringExtra(EXTRA_WITH));
+        final Jid with = Jid.of(intent.getStringExtra(EXTRA_WITH));
         final String lastAction = intent.getStringExtra(EXTRA_LAST_ACTION);
         final String action = intent.getAction();
         final Set<Media> media = actionToMedia(lastAction == null ? action : lastAction);
         this.rtpConnectionReference = null;
-        Log.d(Config.LOGTAG, "attempting retry with " + with.toEscapedString());
+        Log.d(Config.LOGTAG, "attempting retry with " + with.toString());
         CallIntegrationConnectionService.placeCall(xmppConnectionService, account, with, media);
     }
 
@@ -1497,7 +1484,7 @@ public class RtpSessionActivity extends XmppActivity
     private void recordVoiceMail(final View view) {
         final Intent intent = getIntent();
         final Account account = extractAccount(intent);
-        final Jid with = Jid.ofEscaped(intent.getStringExtra(EXTRA_WITH));
+        final Jid with = Jid.of(intent.getStringExtra(EXTRA_WITH));
         final Conversation conversation =
                 xmppConnectionService.findOrCreateConversation(account, with, false, true);
         final Intent launchIntent = new Intent(this, ConversationsActivity.class);
@@ -1668,7 +1655,7 @@ public class RtpSessionActivity extends XmppActivity
             return;
         }
         final Set<Media> media = actionToMedia(currentIntent.getStringExtra(EXTRA_LAST_ACTION));
-        if (Jid.ofEscaped(withExtra).asBareJid().equals(with)) {
+        if (Jid.of(withExtra).asBareJid().equals(with)) {
             runOnUiThread(
                     () -> {
                         updateVerifiedShield(false);
@@ -1691,11 +1678,11 @@ public class RtpSessionActivity extends XmppActivity
     private void resetIntent(
             final Account account, Jid with, final RtpEndUserState state, final Set<Media> media) {
         final Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.putExtra(EXTRA_ACCOUNT, account.getJid().toEscapedString());
+        intent.putExtra(EXTRA_ACCOUNT, account.getJid().toString());
         if (RtpCapability.jmiSupport(account.getRoster().getContact(with))) {
-            intent.putExtra(EXTRA_WITH, with.asBareJid().toEscapedString());
+            intent.putExtra(EXTRA_WITH, with.asBareJid().toString());
         } else {
-            intent.putExtra(EXTRA_WITH, with.toEscapedString());
+            intent.putExtra(EXTRA_WITH, with.toString());
         }
         intent.putExtra(EXTRA_LAST_REPORTED_STATE, state.toString());
         intent.putExtra(

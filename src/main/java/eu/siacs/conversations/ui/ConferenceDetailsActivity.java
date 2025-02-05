@@ -328,7 +328,7 @@ public class ConferenceDetailsActivity extends XmppActivity
                 });
         this.binding.relatedMucs.setOnClickListener(v -> {
             final Intent intent = new Intent(this, ChannelDiscoveryActivity.class);
-            intent.putExtra("services", new String[]{ mConversation.getJid().getDomain().toEscapedString(), mConversation.getAccount().getJid().toEscapedString() });
+            intent.putExtra("services", new String[]{ mConversation.getJid().getDomain().toString(), mConversation.getAccount().getJid().toString() });
             startActivity(intent);
         });
     }
@@ -518,10 +518,9 @@ public class ConferenceDetailsActivity extends XmppActivity
         if (mConversation != null) {
             if (http) {
                 return "https://conversations.im/j/"
-                        + XmppUri.lameUrlEncode(
-                                mConversation.getJid().asBareJid().toEscapedString());
+                        + XmppUri.lameUrlEncode(mConversation.getJid().asBareJid().toString());
             } else {
-                return "xmpp:" + Uri.encode(mConversation.getJid().asBareJid().toEscapedString(), "@/+") + "?join";
+                return "xmpp:" + Uri.encode(mConversation.getJid().asBareJid().toString(), "@/+") + "?join";
             }
         } else {
             return null;
@@ -642,7 +641,7 @@ public class ConferenceDetailsActivity extends XmppActivity
         }
         final MucOptions mucOptions = mConversation.getMucOptions();
         final User self = mucOptions.getSelf();
-        final String account = mConversation.getAccount().getJid().asBareJid().toEscapedString();
+        final String account = mConversation.getAccount().getJid().asBareJid().toString();
         setTitle(
                 mucOptions.isPrivateAndNonAnonymous()
                         ? R.string.action_muc_details
@@ -655,10 +654,10 @@ public class ConferenceDetailsActivity extends XmppActivity
         if (mConversation.isPrivateAndNonAnonymous()) {
             this.binding.jid.setText(
                     getString(R.string.hosted_on, mConversation.getJid().getDomain()));
-            this.binding.truejid.setText(mConversation.getJid().asBareJid().toEscapedString());
+            this.binding.truejid.setText(mConversation.getJid().asBareJid().toString());
             if (mAdvancedMode) this.binding.truejid.setVisibility(View.VISIBLE);
         } else {
-            this.binding.jid.setText(mConversation.getJid().asBareJid().toEscapedString());
+            this.binding.jid.setText(mConversation.getJid().asBareJid().toString());
         }
         AvatarWorkerTask.loadAvatar(
                 mConversation, binding.yourPhoto, R.dimen.avatar_on_details_screen_size);
@@ -843,7 +842,7 @@ public class ConferenceDetailsActivity extends XmppActivity
 
     @Override
     public void onAffiliationChangeFailed(Jid jid, int resId) {
-        displayToast(getString(resId, jid.asBareJid().toEscapedString()));
+        displayToast(getString(resId, jid.asBareJid().toString()));
     }
 
     @Override

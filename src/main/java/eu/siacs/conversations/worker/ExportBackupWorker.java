@@ -14,7 +14,6 @@ import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.SystemClock;
 import android.util.Log;
-
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.work.ForegroundInfo;
@@ -27,7 +26,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.gson.stream.JsonWriter;
-
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.SQLiteAxolotlStore;
@@ -38,7 +36,6 @@ import eu.siacs.conversations.persistance.DatabaseBackend;
 import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.utils.BackupFileHeader;
 import eu.siacs.conversations.utils.Compatibility;
-
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -59,7 +56,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.zip.GZIPOutputStream;
-
 import javax.crypto.Cipher;
 import javax.crypto.CipherOutputStream;
 import javax.crypto.NoSuchPaddingException;
@@ -166,7 +162,8 @@ public class ExportBackupWorker extends Worker {
                 Log.d(
                         Config.LOGTAG,
                         String.format(
-                                "skipping backup for %s because password is empty. unable to encrypt",
+                                "skipping backup for %s because password is empty. unable to"
+                                        + " encrypt",
                                 account.getJid().asBareJid()));
                 count++;
                 continue;
@@ -174,7 +171,7 @@ public class ExportBackupWorker extends Worker {
             final String filename =
                     String.format(
                             "%s.%s.ceb",
-                            account.getJid().asBareJid().toEscapedString(),
+                            account.getJid().asBareJid().toString(),
                             DATE_FORMAT.format(new Date()));
             final File file = new File(FileBackend.getBackupDirectory(context), filename);
             try {

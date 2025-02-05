@@ -129,10 +129,15 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
     @Override
     public Dialog onCreateDialog(final Bundle savedInstanceState) {
         final var arguments = getArguments();
-        final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireActivity());
+        final MaterialAlertDialogBuilder builder =
+                new MaterialAlertDialogBuilder(requireActivity());
         builder.setTitle(arguments.getString(TITLE_KEY));
         binding =
-                DataBindingUtil.inflate(requireActivity().getLayoutInflater(), R.layout.dialog_enter_jid, null, false);
+                DataBindingUtil.inflate(
+                        requireActivity().getLayoutInflater(),
+                        R.layout.dialog_enter_jid,
+                        null,
+                        false);
         this.knownHostsAdapter = new KnownHostsAdapter(getActivity(), R.layout.item_autocomplete);
         binding.jid.setAdapter(this.knownHostsAdapter);
         binding.jid.addTextChangedListener(this);
@@ -162,7 +167,8 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
                     binding.account);
         } else {
             final ArrayAdapter<String> adapter =
-                    new ArrayAdapter<>(requireActivity(), R.layout.item_autocomplete, new String[] {account});
+                    new ArrayAdapter<>(
+                            requireActivity(), R.layout.item_autocomplete, new String[] {account});
             binding.account.setText(account);
             binding.account.setEnabled(false);
             adapter.setDropDownViewResource(R.layout.item_autocomplete);
@@ -229,7 +235,7 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
 
     protected Jid accountJid() {
         try {
-            return Jid.ofEscaped((String) binding.account.getEditableText().toString());
+            return Jid.of((String) binding.account.getEditableText().toString());
         } catch (final IllegalArgumentException e) {
             return null;
         }
@@ -256,7 +262,7 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
 
                 Jid contactJid = null;
                 try {
-                    contactJid = Jid.ofEscaped(jidString);
+                    contactJid = Jid.of(jidString);
                 } catch (final IllegalArgumentException e) {
                     binding.jidLayout.setError(getActivity().getString(R.string.invalid_jid));
                     return;
@@ -269,7 +275,7 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
                         issuedWarning = true;
                         return;
                     }
-                    if (sanityCheckJid != SanityCheck.ALLOW_MUC && suspiciousSubDomain(contactJid.getDomain().toEscapedString())) {
+                    if (sanityCheckJid != SanityCheck.ALLOW_MUC && suspiciousSubDomain(contactJid.getDomain().toString())) {
                         binding.jidLayout.setError(getActivity().getString(R.string.this_looks_like_channel));
                         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText(R.string.add_anway);
                         issuedWarning = true;

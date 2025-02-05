@@ -1,14 +1,15 @@
 package eu.siacs.conversations.xml;
 
 import androidx.annotation.NonNull;
-
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.base.Strings;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
-
+import eu.siacs.conversations.utils.XmlHelper;
+import eu.siacs.conversations.xmpp.Jid;
+import im.conversations.android.xmpp.model.stanza.Message;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Hashtable;
@@ -16,7 +17,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import eu.siacs.conversations.utils.XmlHelper;
-import eu.siacs.conversations.xmpp.InvalidJid;
 import eu.siacs.conversations.xmpp.Jid;
 import im.conversations.android.xmpp.model.stanza.Message;
 
@@ -188,9 +188,9 @@ public class Element implements Node {
 		final String jid = this.getAttribute(name);
 		if (jid != null && !jid.isEmpty()) {
 			try {
-				return Jid.ofEscaped(jid);
+				return Jid.of(jid);
 			} catch (final IllegalArgumentException e) {
-				return InvalidJid.of(jid, this instanceof Message);
+				return Jid.ofOrInvalid(jid, this instanceof Message);
 			}
 		}
 		return null;
@@ -205,7 +205,7 @@ public class Element implements Node {
 
 	public Element setAttribute(String name, Jid value) {
 		if (name != null && value != null) {
-			this.attributes.put(name, value.toEscapedString());
+			this.attributes.put(name, value.toString());
 		}
 		return this;
 	}

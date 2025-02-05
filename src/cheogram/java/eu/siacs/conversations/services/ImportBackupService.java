@@ -277,7 +277,7 @@ public class ImportBackupService extends Service {
             db.setTransactionSuccessful();
             db.endTransaction();
             final Jid jid = backupFileHeader.getJid();
-            final Cursor countCursor = db.rawQuery("select count(messages.uuid) from messages join conversations on conversations.uuid=messages.conversationUuid join accounts on conversations.accountUuid=accounts.uuid where accounts.username=? and accounts.server=?", new String[]{jid.getEscapedLocal(), jid.getDomain().toEscapedString()});
+            final Cursor countCursor = db.rawQuery("select count(messages.uuid) from messages join conversations on conversations.uuid=messages.conversationUuid join accounts on conversations.accountUuid=accounts.uuid where accounts.username=? and accounts.server=?", new String[]{jid.getLocal(), jid.getDomain().toString()});
             countCursor.moveToFirst();
             final int count = countCursor.getInt(0);
             Log.d(Config.LOGTAG, String.format("restored %d messages in %s", count, stopwatch.stop().toString()));
