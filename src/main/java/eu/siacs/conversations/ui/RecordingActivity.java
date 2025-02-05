@@ -126,6 +126,7 @@ public class RecordingActivity extends BaseActivity implements View.OnClickListe
             outputFormat = MediaRecorder.OutputFormat.OGG;
             mRecorder.setOutputFormat(outputFormat);
             mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.OPUS);
+            mRecorder.setAudioSamplingRate(48000);
             mRecorder.setAudioEncodingBitRate(32000);
         } else if ("mpeg4".equals(userChosenCodec) || !Config.USE_OPUS_VOICE_MESSAGES) {
             outputFormat = MediaRecorder.OutputFormat.MPEG_4;
