@@ -67,9 +67,6 @@ import com.cheogram.android.Util;
 import com.cheogram.android.WebxdcPage;
 import com.cheogram.android.WebxdcUpdate;
 
-import androidx.emoji2.emojipicker.EmojiViewItem;
-import androidx.emoji2.emojipicker.RecentEmojiProvider;
-
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.color.MaterialColors;
