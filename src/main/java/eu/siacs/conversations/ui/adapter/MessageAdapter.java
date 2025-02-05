@@ -1834,15 +1834,8 @@ public class MessageAdapter extends ArrayAdapter<Message> {
     }
 
     private void addReaction(final Message message) {
-        activity.addReaction(
-                message,
-                reactions -> {
-                    if (activity.xmppConnectionService.sendReactions(message, reactions)) {
-                        return;
-                    }
-                    Toast.makeText(activity, R.string.could_not_add_reaction, Toast.LENGTH_LONG)
-                            .show();
-                });
+        if (mConversationFragment == null) return;
+        mConversationFragment.addReaction(message);
     }
 
     private void promptOpenKeychainInstall(View view) {

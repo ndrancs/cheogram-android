@@ -2968,16 +2968,12 @@ public class ConversationFragment extends XmppFragment
         }
     }
 
-    private void addReaction(final Message message) {
-        activity.addReaction(
-                message,
-                reactions -> {
-                    if (activity.xmppConnectionService.sendReactions(message, reactions)) {
-                        return;
-                    }
-                    Toast.makeText(activity, R.string.could_not_add_reaction, Toast.LENGTH_LONG)
-                            .show();
-                });
+    public void addReaction(final Message message) {
+        activity.addReaction(emoji -> {
+            setupReply(message);
+            binding.textinput.setText(emoji.toInsert());
+            sendMessage();
+        });
     }
 
     private void reportMessage(final Message message) {

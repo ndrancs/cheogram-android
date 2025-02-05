@@ -15,6 +15,28 @@
             android:layout_height="wrap_content"
             android:layout_centerHorizontal="true" />
 
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/search_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/emojis"
+            android:hint="Search for emoji"
+            app:errorEnabled="true">
+
+            <EditText
+                android:padding="16dp"
+                android:id="@+id/search"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ems="10"
+                android:inputType="textPersonName">
+
+                <requestFocus />
+            </EditText>
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+
     </RelativeLayout>
 
 </layout>

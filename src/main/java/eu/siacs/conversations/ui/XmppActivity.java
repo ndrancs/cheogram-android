@@ -33,12 +33,15 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
+import android.text.Editable;
 import android.text.Html;
 import android.text.InputType;
+import android.text.Spannable;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Pair;
@@ -59,11 +62,20 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.pm.ShortcutInfoCompat;
 import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.databinding.DataBindingUtil;
+import androidx.recyclerview.widget.RecyclerView.Adapter;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableSet;
+
+import com.cheogram.android.EmojiSearch;
+
+import com.otaliastudios.autocomplete.Autocomplete;
+import com.otaliastudios.autocomplete.AutocompleteCallback;
+import com.otaliastudios.autocomplete.AutocompletePolicy;
+import com.otaliastudios.autocomplete.AutocompletePresenter;
+import com.otaliastudios.autocomplete.RecyclerViewPresenter;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -359,7 +371,7 @@ public abstract class XmppActivity extends ActionBarActivity {
         builder.create().show();
     }
 
-    public void addReaction(final Message message, Consumer<Collection<String>> callback) {
+    public void addReaction(Consumer<EmojiSearch.Emoji> callback) {
         final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
         final var layoutInflater = this.getLayoutInflater();
         final DialogAddReactionBinding viewBinding =
@@ -375,20 +387,69 @@ public abstract class XmppActivity extends ActionBarActivity {
             button.setText(emoji);
             button.setOnClickListener(
                     v -> {
-                        final var aggregated = message.getAggregatedReactions();
-                        if (aggregated.ourReactions.contains(emoji)) {
-                            callback.accept(aggregated.ourReactions);
-                        } else {
-                            final ImmutableSet.Builder<String> reactionBuilder =
-                                    new ImmutableSet.Builder<>();
-                            reactionBuilder.addAll(aggregated.ourReactions);
-                            reactionBuilder.add(emoji);
-                            callback.accept(reactionBuilder.build());
-                        }
+                        callback.accept(new EmojiSearch.Emoji(emoji, 0));
                         dialog.dismiss();
                     });
         }
+
+        final var emojiDebounce = new Handler(Looper.getMainLooper());
+        final var emojiSearch = xmppConnectionService.emojiSearch();
+        final var autocomplete = Autocomplete.<EmojiSearch.Emoji>on(viewBinding.search)
+            .with(getDrawable(R.drawable.background_message_bubble))
+            .with(new AutocompletePolicy() {
+                @Override
+                public boolean shouldShowPopup(@NonNull Spannable text, int cursorPos) { return true; }
+
+                @Override
+                public boolean shouldDismissPopup(@NonNull Spannable text, int cursorPos) { return false; }
+
+                @Override
+                public CharSequence getQuery(@NonNull Spannable text) { return text; }
+
+                @Override
+                public void onDismiss(@NonNull Spannable text) { }
+            })
+            .with(new RecyclerViewPresenter<EmojiSearch.Emoji>(this) {
+                protected EmojiSearch.EmojiSearchAdapter adapter;
+
+                @Override
+                protected Adapter instantiateAdapter() {
+                    adapter = emojiSearch.makeAdapter(item -> dispatchClick(item));
+                    return adapter;
+                }
+
+                @Override
+                protected void onViewHidden() {
+                    if (getRecyclerView() == null) return;
+                    super.onViewHidden();
+                }
+
+                @Override
+                protected void onQuery(CharSequence query) {
+                    emojiDebounce.removeCallbacksAndMessages(null);
+                    emojiDebounce.postDelayed(() -> {
+                        if (getRecyclerView() == null) return;
+                        getRecyclerView().setItemAnimator(null);
+                        adapter.search(XmppActivity.this, getRecyclerView(), query.toString());
+                    }, 100L);
+                }
+            })
+            .with(new AutocompleteCallback<EmojiSearch.Emoji>() {
+                @Override
+                public boolean onPopupItemClicked(Editable editable, EmojiSearch.Emoji emoji) {
+                    callback.accept(emoji);
+                    dialog.dismiss();
+                    return true;
+                }
+
+                @Override
+                public void onPopupVisibilityChanged(boolean shown) {}
+            }).build();
+
         dialog.show();
+        dialog.getWindow().getDecorView().post(() -> {
+            autocomplete.showPopup("");
+        });
     }
 
     protected void deleteAccount(final Account account) {
