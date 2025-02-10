@@ -447,8 +447,8 @@ public abstract class XmppActivity extends ActionBarActivity {
             }).build();
 
         dialog.show();
-        dialog.getWindow().getDecorView().post(() -> {
-            autocomplete.showPopup("");
+        viewBinding.search.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) autocomplete.showPopup(viewBinding.search.getText());
         });
     }
 
