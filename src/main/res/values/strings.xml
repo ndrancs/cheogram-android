@@ -893,8 +893,8 @@
     <string name="i_already_have_an_account">I already have an account</string>
     <string name="add_existing_account">Add existing account</string>
     <string name="register_new_account">Register new account</string>
-    <string name="this_looks_like_a_domain">This looks like a domain address</string>
-    <string name="add_anway">Add anyway</string>
+    <string name="this_looks_like_a_domain">This looks like a Space</string>
+    <string name="add_anway">Continue</string>
     <string name="this_looks_like_channel">This looks like a channel address</string>
     <string name="share_backup_files">Share backup files</string>
     <string name="conversations_backup">Conversations backup</string>

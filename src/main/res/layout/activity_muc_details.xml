@@ -236,7 +236,7 @@
                             android:minWidth="0dp"
                             android:layout_marginTop="32dp"
                             android:layout_marginRight="-13dp"
-                            android:text="Related Chats" />
+                            android:text="Browse Space" />
 
                         <TextView
                             android:id="@+id/jid"
