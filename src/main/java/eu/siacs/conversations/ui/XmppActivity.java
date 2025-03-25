@@ -419,6 +419,14 @@ public abstract class XmppActivity extends ActionBarActivity {
                 }
 
                 @Override
+                protected PopupDimensions getPopupDimensions() {
+                    final var dims = super.getPopupDimensions();
+                    final var available = new android.widget.PopupWindow().getMaxAvailableHeight(viewBinding.search);
+                    dims.maxHeight = available / 4;
+                    return dims;
+                }
+
+                @Override
                 protected void onViewHidden() {
                     if (getRecyclerView() == null) return;
                     super.onViewHidden();
