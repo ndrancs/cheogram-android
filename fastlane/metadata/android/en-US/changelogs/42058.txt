@@ -1,0 +1,12 @@
+* Button to browser chat "space", offer to browse a space from the "new contact" dialog if a space address is entered
+* Allow selecting text in command UI notes
+* Improve channel reconnection logic
+* Do not clear message box after upload
+* Don't set empty nickname on bookmarks
+* Show missed calls from when you were offline
+* Allow searching for emoji to react with (including custom emoji)
+* Speed up experimental export
+* Do not default to a server-specified invalid option in Command UI
+* Prevent audio device selectoin feedback loop on some devices
+* Always set up the drawer
+* Allow scannning Snikket invites to work for new account
