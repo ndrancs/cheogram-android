@@ -70,6 +70,7 @@ import io.michaelrocks.libphonenumber.android.NumberParseException;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.color.MaterialColors;
 
+import org.jetbrains.annotations.NotNull;
 import org.openintents.openpgp.util.OpenPgpApi;
 
 import java.util.Arrays;
@@ -223,12 +224,24 @@ public class ConversationsActivity extends XmppActivity
             final var items = binding.drawer.getItemAdapter().getAdapterItems();
             final var tags = new TreeMap<Tag, Integer>();
             final var conversations = new ArrayList<Conversation>();
+            final var removedConversations = new ArrayList<Conversation>();
             var totalUnread = 0;
             var dmUnread = 0;
             var channelUnread = 0;
             var chatRequests = 0;
             final var selectedAccount = selectedAccount();
-            populateWithOrderedConversations(conversations, false, false);
+            // What sort of memory footprint does this function typically have?
+            populateWithOrderedConversations(
+                    conversations,
+                    removedConversations,
+                    false
+            );
+
+            final var invisibles = removedConversations.stream().anyMatch(c -> c.unreadCount(xmppConnectionService) > 0);
+
+            // Reconstruct the complete list for counts and tags computation
+            conversations.addAll(removedConversations);
+
             for (final var c : conversations) {
                 final var unread = c.unreadCount(xmppConnectionService);
                 if (selectedAccount == null || selectedAccount.getUuid().equals(c.getAccount().getUuid())) {
@@ -247,6 +260,7 @@ public class ConversationsActivity extends XmppActivity
                 if (accountUnread == null) accountUnread = 0;
                 accountUnreads.put(c.getAccount(), accountUnread + unread);
             }
+
             filterByMainFilter(conversations);
             for (final var c : conversations) {
                 if (selectedAccount == null || selectedAccount.getUuid().equals(c.getAccount().getUuid())) {
@@ -258,6 +272,14 @@ public class ConversationsActivity extends XmppActivity
                         tags.put(tag, count + unread);
                     }
                 }
+            }
+
+            ActionBar supportBar = getSupportActionBar();
+
+            if (invisibles && supportBar != null) {
+               supportBar.setHomeAsUpIndicator(R.drawable.menu_with_dot_24dp);
+            } else if (supportBar != null) {
+                supportBar.setHomeAsUpIndicator(R.drawable.menu_24dp);
             }
 
             com.mikepenz.materialdrawer.util.MaterialDrawerSliderViewExtensionsKt.updateBadge(
@@ -652,30 +674,49 @@ public class ConversationsActivity extends XmppActivity
 
     @Override
     public void populateWithOrderedConversations(List<Conversation> list) {
-        populateWithOrderedConversations(list, true, true);
+        populateWithOrderedConversations(list, new ArrayList<>(), true);
     }
 
-    public void populateWithOrderedConversations(List<Conversation> list, final boolean filter, final boolean sort) {
-        if (sort) {
-            super.populateWithOrderedConversations(list);
-        } else {
-            list.addAll(xmppConnectionService.getConversations());
-        }
+    public void populateWithOrderedConversations(
+            @NotNull List<Conversation> list,
+            final boolean sort
+    ) {
+        populateWithOrderedConversations(list, new ArrayList<>(), sort);
+    }
 
-        if (!filter) return;
-        filterByMainFilter(list);
+    // @param conversations an initially empty list representing the messages
+    //         to returned as relevant
+    // @return a `boolean` value indicating whether any conversations
+    //         were filtered out and therefore would be invisible to
+    //         the user.
+    public void populateWithOrderedConversations(
+            @NotNull List<Conversation> retained,
+            @NotNull List<Conversation> removed,
+            final boolean sort
+    ) {
+		if (sort) {
+			super.populateWithOrderedConversations(retained);
+		} else {
+			retained.addAll(xmppConnectionService.getConversations());
+		}
 
-        final var selectedAccount = selectedAccount();
+		filterByMainFilter(retained, removed);
 
-        for (final var c : ImmutableList.copyOf(list)) {
-            if (selectedAccount != null && !selectedAccount.getUuid().equals(c.getAccount().getUuid())) {
-                list.remove(c);
-            } else if (!selectedTag.isEmpty()) {
-                final var tags = new HashSet<>(c.getTags(this));
-                tags.retainAll(selectedTag);
-                if (tags.isEmpty()) list.remove(c);
-            }
-        }
+		final var selectedAccount = selectedAccount();
+
+		for (final var c : ImmutableList.copyOf(retained)) {
+			if (selectedAccount != null && !selectedAccount.getUuid().equals(c.getAccount().getUuid())) {
+				retained.remove(c);
+				removed.add(c);
+			} else if (!selectedTag.isEmpty()) {
+				final var tags = new HashSet<>(c.getTags(this));
+				tags.retainAll(selectedTag);
+				if (tags.isEmpty()) {
+					retained.remove(c);
+					removed.add(c);
+				}
+			}
+		}
     }
 
     protected Account selectedAccount() {
@@ -683,22 +724,41 @@ public class ConversationsActivity extends XmppActivity
         return (Account) accountHeader.getActiveProfile().getTag();
     }
 
-    protected void filterByMainFilter(List<Conversation> list) {
+    // Applies pre-defined filters to specify that only conversations
+    // from certain accounts or types of conversations are displayed.
+    //
+    // @param `retained` an initially-empty list representing the messages
+    //         to eventually be returned as relevant.
+    // @param `removed` an initially-empty list representing the messages
+    //         filtered out by tags and `filterByMainFilter`
+    protected void filterByMainFilter(
+        @NotNull List<Conversation> list,
+        @NotNull List<Conversation> removed
+    ) {
          final var chatRequests = xmppConnectionService.getStringPreference("chat_requests", R.string.default_chat_requests);
          for (final var c : ImmutableList.copyOf(list)) {
             if (mainFilter == DRAWER_CHANNELS && c.getMode() != Conversation.MODE_MULTI) {
                 list.remove(c);
+                removed.add(c);
             } else if (mainFilter == DRAWER_DIRECT_MESSAGES && c.getMode() == Conversation.MODE_MULTI) {
                 list.remove(c);
+                removed.add(c);
             } else if (mainFilter == DRAWER_UNREAD_CHATS && c.unreadCount(xmppConnectionService) < 1) {
                 list.remove(c);
+                removed.add(c);
             } else if (mainFilter == DRAWER_CHAT_REQUESTS && !c.isChatRequest(chatRequests)) {
                 list.remove(c);
+                removed.add(c);
             }
             if (mainFilter != DRAWER_CHAT_REQUESTS && c.isChatRequest(chatRequests)) {
                 list.remove(c);
+                removed.add(c);
             }
         }
+    }
+
+    protected void filterByMainFilter(@NotNull List<Conversation> list) {
+        filterByMainFilter(list, new ArrayList<>());
     }
 
     @Override
@@ -1260,7 +1320,7 @@ public class ConversationsActivity extends XmppActivity
             }
             case R.id.action_report_spam: {
                 final var list = new ArrayList<Conversation>();
-                populateWithOrderedConversations(list, true, false);
+                populateWithOrderedConversations(list, false);
                 new AlertDialog.Builder(this)
                     .setTitle(R.string.report_spam)
                     .setMessage("Do you really want to block all these users and report as SPAM?")
