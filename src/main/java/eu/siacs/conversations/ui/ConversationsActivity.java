@@ -192,6 +192,7 @@ public class ConversationsActivity extends XmppActivity
     private HashSet<Tag> selectedTag = new HashSet<>();
     private long mainFilter = DRAWER_ALL_CHATS;
     private boolean refreshAccounts = true;
+    private boolean invisibles = false;
 
     private static boolean isViewOrShareIntent(Intent i) {
         Log.d(Config.LOGTAG, "action: " + (i == null ? null : i.getAction()));
@@ -237,7 +238,8 @@ public class ConversationsActivity extends XmppActivity
                     false
             );
 
-            final var invisibles = removedConversations.stream().anyMatch(c -> c.unreadCount(xmppConnectionService) > 0);
+            invisibles = removedConversations.stream().anyMatch(c -> c.unreadCount(xmppConnectionService) > 0);
+            invalidateActionBarTitle();
 
             // Reconstruct the complete list for counts and tags computation
             conversations.addAll(removedConversations);
@@ -272,14 +274,6 @@ public class ConversationsActivity extends XmppActivity
                         tags.put(tag, count + unread);
                     }
                 }
-            }
-
-            ActionBar supportBar = getSupportActionBar();
-
-            if (invisibles && supportBar != null) {
-               supportBar.setHomeAsUpIndicator(R.drawable.menu_with_dot_24dp);
-            } else if (supportBar != null) {
-                supportBar.setHomeAsUpIndicator(R.drawable.menu_24dp);
             }
 
             com.mikepenz.materialdrawer.util.MaterialDrawerSliderViewExtensionsKt.updateBadge(
@@ -1464,7 +1458,7 @@ public class ConversationsActivity extends XmppActivity
             actionBar.setTitle(R.string.app_name);
         }
         actionBar.setDisplayHomeAsUpEnabled(true);
-        actionBar.setHomeAsUpIndicator(R.drawable.menu_24dp);
+        actionBar.setHomeAsUpIndicator(invisibles ? R.drawable.menu_with_dot_24dp : R.drawable.menu_24dp);
         ToolbarUtils.resetActionBarOnClickListeners(binding.toolbar);
         ToolbarUtils.setActionBarOnClickListener(
                 binding.toolbar,
