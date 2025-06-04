@@ -2,17 +2,16 @@
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="960"
-    android:viewportHeight="960"
-    android:tint="?attr/colorControlNormal">
+    android:viewportHeight="960">
 
     <!-- Hamburger menu icon -->
     <path
-        android:fillColor="@android:color/white"
+        android:fillColor="?attr/colorControlNormal"
         android:pathData="M120,720L120,640L840,640L840,720L120,720ZM120,520L120,440L840,440L840,520L120,520ZM120,320L120,240L840,240L840,320L120,320Z"/>
 
     <!-- Notification badge (dot) - radius 160, moved up -->
     <path
-        android:fillColor="@color/perpy"
+        android:fillColor="?colorPrimary"
         android:pathData="M820,100
                           A160,160 0 1,1 819.9,100
                           Z"/>
