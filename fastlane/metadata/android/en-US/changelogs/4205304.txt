@@ -1,0 +1,10 @@
+* WebXDC "store" to choose a widget to add
+* WebXDC UX improvements, especially for widgets that use touch events
+* WebXDC experimental "realtime" API support
+* Improve display of images shared from WebXDC
+* Fix top spacing in chat bubbles
+* Fix colour of "send private message" indicator
+* Improve thread identicon contrast
+* Fixes for rich reply markup processing
+* Fix for large font on a retracted message that was a reply
+* Improvements to showing what a MUC "actually" sent
