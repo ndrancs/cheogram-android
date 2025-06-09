@@ -1,0 +1,5 @@
+* Use better filename when sharing media more often
+* Many crash fixes
+* Restore support for add someone not a contact to new group text
+* Clear reply UI when switching to correction
+* Disable "send private message" menu item by default
