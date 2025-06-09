@@ -499,12 +499,6 @@ public class StartConversationActivity extends XmppActivity
         super.onStart();
         mConferenceAdapter.refreshSettings();
         mContactsAdapter.refreshSettings();
-        if (!createdByViewIntent) {
-            if (askForContactsPermissions()) {
-                return;
-            }
-            requestNotificationPermissionIfNeeded();
-        }
     }
 
     private void requestNotificationPermissionIfNeeded() {
@@ -1203,6 +1197,13 @@ public class StartConversationActivity extends XmppActivity
                 && this.conferences.size() == 0
                 && mOpenedFab.compareAndSet(false, true)) {
             binding.speedDial.open();
+        }
+
+        if (!createdByViewIntent) {
+            if (askForContactsPermissions()) {
+                return;
+            }
+            requestNotificationPermissionIfNeeded();
         }
     }
 
