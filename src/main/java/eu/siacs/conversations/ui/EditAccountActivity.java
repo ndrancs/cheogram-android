@@ -1320,8 +1320,7 @@ public class EditAccountActivity extends OmemoActivity
                 mAccount.isOptionSet(Account.OPTION_MAGIC_CREATE)
                         || !mAccount.isOptionSet(Account.OPTION_LOGGED_IN_SUCCESSFULLY);
         final boolean neverLoggedIn =
-                !mAccount.isOptionSet(Account.OPTION_LOGGED_IN_SUCCESSFULLY)
-                        && QuickConversationsService.isConversations();
+                !mAccount.isOptionSet(Account.OPTION_LOGGED_IN_SUCCESSFULLY);
         final boolean editPassword = mAccount.unauthorized() || neverLoggedIn;
 
         this.binding.accountPasswordLayout.setPasswordVisibilityToggleEnabled(togglePassword);
