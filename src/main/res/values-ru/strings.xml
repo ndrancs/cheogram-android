@@ -676,7 +676,7 @@
     <string name="pref_automatically_delete_messages_description">Автоматически удалять сообщения с этого устройства по прошествии заданного времени.</string>
     <string name="encrypting_message">Зашифровать сообщение</string>
     <string name="not_fetching_history_retention_period">Сообщения не загружаются в соответствии с локальным сроком хранения.</string>
-    <string name="transcoding_video">Сжимание видео</string>
+    <string name="transcoding_video">Сжатие видео</string>
     <string name="contact_blocked_past_tense">Контакт заблокирован.</string>
     <string name="pref_notifications_from_strangers">Уведомления от неизвестных контактов</string>
     <string name="pref_notifications_from_strangers_summary">Уведомлять о сообщениях и звонках от неизвестных контактов</string>
@@ -1156,4 +1156,6 @@
     <string name="delete_avatar_message">Хотите удалить свой аватар? Некоторые клиенты могут продолжать отображать кэшированную копию вашего аватара.</string>
     <string name="show_to_contacts_only">Показывать только контактам</string>
     <string name="account_status_connection_timeout">Истекло время ожидания подключения</string>
+    <string name="retry_with_p2p">Повторить через P2P</string>
+    <string name="account_status_channel_binding">Привязка канала недоступна</string>
 </resources>

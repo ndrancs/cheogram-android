@@ -1858,24 +1858,25 @@ public class ConversationFragment extends XmppFragment
             activity.getMenuInflater().inflate(R.menu.message_context, menu);
             final MenuItem reportAndBlock = menu.findItem(R.id.action_report_and_block);
             final MenuItem addReaction = menu.findItem(R.id.action_add_reaction);
-            MenuItem openWith = menu.findItem(R.id.open_with);
-            MenuItem copyMessage = menu.findItem(R.id.copy_message);
-            MenuItem quoteMessage = menu.findItem(R.id.quote_message);
-            MenuItem retryDecryption = menu.findItem(R.id.retry_decryption);
-            MenuItem correctMessage = menu.findItem(R.id.correct_message);
-            MenuItem retractMessage = menu.findItem(R.id.retract_message);
-            MenuItem moderateMessage = menu.findItem(R.id.moderate_message);
-            MenuItem onlyThisThread = menu.findItem(R.id.only_this_thread);
-            MenuItem shareWith = menu.findItem(R.id.share_with);
-            MenuItem sendAgain = menu.findItem(R.id.send_again);
-            MenuItem copyUrl = menu.findItem(R.id.copy_url);
-            MenuItem copyLink = menu.findItem(R.id.copy_link);
-            MenuItem saveAsSticker = menu.findItem(R.id.save_as_sticker);
-            MenuItem downloadFile = menu.findItem(R.id.download_file);
-            MenuItem cancelTransmission = menu.findItem(R.id.cancel_transmission);
-            MenuItem blockMedia = menu.findItem(R.id.block_media);
-            MenuItem deleteFile = menu.findItem(R.id.delete_file);
-            MenuItem showErrorMessage = menu.findItem(R.id.show_error_message);
+            final MenuItem openWith = menu.findItem(R.id.open_with);
+            final MenuItem copyMessage = menu.findItem(R.id.copy_message);
+            final MenuItem quoteMessage = menu.findItem(R.id.quote_message);
+            final MenuItem retryDecryption = menu.findItem(R.id.retry_decryption);
+            final MenuItem correctMessage = menu.findItem(R.id.correct_message);
+            final MenuItem retractMessage = menu.findItem(R.id.retract_message);
+            final MenuItem moderateMessage = menu.findItem(R.id.moderate_message);
+            final MenuItem onlyThisThread = menu.findItem(R.id.only_this_thread);
+            final MenuItem shareWith = menu.findItem(R.id.share_with);
+            final MenuItem sendAgain = menu.findItem(R.id.send_again);
+            final MenuItem retryAsP2P = menu.findItem(R.id.send_again_as_p2p);
+            final MenuItem copyUrl = menu.findItem(R.id.copy_url);
+            final MenuItem copyLink = menu.findItem(R.id.copy_link);
+            final MenuItem saveAsSticker = menu.findItem(R.id.save_as_sticker);
+            final MenuItem downloadFile = menu.findItem(R.id.download_file);
+            final MenuItem cancelTransmission = menu.findItem(R.id.cancel_transmission);
+            final MenuItem blockMedia = menu.findItem(R.id.block_media);
+            final MenuItem deleteFile = menu.findItem(R.id.delete_file);
+            final MenuItem showErrorMessage = menu.findItem(R.id.show_error_message);
             onlyThisThread.setVisible(!conversation.getLockThread() && m.getThread() != null);
             final boolean unInitiatedButKnownSize = MessageUtils.unInitiatedButKnownSize(m);
             final boolean showError =
@@ -1949,6 +1950,12 @@ public class ConversationFragment extends XmppFragment
             }
             if (m.getStatus() == Message.STATUS_SEND_FAILED) {
                 sendAgain.setVisible(true);
+                final var fileNotUploaded = m.isFileOrImage() && !m.hasFileOnRemoteHost();
+                final var isPeerOnline =
+                        conversational.getMode() == Conversation.MODE_SINGLE
+                                && (conversational instanceof Conversation c)
+                                && !c.getContact().getPresences().isEmpty();
+                retryAsP2P.setVisible(fileNotUploaded && isPeerOnline);
             }
             if (m.hasFileOnRemoteHost()
                     || m.isGeoUri()
@@ -2061,7 +2068,10 @@ public class ConversationFragment extends XmppFragment
                 quoteMessage(selectedMessage);
                 return true;
             case R.id.send_again:
-                resendMessage(selectedMessage);
+                resendMessage(selectedMessage, false);
+                return true;
+            case R.id.send_again_as_p2p:
+                resendMessage(selectedMessage, true);
                 return true;
             case R.id.copy_url:
                 ShareUtil.copyUrlToClipboard(activity, selectedMessage);
@@ -3085,12 +3095,11 @@ public class ConversationFragment extends XmppFragment
         builder.create().show();
     }
 
-    private void resendMessage(final Message message) {
+    private void resendMessage(final Message message, final boolean forceP2P) {
         if (message.isFileOrImage()) {
-            if (!(message.getConversation() instanceof Conversation)) {
+            if (!(message.getConversation() instanceof Conversation conversation)) {
                 return;
             }
-            final Conversation conversation = (Conversation) message.getConversation();
             final DownloadableFile file =
                     activity.xmppConnectionService.getFileBackend().getFile(message);
             if ((file.exists() && file.canRead()) || message.hasFileOnRemoteHost()) {
@@ -3098,14 +3107,16 @@ public class ConversationFragment extends XmppFragment
                 if (!message.hasFileOnRemoteHost()
                         && xmppConnection != null
                         && conversation.getMode() == Conversational.MODE_SINGLE
-                        && !xmppConnection
-                                .getFeatures()
-                                .httpUpload(message.getFileParams().getSize())) {
+                        && (!xmppConnection
+                                        .getFeatures()
+                                        .httpUpload(message.getFileParams().getSize())
+                                || forceP2P)) {
                     activity.selectPresence(
                             conversation,
                             () -> {
                                 message.setCounterpart(conversation.getNextCounterpart());
-                                activity.xmppConnectionService.resendFailedMessages(message);
+                                activity.xmppConnectionService.resendFailedMessages(
+                                        message, forceP2P);
                                 new Handler()
                                         .post(
                                                 () -> {
@@ -3128,7 +3139,7 @@ public class ConversationFragment extends XmppFragment
                 return;
             }
         }
-        activity.xmppConnectionService.resendFailedMessages(message);
+        activity.xmppConnectionService.resendFailedMessages(message, false);
         new Handler()
                 .post(
                         () -> {
