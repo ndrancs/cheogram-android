@@ -39,9 +39,9 @@ import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.text.Editable;
-import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.text.SpannableStringBuilder;
 import android.text.style.ImageSpan;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -132,6 +132,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.Iterables;
+import de.gultsch.common.Linkify;
+import de.gultsch.common.Patterns;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
@@ -997,7 +1000,7 @@ public class ConversationFragment extends XmppFragment
                 message = new Message(conversation, body.toString(), conversation.getNextEncryption());
                 message.setBody(hasSubject && body.length() == 0 ? null : body);
                 if (message.bodyIsOnlyEmojis()) {
-                    SpannableStringBuilder spannable = message.getSpannableBody(null, null);
+                    var spannable = message.getSpannableBody(null, null);
                     ImageSpan[] imageSpans = spannable.getSpans(0, spannable.length(), ImageSpan.class);
                     for (ImageSpan span : imageSpans) {
                         final int start = spannable.getSpanStart(span);
@@ -1758,7 +1761,7 @@ public class ConversationFragment extends XmppFragment
             return;
         }
 
-        SpannableStringBuilder body = message.getSpannableBody(null, null);
+        var body = message.getSpannableBody(null, null);
         if (message.isFileOrImage() || message.isOOb()) body.append(" 🖼️");
         messageListAdapter.handleTextQuotes(binding.contextPreviewText, body);
         binding.contextPreviewText.setText(body);
@@ -1914,13 +1917,22 @@ public class ConversationFragment extends XmppFragment
                     && t == null) {
                 copyMessage.setVisible(true);
                 quoteMessage.setVisible(!showError && !MessageUtils.prepareQuote(m).isEmpty());
-                final String scheme =
-                        ShareUtil.getLinkScheme(new SpannableStringBuilder(m.getBody()));
-                if ("xmpp".equals(scheme)) {
-                    copyLink.setTitle(R.string.copy_jabber_id);
+                final var firstUri = Iterables.getFirst(Linkify.getLinks(m.getBody()), null);
+                if (firstUri != null) {
+                    final var scheme = firstUri.getScheme();
+                    final @StringRes int resForScheme =
+                            switch (scheme) {
+                                case "xmpp" -> R.string.copy_jabber_id;
+                                case "http", "https", "gemini" -> R.string.copy_link;
+                                case "geo" -> R.string.copy_geo_uri;
+                                case "tel" -> R.string.copy_telephone_number;
+                                case "mailto" -> R.string.copy_email_address;
+                                default -> R.string.copy_URI;
+                            };
+                    copyLink.setTitle(resForScheme);
                     copyLink.setVisible(true);
-                } else if (scheme != null) {
-                    copyLink.setVisible(true);
+                } else {
+                    copyLink.setVisible(false);
                 }
             }
             quoteMessage.setVisible(!encrypted && !showError);
@@ -3008,12 +3020,14 @@ public class ConversationFragment extends XmppFragment
         builder.setNegativeButton(
                 R.string.copy_to_clipboard,
                 (dialog, which) -> {
-                    activity.copyTextToClipboard(displayError, R.string.error_message);
-                    Toast.makeText(
-                                    activity,
-                                    R.string.error_message_copied_to_clipboard,
-                                    Toast.LENGTH_SHORT)
-                            .show();
+                    if (activity.copyTextToClipboard(displayError, R.string.error_message)
+                            && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        Toast.makeText(
+                                        activity,
+                                        R.string.error_message_copied_to_clipboard,
+                                        Toast.LENGTH_SHORT)
+                                .show();
+                    }
                 });
         builder.setPositiveButton(R.string.confirm, null);
         builder.create().show();
@@ -3633,7 +3647,7 @@ public class ConversationFragment extends XmppFragment
                 }
             }
         } else {
-            if (text != null && GeoHelper.GEO_URI.matcher(text).matches()) {
+            if (text != null && Patterns.URI_GEO.matcher(text).matches()) {
                 mediaPreviewAdapter.addMediaPreviews(
                         Attachment.of(getActivity(), Uri.parse(text), Attachment.Type.LOCATION));
                 toggleInputMethod();

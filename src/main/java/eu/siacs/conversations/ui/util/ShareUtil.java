@@ -41,17 +41,27 @@ import android.widget.Toast;
 
 import java.util.regex.Matcher;
 
+import android.os.Build;
+import android.widget.Toast;
+import androidx.annotation.StringRes;
+import com.google.common.collect.Iterables;
+import de.gultsch.common.Linkify;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.entities.DownloadableFile;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.ui.ConversationsActivity;
 import eu.siacs.conversations.ui.XmppActivity;
-import eu.siacs.conversations.utils.Patterns;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.Jid;
+import java.util.Arrays;
+import java.util.Collection;
 
 public class ShareUtil {
+
+    private static final Collection<String> SCHEMES_COPY_PATH_ONLY =
+            Arrays.asList("xmpp", "mailto", "tel");
+
 
     public static void share(XmppActivity activity, Message message) {
         Intent shareIntent = new Intent();
@@ -101,14 +111,26 @@ public class ShareUtil {
         }
     }
 
-    public static void copyToClipboard(XmppActivity activity, Message message) {
-        if (activity.copyTextToClipboard(message.getQuoteableBody(), R.string.message)) {
+    public static void copyToClipboard(final XmppActivity activity, final Message message) {
+        if (activity.copyTextToClipboard(message.getQuoteableBody(), R.string.message)
+                && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             Toast.makeText(activity, R.string.message_copied_to_clipboard, Toast.LENGTH_SHORT)
                     .show();
         }
     }
 
-    public static void copyUrlToClipboard(XmppActivity activity, Message message) {
+	public static boolean copyTextToClipboard(Context context, String text, int labelResId) {
+        ClipboardManager mClipBoardManager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        String label = context.getResources().getString(labelResId);
+        if (mClipBoardManager != null) {
+            ClipData mClipData = ClipData.newPlainText(label, text);
+            mClipBoardManager.setPrimaryClip(mClipData);
+            return true;
+        }
+        return false;
+    }
+
+    public static void copyUrlToClipboard(final XmppActivity activity, final Message message) {
         final String url;
         final int resId;
         if (message.isGeoUri()) {
@@ -125,10 +147,12 @@ public class ShareUtil {
                             : message.getRawBody().trim();
             resId = R.string.file_url;
         }
-        if (activity.copyTextToClipboard(url, resId)) {
+        if (activity.copyTextToClipboard(url, resId)
+                && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             Toast.makeText(activity, R.string.url_copied_to_clipboard, Toast.LENGTH_SHORT).show();
         }
     }
+
 
     public static void copyLinkToClipboard(final Context context, final String url) {
         final Uri uri = Uri.parse(url);
@@ -147,35 +171,33 @@ public class ShareUtil {
     }
 
     public static void copyLinkToClipboard(final XmppActivity activity, final Message message) {
-        final SpannableStringBuilder body = message.getSpannableBody();
-        MyLinkify.addLinks(body, true);
-        for (final URLSpan urlspan : body.getSpans(0, body.length() - 1, URLSpan.class)) {
-            copyLinkToClipboard(activity, urlspan.getURL());
+        final var firstUri = Iterables.getFirst(Linkify.getLinks(message.getBody()), null);
+        if (firstUri == null) {
             return;
         }
-    }
-
-    public static boolean copyTextToClipboard(Context context, String text, int labelResId) {
-        ClipboardManager mClipBoardManager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-        String label = context.getResources().getString(labelResId);
-        if (mClipBoardManager != null) {
-            ClipData mClipData = ClipData.newPlainText(label, text);
-            mClipBoardManager.setPrimaryClip(mClipData);
-            return true;
+        final String clip;
+        if (SCHEMES_COPY_PATH_ONLY.contains(firstUri.getScheme())) {
+            clip = firstUri.getPath();
+        } else {
+            clip = firstUri.getRaw();
         }
-        return false;
-    }
-
-    public static String getLinkScheme(final SpannableStringBuilder body) {
-        MyLinkify.addLinks(body, false);
-        for (final String url : MyLinkify.extractLinks(body)) {
-            final Uri uri = Uri.parse(url);
-            if ("xmpp".equals(uri.getScheme())) {
-                return uri.getScheme();
-            } else {
-                return "http";
-            }
+        final @StringRes int label =
+                switch (firstUri.getScheme()) {
+                    case "http", "https", "gemini" -> R.string.web_address;
+                    case "xmpp" -> R.string.account_settings_jabber_id;
+                    default -> R.string.uri;
+                };
+        final @StringRes int toast =
+                switch (firstUri.getScheme()) {
+                    case "http", "https", "gemini", "web+ap" -> R.string.url_copied_to_clipboard;
+                    case "xmpp" -> R.string.jabber_id_copied_to_clipboard;
+                    case "tel" -> R.string.copied_phone_number;
+                    case "mailto" -> R.string.copied_email_address;
+                    default -> R.string.uri_copied_to_clipboard;
+                };
+        if (activity.copyTextToClipboard(clip, label)
+                && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Toast.makeText(activity, toast, Toast.LENGTH_SHORT).show();
         }
-        return null;
     }
 }

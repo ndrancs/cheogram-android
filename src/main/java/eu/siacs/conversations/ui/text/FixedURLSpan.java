@@ -34,10 +34,10 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
 import android.text.Editable;
 import android.text.Spanned;
 import android.text.style.URLSpan;
+import android.util.Log;
 import android.view.SoundEffectConstants;
 import android.view.View;
 import android.widget.Toast;
@@ -46,37 +46,41 @@ import com.cheogram.android.BrowserHelper;
 
 import java.util.Arrays;
 
+import com.google.common.base.Joiner;
+import de.gultsch.common.MiniUri;
+import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.ui.ConversationsActivity;
 import eu.siacs.conversations.ui.ShowLocationActivity;
+import java.util.Arrays;
 
 @SuppressLint("ParcelCreator")
 public class FixedURLSpan extends URLSpan {
 
 	protected final Account account;
 
-	public FixedURLSpan(String url) {
+	public FixedURLSpan(final String url) {
 		this(url, null);
 	}
 
-	public FixedURLSpan(String url, Account account) {
+	public FixedURLSpan(final String url, Account account) {
 		super(url);
 		this.account = account;
 	}
 
-    public static void fix(final Editable editable) {
-        for (final URLSpan urlspan : editable.getSpans(0, editable.length() - 1, URLSpan.class)) {
-            final int start = editable.getSpanStart(urlspan);
-            final int end = editable.getSpanEnd(urlspan);
-            editable.removeSpan(urlspan);
-            editable.setSpan(
-                    new FixedURLSpan(urlspan.getURL()),
-                    start,
-                    end,
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-    }
+	public static void fix(final Editable editable) {
+		for (final URLSpan urlspan : editable.getSpans(0, editable.length() - 1, URLSpan.class)) {
+			final int start = editable.getSpanStart(urlspan);
+			final int end = editable.getSpanEnd(urlspan);
+			editable.removeSpan(urlspan);
+			editable.setSpan(
+					new FixedURLSpan(urlspan.getURL()),
+					start,
+					end,
+					Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+		}
+	}
 
 	@Override
 	public void onClick(View widget) {
@@ -107,7 +111,19 @@ public class FixedURLSpan extends URLSpan {
 			return;
 		}
 
-		final Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+		var intent = new Intent(Intent.ACTION_VIEW, uri);
+		if ("web+ap".equals(uri.getScheme())) {
+			if (intent.resolveActivity(context.getPackageManager()) == null) {
+				Log.d(Config.LOGTAG, "no app found to handle web+ap");
+				final var webApAsHttps =
+						Uri.parse(
+								String.format(
+										"https://%s/%s",
+										uri.getAuthority(),
+										Joiner.on('/').join(uri.getPathSegments())));
+				intent = new Intent(Intent.ACTION_VIEW, webApAsHttps);
+			}
+		}
 		if ("geo".equalsIgnoreCase(uri.getScheme())) {
 			intent.setClass(context, ShowLocationActivity.class);
 		} else {
@@ -118,10 +134,10 @@ public class FixedURLSpan extends URLSpan {
 			widget.playSoundEffect(SoundEffectConstants.CLICK);
 		} catch (ActivityNotFoundException e) {
 			if ("bitcoin".equals(uri.getScheme()) || "bitcoincash".equals(uri.getScheme()) || "monero".equals(uri.getScheme())) {
-			    Toast.makeText(context, "No compatible wallet app found", Toast.LENGTH_SHORT).show();
+				Toast.makeText(context, "No compatible wallet app found", Toast.LENGTH_SHORT).show();
 			} else {
-			    Toast.makeText(context, R.string.no_application_found_to_open_link, Toast.LENGTH_SHORT).show();
-		    }
+				Toast.makeText(context, R.string.no_application_found_to_open_link, Toast.LENGTH_SHORT).show();
+			}
 		}
 	}
 }

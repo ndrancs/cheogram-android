@@ -48,19 +48,18 @@ import java.util.stream.Collectors;
 
 import io.ipfs.cid.Cid;
 
+import de.gultsch.common.Patterns;
+import de.gultsch.common.Linkify;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
 import eu.siacs.conversations.http.URL;
 import eu.siacs.conversations.services.AvatarService;
 import eu.siacs.conversations.ui.text.FixedURLSpan;
-import eu.siacs.conversations.ui.util.MyLinkify;
 import eu.siacs.conversations.ui.util.PresenceSelector;
 import eu.siacs.conversations.ui.util.QuoteHelper;
 import eu.siacs.conversations.utils.CryptoHelper;
 import eu.siacs.conversations.utils.Emoticons;
-import eu.siacs.conversations.utils.GeoHelper;
-import eu.siacs.conversations.utils.Patterns;
 import eu.siacs.conversations.utils.MessageUtils;
 import eu.siacs.conversations.utils.MimeUtils;
 import eu.siacs.conversations.utils.StringUtils;
@@ -1249,7 +1248,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
         SpannableStringBuilder text = new SpannableStringBuilder(
             getBody(true).replaceAll("^>.*", "") // Remove quotes
         );
-        return MyLinkify.extractLinks(text).stream().map((url) -> {
+        return Linkify.extractLinks(text).stream().map((url) -> {
             try {
                 return new URI(url);
             } catch (final URISyntaxException e) {
@@ -1400,7 +1399,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
 
     public synchronized boolean isGeoUri() {
         if (isGeoUri == null) {
-            isGeoUri = GeoHelper.GEO_URI.matcher(body).matches();
+            isGeoUri = Patterns.URI_GEO.matcher(body).matches();
         }
         return isGeoUri;
     }

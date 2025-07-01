@@ -4183,7 +4183,7 @@ public class XmppConnectionService extends Service {
     }
 
     private void joinMuc(
-            Conversation conversation,
+            final Conversation conversation,
             final OnConferenceJoined onConferenceJoined,
             final boolean followedInvite) {
         final Account account = conversation.getAccount();
@@ -4933,6 +4933,7 @@ public class XmppConnectionService extends Service {
                                         bookmark == null ? null : bookmark.getBookmarkName(),
                                         mucOptions.getName());
 
+                        final var hadOccupantId = mucOptions.occupantId();
                         if (mucOptions.updateConfiguration(new ServiceDiscoveryResult(response))) {
                             Log.d(
                                     Config.LOGTAG,
@@ -4940,6 +4941,25 @@ public class XmppConnectionService extends Service {
                                             + ": muc configuration changed for "
                                             + conversation.getJid().asBareJid());
                             updateConversation(conversation);
+                        }
+
+                        final var hasOccupantId = mucOptions.occupantId();
+
+                        if (!hadOccupantId && hasOccupantId && mucOptions.online()) {
+                            final var me = mucOptions.getSelf().getFullJid();
+                            Log.d(
+                                    Config.LOGTAG,
+                                    account.getJid().asBareJid()
+                                            + ": gained support for occupant-id in "
+                                            + me
+                                            + ". resending presence");
+                            final var packet =
+                                    mPresenceGenerator.selfPresence(
+                                            account,
+                                            Presence.Status.ONLINE,
+                                            mucOptions.nonanonymous(), mucOptions.getSelf().getNick());
+                            packet.setTo(me);
+                            sendPresencePacket(account, packet);
                         }
 
                         if (bookmark != null
@@ -6401,13 +6421,13 @@ public class XmppConnectionService extends Service {
             if (conversation.getMode() == Conversational.MODE_MULTI && !isPrivateMessage) {
                 final var mucOptions = conversation.getMucOptions();
                 if (!mucOptions.participating()) {
-                    Log.d(Config.LOGTAG, "not participating in MUC");
+                    Log.e(Config.LOGTAG, "not participating in MUC");
                     return false;
                 }
                 final var self = mucOptions.getSelf();
                 final String occupantId = self.getOccupantId();
                 if (Strings.isNullOrEmpty(occupantId)) {
-                    Log.d(Config.LOGTAG, "occupant id not found for reaction in MUC");
+                    Log.e(Config.LOGTAG, "occupant id not found for reaction in MUC");
                     return false;
                 }
                 final var existingRaw =
@@ -6453,6 +6473,7 @@ public class XmppConnectionService extends Service {
                                 null);
             }
             if (reactTo == null || Strings.isNullOrEmpty(reactToId)) {
+                Log.e(Config.LOGTAG, "could not find id to react to");
                 return false;
             }
 
@@ -7100,10 +7121,6 @@ public class XmppConnectionService extends Service {
             }
         }
         return verifiedSomething;
-    }
-
-    public boolean blindTrustBeforeVerification() {
-        return getBooleanPreference(AppSettings.BLIND_TRUST_BEFORE_VERIFICATION, R.bool.btbv);
     }
 
     public ShortcutService getShortcutService() {

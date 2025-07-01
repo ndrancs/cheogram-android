@@ -7,7 +7,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.5.2'
-        classpath "com.diffplug.spotless:spotless-plugin-gradle:6.25.0"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:7.0.2"
     }
 }
 
@@ -59,14 +59,14 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
 
     implementation "androidx.core:core:1.10.1"
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 
     implementation project(':libs:annotation')
     annotationProcessor project(':libs:annotation-processor')
 
     implementation 'androidx.viewpager:viewpager:1.1.0'
 
-    playstoreImplementation('com.google.firebase:firebase-messaging:24.1.0') {
+    playstoreImplementation('com.google.firebase:firebase-messaging:24.1.1') {
         exclude group: 'com.google.firebase', module: 'firebase-core'
         exclude group: 'com.google.firebase', module: 'firebase-analytics'
         exclude group: 'com.google.firebase', module: 'firebase-measurement-connector'
@@ -74,13 +74,13 @@ dependencies {
     cheogramPlaystoreImplementation("com.android.installreferrer:installreferrer:2.2")
     cheogramPlaystoreImplementation 'com.github.singpolyma:play-licensing:1c637ea03c'
     conversationsPlaystoreImplementation("com.android.installreferrer:installreferrer:2.2")
-    quicksyPlaystoreImplementation 'com.google.android.gms:play-services-auth-api-phone:18.1.0'
+    quicksyPlaystoreImplementation 'com.google.android.gms:play-services-auth-api-phone:18.2.0'
     implementation 'com.github.open-keychain.open-keychain:openpgp-api:v5.7.1'
-    implementation("com.github.CanHub:Android-Image-Cropper:2.0.0")
+    implementation("com.vanniktech:android-image-cropper:4.6.0")
     implementation "androidx.sharetarget:sharetarget:1.2.0"
 
     implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.exifinterface:exifinterface:1.3.7'
+    implementation 'androidx.exifinterface:exifinterface:1.4.0'
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation "androidx.preference:preference:1.2.1"
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
@@ -90,8 +90,8 @@ dependencies {
     implementation "androidx.emoji2:emoji2:1.5.0"
     freeImplementation "androidx.emoji2:emoji2-bundled:1.5.0"
 
-    implementation 'org.bouncycastle:bcmail-jdk18on:1.78.1'
-    implementation 'org.bouncycastle:bcpg-jdk18on:1.78.1'
+    implementation 'org.bouncycastle:bcmail-jdk18on:1.80'
+    implementation 'org.bouncycastle:bcpg-jdk18on:1.80'
     implementation 'com.google.zxing:core:3.5.3'
     implementation 'org.minidns:minidns-hla:1.1.1'
     implementation 'me.leolin:ShortcutBadger:1.1.22@aar'
@@ -113,8 +113,8 @@ dependencies {
     implementation "com.squareup.retrofit2:converter-gson:2.11.0"
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
 
-    implementation 'com.google.guava:guava:32.1.3-android'
-    implementation 'io.michaelrocks:libphonenumber-android:8.13.35'
+    implementation 'com.google.guava:guava:33.4.0-android'
+    implementation 'io.michaelrocks:libphonenumber-android:8.13.52'
     implementation 'im.conversations.webrtc:webrtc-android:129.0.0'
     implementation 'io.github.nishkarsh:android-permissions:2.1.6'
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
@@ -135,6 +135,9 @@ dependencies {
     implementation 'net.fellbaum:jemoji:1.4.1'
     implementation 'com.github.natario1:Autocomplete:v1.1.0'
     implementation 'com.mikepenz:materialdrawer:9.0.1'
+
+    //Testing
+    testImplementation 'junit:junit:4.13.2'
 }
 
 ext {

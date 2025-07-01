@@ -8,7 +8,6 @@ import android.text.format.DateFormat;
 import android.text.format.DateUtils;
 import android.util.Pair;
 import android.widget.TextView;
-
 import androidx.annotation.ColorInt;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.annotation.ColorRes;
@@ -29,6 +28,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import de.gultsch.common.Linkify;
+import com.google.android.material.color.MaterialColors;
+import com.google.common.base.Strings;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
@@ -43,39 +45,45 @@ import eu.siacs.conversations.entities.Reaction;
 import eu.siacs.conversations.entities.RtpSessionStatus;
 import eu.siacs.conversations.entities.Transferable;
 import eu.siacs.conversations.services.XmppConnectionService;
-import eu.siacs.conversations.ui.util.MyLinkify;
 import eu.siacs.conversations.ui.util.QuoteHelper;
 import eu.siacs.conversations.worker.ExportBackupWorker;
 import eu.siacs.conversations.xmpp.Jid;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 public class UIHelper {
 
-    private static final List<String> LOCATION_QUESTIONS = Arrays.asList(
-            "where are you", //en
-            "where are you now", //en
-            "where are you right now", //en
-            "whats your 20", //en
-            "what is your 20", //en
-            "what's your 20", //en
-            "whats your twenty", //en
-            "what is your twenty", //en
-            "what's your twenty", //en
-            "wo bist du", //de
-            "wo bist du jetzt", //de
-            "wo bist du gerade", //de
-            "wo seid ihr", //de
-            "wo seid ihr jetzt", //de
-            "wo seid ihr gerade", //de
-            "dónde estás", //es
-            "donde estas" //es
-    );
+    private static final List<String> LOCATION_QUESTIONS =
+            Arrays.asList(
+                    "where are you", // en
+                    "where are you now", // en
+                    "where are you right now", // en
+                    "whats your 20", // en
+                    "what is your 20", // en
+                    "what's your 20", // en
+                    "whats your twenty", // en
+                    "what is your twenty", // en
+                    "what's your twenty", // en
+                    "wo bist du", // de
+                    "wo bist du jetzt", // de
+                    "wo bist du gerade", // de
+                    "wo seid ihr", // de
+                    "wo seid ihr jetzt", // de
+                    "wo seid ihr gerade", // de
+                    "dónde estás", // es
+                    "donde estas" // es
+                    );
 
-    private static final List<Character> PUNCTIONATION = Arrays.asList('.', ',', '?', '!', ';', ':');
+    private static final List<Character> PUNCTIONATION =
+            Arrays.asList('.', ',', '?', '!', ';', ':');
 
-    private static final int SHORT_DATE_FLAGS = DateUtils.FORMAT_SHOW_DATE
-            | DateUtils.FORMAT_NO_YEAR | DateUtils.FORMAT_ABBREV_ALL;
-    private static final int FULL_DATE_FLAGS = DateUtils.FORMAT_SHOW_TIME
-            | DateUtils.FORMAT_ABBREV_ALL | DateUtils.FORMAT_SHOW_DATE;
+    private static final int SHORT_DATE_FLAGS =
+            DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_NO_YEAR | DateUtils.FORMAT_ABBREV_ALL;
+    private static final int FULL_DATE_FLAGS =
+            DateUtils.FORMAT_SHOW_TIME | DateUtils.FORMAT_ABBREV_ALL | DateUtils.FORMAT_SHOW_DATE;
 
     public static String readableTimeDifference(Context context, long time) {
         return readableTimeDifference(context, time, false);
@@ -85,8 +93,7 @@ public class UIHelper {
         return readableTimeDifference(context, time, true);
     }
 
-    private static String readableTimeDifference(Context context, long time,
-                                                 boolean fullDate) {
+    private static String readableTimeDifference(Context context, long time, boolean fullDate) {
         if (time == 0) {
             return context.getString(R.string.just_now);
         }
@@ -103,11 +110,9 @@ public class UIHelper {
             return df.format(date);
         } else {
             if (fullDate) {
-                return DateUtils.formatDateTime(context, date.getTime(),
-                        FULL_DATE_FLAGS);
+                return DateUtils.formatDateTime(context, date.getTime(), FULL_DATE_FLAGS);
             } else {
-                return DateUtils.formatDateTime(context, date.getTime(),
-                        SHORT_DATE_FLAGS);
+                return DateUtils.formatDateTime(context, date.getTime(), SHORT_DATE_FLAGS);
             }
         }
     }
@@ -126,8 +131,7 @@ public class UIHelper {
         cal1.add(Calendar.DAY_OF_YEAR, -1);
         cal2.setTime(new Date(date));
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
-                && cal1.get(Calendar.DAY_OF_YEAR) == cal2
-                .get(Calendar.DAY_OF_YEAR);
+                && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR);
     }
 
     public static boolean sameDay(long a, long b) {
@@ -140,8 +144,7 @@ public class UIHelper {
         cal1.setTime(a);
         cal2.setTime(b);
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
-                && cal1.get(Calendar.DAY_OF_YEAR) == cal2
-                .get(Calendar.DAY_OF_YEAR);
+                && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR);
     }
 
     public static String lastseen(Context context, boolean active, long time) {
@@ -157,13 +160,13 @@ public class UIHelper {
         } else if (difference < 60 * 60 * 2) {
             return context.getString(R.string.last_seen_hour);
         } else if (difference < 60 * 60 * 24) {
-            return context.getString(R.string.last_seen_hours,
-                    Math.round(difference / (60.0 * 60.0)));
+            return context.getString(
+                    R.string.last_seen_hours, Math.round(difference / (60.0 * 60.0)));
         } else if (difference < 60 * 60 * 48) {
             return context.getString(R.string.last_seen_day);
         } else {
-            return context.getString(R.string.last_seen_days,
-                    Math.round(difference / (60.0 * 60.0 * 24.0)));
+            return context.getString(
+                    R.string.last_seen_days, Math.round(difference / (60.0 * 60.0 * 24.0)));
         }
     }
 
@@ -177,7 +180,7 @@ public class UIHelper {
         }
     }
 
-    public static int getColorForName(String name) {
+    public static int getColorForName(final String name) {
         return XEP0392Helper.rgbFromNick(name);
     }
 
@@ -185,7 +188,8 @@ public class UIHelper {
         return getMessagePreview(context, message, 0);
     }
 
-    public static Pair<CharSequence, Boolean> getMessagePreview(final XmppConnectionService context, final Message message, @ColorInt int textColor) {
+    public static Pair<CharSequence, Boolean> getMessagePreview(
+            final XmppConnectionService context, final Message message, @ColorInt int textColor) {
         final Transferable d = message.getTransferable();
         final boolean moderated = message.getModerated() != null;
         final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && message.getConversation().getMode() == Conversation.MODE_MULTI && context.isMucUserMuted(new MucOptions.User(null, message.getConversation().getJid(), message.getOccupantId(), null, null));
@@ -194,27 +198,43 @@ public class UIHelper {
         } else if (d != null && !moderated) {
             switch (d.getStatus()) {
                 case Transferable.STATUS_CHECKING:
-                    return new Pair<>(context.getString(R.string.checking_x,
-                            getFileDescriptionString(context, message)), true);
+                    return new Pair<>(
+                            context.getString(
+                                    R.string.checking_x,
+                                    getFileDescriptionString(context, message)),
+                            true);
                 case Transferable.STATUS_DOWNLOADING:
-                    return new Pair<>(context.getString(R.string.receiving_x_file,
-                            getFileDescriptionString(context, message),
-                            d.getProgress()), true);
+                    return new Pair<>(
+                            context.getString(
+                                    R.string.receiving_x_file,
+                                    getFileDescriptionString(context, message),
+                                    d.getProgress()),
+                            true);
                 case Transferable.STATUS_OFFER:
                 case Transferable.STATUS_OFFER_CHECK_FILESIZE:
-                    return new Pair<>(context.getString(R.string.x_file_offered_for_download,
-                            getFileDescriptionString(context, message)), true);
+                    return new Pair<>(
+                            context.getString(
+                                    R.string.x_file_offered_for_download,
+                                    getFileDescriptionString(context, message)),
+                            true);
                 case Transferable.STATUS_FAILED:
                     return new Pair<>(context.getString(R.string.file_transmission_failed), true);
                 case Transferable.STATUS_CANCELLED:
-                    return new Pair<>(context.getString(R.string.file_transmission_cancelled), true);
+                    return new Pair<>(
+                            context.getString(R.string.file_transmission_cancelled), true);
                 case Transferable.STATUS_UPLOADING:
                     if (message.getStatus() == Message.STATUS_OFFERED) {
-                        return new Pair<>(context.getString(R.string.offering_x_file,
-                                getFileDescriptionString(context, message)), true);
+                        return new Pair<>(
+                                context.getString(
+                                        R.string.offering_x_file,
+                                        getFileDescriptionString(context, message)),
+                                true);
                     } else {
-                        return new Pair<>(context.getString(R.string.sending_x_file,
-                                getFileDescriptionString(context, message)), true);
+                        return new Pair<>(
+                                context.getString(
+                                        R.string.sending_x_file,
+                                        getFileDescriptionString(context, message)),
+                                true);
                     }
                 default:
                     return new Pair<>("", false);
@@ -235,18 +255,28 @@ public class UIHelper {
             if (!rtpSessionStatus.successful && received) {
                 return new Pair<>(context.getString(R.string.missed_call), true);
             } else {
-                return new Pair<>(context.getString(received ? R.string.incoming_call : R.string.outgoing_call), true);
+                return new Pair<>(
+                        context.getString(
+                                received ? R.string.incoming_call : R.string.outgoing_call),
+                        true);
             }
         } else {
             final String body = MessageUtils.filterLtrRtl(message.getBody());
             if (body.startsWith(Message.ME_COMMAND)) {
-                return new Pair<>(body.replaceAll("^" + Message.ME_COMMAND,
-                        UIHelper.getMessageDisplayName(message) + " "), false);
+                return new Pair<>(
+                        body.replaceAll(
+                                "^" + Message.ME_COMMAND,
+                                UIHelper.getMessageDisplayName(message) + " "),
+                        false);
             } else if (message.isGeoUri()) {
                 return new Pair<>(context.getString(R.string.location), true);
-            } else if (!moderated && (message.treatAsDownloadable() || MessageUtils.unInitiatedButKnownSize(message))) {
-                return new Pair<>(context.getString(R.string.x_file_offered_for_download,
-                        getFileDescriptionString(context, message)), true);
+            } else if (!moderated && (message.treatAsDownloadable()
+                    || MessageUtils.unInitiatedButKnownSize(message))) {
+                return new Pair<>(
+                        context.getString(
+                                R.string.x_file_offered_for_download,
+                                getFileDescriptionString(context, message)),
+                        true);
             } else {
                 Drawable fallbackImg = ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_photo_24dp, null);
                 fallbackImg.setBounds(0, 0, fallbackImg.getIntrinsicWidth(), fallbackImg.getIntrinsicHeight());
@@ -255,7 +285,7 @@ public class UIHelper {
                 if (textColor != 0 && processMarkup) {
                     StylingHelper.format(styledBody, 0, styledBody.length() - 1, textColor, false);
                 }
-                MyLinkify.addLinks(styledBody, message.getConversation().getAccount(), message.getConversation().getJid());
+                Linkify.addLinks(styledBody, message.getConversation().getAccount(), message.getConversation().getJid());
 
                 for (final android.text.style.QuoteSpan quote : Lists.reverse(Lists.newArrayList(styledBody.getSpans(0, styledBody.length(), android.text.style.QuoteSpan.class)))) {
                     int start = styledBody.getSpanStart(quote);
@@ -317,18 +347,18 @@ public class UIHelper {
         return input.length() > 256 ? StylingHelper.subSequence(input, 0, 256) : input;
     }
 
-    public static boolean isPositionPrecededByBodyStart(CharSequence body, int pos){
+    public static boolean isPositionPrecededByBodyStart(CharSequence body, int pos) {
         // true if not a single linebreak before current position
-        for (int i = pos - 1; i >= 0; i--){
-            if (body.charAt(i) != ' '){
+        for (int i = pos - 1; i >= 0; i--) {
+            if (body.charAt(i) != ' ') {
                 return false;
             }
         }
         return true;
     }
 
-    public static boolean isPositionPrecededByLineStart(CharSequence body, int pos){
-        if (isPositionPrecededByBodyStart(body, pos)){
+    public static boolean isPositionPrecededByLineStart(CharSequence body, int pos) {
+        if (isPositionPrecededByBodyStart(body, pos)) {
             return true;
         }
         return body.charAt(pos - 1) == '\n';
@@ -376,7 +406,8 @@ public class UIHelper {
             final char c = body.charAt(i);
             if (Character.isWhitespace(c)) {
                 return false;
-            } else if (QuoteHelper.isPositionQuoteCharacter(body, pos) || QuoteHelper.isPositionQuoteEndCharacter(body, pos)) {
+            } else if (QuoteHelper.isPositionQuoteCharacter(body, pos)
+                    || QuoteHelper.isPositionQuoteEndCharacter(body, pos)) {
                 return body.length() == i + 1 || Character.isWhitespace(body.charAt(i + 1));
             }
         }
@@ -439,6 +470,8 @@ public class UIHelper {
             return context.getString(R.string.image);
         } else if (mime.contains("pdf")) {
             return context.getString(R.string.pdf_document);
+        } else if (MimeUtils.WORD_DOCUMENT_MIMES.contains(mime)) {
+            return context.getString(R.string.word_document);
         } else if (mime.equals("application/vnd.android.package-archive")) {
             return context.getString(R.string.apk);
         } else if (mime.equals(ExportBackupWorker.MIME_TYPE)) {
@@ -447,7 +480,8 @@ public class UIHelper {
             return context.getString(R.string.vcard);
         } else if (mime.equals("text/x-vcalendar") || mime.equals("text/calendar")) {
             return context.getString(R.string.event);
-        } else if (mime.equals("application/epub+zip") || mime.equals("application/vnd.amazon.mobi8-ebook")) {
+        } else if (mime.equals("application/epub+zip")
+                || mime.equals("application/vnd.amazon.mobi8-ebook")) {
             return context.getString(R.string.ebook);
         } else if (mime.equals("application/gpx+xml")) {
             return context.getString(R.string.gpx_track);
@@ -488,7 +522,8 @@ public class UIHelper {
                 return contact != null ? contact.getDisplayName() : "";
             }
         } else {
-            if (conversation instanceof Conversation && conversation.getMode() == Conversation.MODE_MULTI) {
+            if (conversation instanceof Conversation
+                    && conversation.getMode() == Conversation.MODE_MULTI) {
                 return ((Conversation) conversation).getMucOptions().getSelf().getNick();
             } else {
                 final Account account = conversation.getAccount();
@@ -499,7 +534,6 @@ public class UIHelper {
                 } else {
                     return displayName;
                 }
-
             }
         }
     }
@@ -520,7 +554,7 @@ public class UIHelper {
         return conversation == null ? reaction.from.asBareJid().toString() : conversation.getAccount().getRoster().getContact(reaction.from).getDisplayName();
     }
 
-    public static String getMessageHint(final Context context,final  Conversation conversation) {
+    public static String getMessageHint(final Context context, final Conversation conversation) {
         return switch (conversation.getNextEncryption()) {
             case Message.ENCRYPTION_NONE -> {
                 if (Config.multipleEncryptionChoices()) {
@@ -557,10 +591,12 @@ public class UIHelper {
                 || message.getType() != Message.TYPE_TEXT) {
             return false;
         }
-        final String body = Strings.nullToEmpty(message.getBody())
-                .trim()
-                .toLowerCase(Locale.getDefault())
-                .replace("?", "").replace("¿", "");
+        final String body =
+                Strings.nullToEmpty(message.getBody())
+                        .trim()
+                        .toLowerCase(Locale.getDefault())
+                        .replace("?", "")
+                        .replace("¿", "");
         return LOCATION_QUESTIONS.contains(body);
     }
 

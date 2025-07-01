@@ -1329,6 +1329,10 @@ public class EditAccountActivity extends OmemoActivity
         this.binding.accountPassword.setFocusableInTouchMode(editPassword);
         this.binding.accountPassword.setCursorVisible(editPassword);
         this.binding.accountPassword.setEnabled(editPassword);
+        if (!editPassword && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            this.binding.accountJid.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+            this.binding.accountPassword.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        }
 
         if (!mInitMode) {
             this.binding.avater.setVisibility(View.VISIBLE);
@@ -1463,6 +1467,13 @@ public class EditAccountActivity extends OmemoActivity
                     this.mAccount.getAxolotlService().getOwnFingerprint();
             if (ownAxolotlFingerprint != null && Config.supportOmemo()) {
                 this.binding.axolotlFingerprintBox.setVisibility(View.VISIBLE);
+                this.binding.axolotlFingerprintBox.setOnCreateContextMenuListener(
+                        (menu, v, menuInfo) -> {
+                            getMenuInflater().inflate(R.menu.omemo_key_context, menu);
+                            menu.findItem(R.id.verify_scan).setVisible(false);
+                            menu.findItem(R.id.distrust_key).setVisible(false);
+                            this.mSelectedFingerprint = ownAxolotlFingerprint;
+                        });
                 if (ownAxolotlFingerprint.equals(messageFingerprint)) {
                     this.binding.ownFingerprintDesc.setTextColor(
                             MaterialColors.getColor(
