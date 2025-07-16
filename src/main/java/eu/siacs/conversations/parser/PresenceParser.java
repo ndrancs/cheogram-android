@@ -15,7 +15,6 @@ import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.MucOptions;
-import eu.siacs.conversations.generator.PresenceGenerator;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xml.Element;
@@ -321,7 +320,6 @@ public class PresenceParser extends AbstractParser
     private void parseContactPresence(
             final im.conversations.android.xmpp.model.stanza.Presence packet) {
         final var account = getAccount();
-        final PresenceGenerator mPresenceGenerator = mXmppConnectionService.getPresenceGenerator();
         final Jid from = packet.getFrom();
         if (from == null || from.equals(account.getJid())) {
             return;
