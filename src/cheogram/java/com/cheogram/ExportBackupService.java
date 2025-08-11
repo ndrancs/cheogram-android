@@ -90,7 +90,7 @@ public class ExportBackupService extends Worker {
         //do not use 'vnd.android.document/directory' since this will trigger system file manager
         final Intent openIntent = new Intent(Intent.ACTION_VIEW);
         openIntent.addCategory(Intent.CATEGORY_DEFAULT);
-        if (Compatibility.runsAndTargetsTwentyFour(context)) {
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
             openIntent.setType("resource/folder");
         } else {
             openIntent.setDataAndType(Uri.parse("file://" + path), "resource/folder");

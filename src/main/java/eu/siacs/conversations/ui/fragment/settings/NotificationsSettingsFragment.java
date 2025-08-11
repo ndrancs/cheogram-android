@@ -78,7 +78,7 @@ public class NotificationsSettingsFragment extends XmppPreferenceFragment {
                 || callIntegration == null) {
             throw new IllegalStateException("The preference resource file is missing preferences");
         }
-        if (Compatibility.runsTwentySix()) {
+        if (Compatibility.twentySix()) {
             notificationRingtone.setVisible(false);
             notificationHeadsUp.setVisible(false);
             notificationVibrate.setVisible(false);

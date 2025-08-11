@@ -12,6 +12,7 @@ import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.services.QuickConversationsService;
+import eu.siacs.conversations.utils.Compatibility;
 import java.security.SecureRandom;
 
 public class AppSettings {
@@ -143,6 +144,15 @@ public class AppSettings {
         return QuickConversationsService.isConversations()
                 && getBooleanPreference(
                         AppSettings.SHOW_CONNECTION_OPTIONS, R.bool.show_connection_options);
+    }
+
+    public boolean isAcceptInvitesFromStrangers() {
+        return true;
+    }
+
+    public boolean isKeepForegroundService() {
+        return Compatibility.twentySix()
+                || getBooleanPreference(KEEP_FOREGROUND_SERVICE, R.bool.enable_foreground_service);
     }
 
     private boolean getBooleanPreference(@NonNull final String name, @BoolRes int res) {
