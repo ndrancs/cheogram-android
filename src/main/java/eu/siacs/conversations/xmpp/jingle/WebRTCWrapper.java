@@ -25,8 +25,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
 import org.webrtc.CandidatePairChangeEvent;
@@ -60,8 +58,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 public class WebRTCWrapper {
 
@@ -706,7 +704,7 @@ public class WebRTCWrapper {
                 MoreExecutors.directExecutor());
     }
 
-    @Nonnull
+    @NonNull
     private ListenableFuture<PeerConnection> getPeerConnectionFuture() {
         final PeerConnection peerConnection = this.peerConnection;
         if (peerConnection == null) {
@@ -716,7 +714,7 @@ public class WebRTCWrapper {
         }
     }
 
-    @Nonnull
+    @NonNull
     private PeerConnection requirePeerConnection() {
         final PeerConnection peerConnection = this.peerConnection;
         if (peerConnection == null) {
@@ -744,7 +742,7 @@ public class WebRTCWrapper {
         return true;
     }
 
-    @Nonnull
+    @NonNull
     private PeerConnectionFactory requirePeerConnectionFactory() {
         final PeerConnectionFactory peerConnectionFactory = this.peerConnectionFactory;
         if (peerConnectionFactory == null) {

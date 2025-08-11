@@ -34,6 +34,7 @@ import android.text.Editable;
 import android.text.Spanned;
 import android.text.style.TypefaceSpan;
 import android.text.style.URLSpan;
+import android.text.Spannable;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
@@ -76,7 +77,7 @@ public class Linkify {
         };
     }
 
-    public static void addLinks(final Editable body) {
+    public static void addLinks(final Spannable body) {
         android.text.util.Linkify.addLinks(body, Patterns.URI_GENERIC, null, MATCH_FILTER, null);
     }
 

@@ -34,7 +34,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.text.Editable;
+import android.text.Spannable;
 import android.text.Spanned;
 import android.text.style.URLSpan;
 import android.util.Log;
@@ -60,6 +60,19 @@ public class FixedURLSpan extends URLSpan {
 
 	protected final Account account;
 
+	public static void fix(final Spannable spannable) {
+		for (final URLSpan urlspan : spannable.getSpans(0, spannable.length() - 1, URLSpan.class)) {
+			final int start = spannable.getSpanStart(urlspan);
+			final int end = spannable.getSpanEnd(urlspan);
+			spannable.removeSpan(urlspan);
+			spannable.setSpan(
+					new FixedURLSpan(urlspan.getURL()),
+					start,
+					end,
+					Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+		}
+	}
+
 	public FixedURLSpan(final String url) {
 		this(url, null);
 	}
@@ -67,19 +80,6 @@ public class FixedURLSpan extends URLSpan {
 	public FixedURLSpan(final String url, Account account) {
 		super(url);
 		this.account = account;
-	}
-
-	public static void fix(final Editable editable) {
-		for (final URLSpan urlspan : editable.getSpans(0, editable.length() - 1, URLSpan.class)) {
-			final int start = editable.getSpanStart(urlspan);
-			final int end = editable.getSpanEnd(urlspan);
-			editable.removeSpan(urlspan);
-			editable.setSpan(
-					new FixedURLSpan(urlspan.getURL()),
-					start,
-					end,
-					Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-		}
 	}
 
 	@Override

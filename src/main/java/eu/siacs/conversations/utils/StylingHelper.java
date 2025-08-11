@@ -83,7 +83,7 @@ public class StylingHelper {
         }
     }
 
-    public static void format(final Editable editable, int start, int end, @ColorInt int textColor, final boolean composing) {
+    public static void format(final Spannable editable, int start, int end, @ColorInt int textColor, final boolean composing) {
         for (ImStyleParser.Style style : ImStyleParser.parse(editable, start, end)) {
             final int keywordLength = style.getKeyword().length();
             int keywordLengthStart = keywordLength;
@@ -109,13 +109,12 @@ public class StylingHelper {
         }
     }
 
-    public static void format(final Editable editable, @ColorInt int textColor) {
+    public static void format(final Spannable editable, @ColorInt int textColor) {
         format(editable, textColor, false);
     }
 
-    public static void format(final Editable editable, @ColorInt int textColor, final boolean composing) {
-        int end = 0;
-        format(editable, end, editable.length() - 1, textColor, composing);
+    public static void format(final Spannable editable, @ColorInt int textColor, final boolean composing) {
+        format(editable, 0, editable.length() - 1, textColor, composing);
     }
 
     public static void highlight(
@@ -150,7 +149,7 @@ public class StylingHelper {
     }
 
     private static void highlight(
-            final TextView view, final Editable editable, final String needle) {
+            final TextView view, final Spannable editable, final String needle) {
         final int length = needle.length();
         String string = editable.toString();
         int start = indexOfIgnoreCase(string, needle, 0);
@@ -225,7 +224,7 @@ public class StylingHelper {
         };
     }
 
-    private static void makeKeywordOpaque(final Editable editable, int start, int end, @ColorInt int fallbackTextColor, final boolean composing) {
+    private static void makeKeywordOpaque(final Spannable editable, int start, int end, @ColorInt int fallbackTextColor, final boolean composing) {
         QuoteSpan[] quoteSpans = editable.getSpans(start, end, QuoteSpan.class);
         @ColorInt int textColor = quoteSpans.length > 0 ? quoteSpans[0].getColor() : fallbackTextColor;
         @ColorInt int keywordColor = transformColor(textColor);

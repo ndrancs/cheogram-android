@@ -115,6 +115,9 @@ import java.util.function.Consumer;
 
 import io.ipfs.cid.Cid;
 
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
@@ -145,6 +148,7 @@ import eu.siacs.conversations.generator.IqGenerator;
 import eu.siacs.conversations.generator.MessageGenerator;
 import eu.siacs.conversations.generator.PresenceGenerator;
 import eu.siacs.conversations.http.HttpConnectionManager;
+import eu.siacs.conversations.http.ServiceOutageStatus;
 import eu.siacs.conversations.parser.AbstractParser;
 import eu.siacs.conversations.parser.IqParser;
 import eu.siacs.conversations.persistance.DatabaseBackend;
@@ -202,7 +206,12 @@ import eu.siacs.conversations.xmpp.jingle.RtpEndUserState;
 import eu.siacs.conversations.xmpp.mam.MamReference;
 import eu.siacs.conversations.xmpp.pep.Avatar;
 import eu.siacs.conversations.xmpp.pep.PublishOptions;
+import im.conversations.android.xmpp.model.avatar.Metadata;
+import im.conversations.android.xmpp.model.bookmark.Storage;
+import im.conversations.android.xmpp.model.mds.Displayed;
+import im.conversations.android.xmpp.model.pubsub.PubSub;
 import im.conversations.android.xmpp.model.stanza.Iq;
+import im.conversations.android.xmpp.model.storage.PrivateStorage;
 import java.io.File;
 import java.security.Security;
 import java.security.cert.CertificateException;
@@ -230,6 +239,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import me.leolin.shortcutbadger.ShortcutBadger;
+import okhttp3.HttpUrl;
 import org.conscrypt.Conscrypt;
 import org.jxmpp.stringprep.libidn.LibIdnXmppStringprep;
 import org.openintents.openpgp.IOpenPgpService2;
@@ -431,6 +441,10 @@ public class XmppConnectionService extends Service {
 
                 @Override
                 public void onStatusChanged(final Account account) {
+                    final var status = account.getStatus();
+                    if (ServiceOutageStatus.isPossibleOutage(status)) {
+                        fetchServiceOutageStatus(account);
+                    }
                     XmppConnection connection = account.getXmppConnection();
                     updateAccountUi();
 
@@ -562,6 +576,7 @@ public class XmppConnectionService extends Service {
                     getNotificationService().updateErrorNotification();
                 }
             };
+
     private OpenPgpServiceConnection pgpServiceConnection;
     private PgpEngine mPgpEngine = null;
     private WakeLock wakeLock;
@@ -1395,6 +1410,34 @@ public class XmppConnectionService extends Service {
                 }
             }
         }
+    }
+
+    private void fetchServiceOutageStatus(final Account account) {
+        final var sosUrl = account.getKey(Account.KEY_SOS_URL);
+        if (Strings.isNullOrEmpty(sosUrl)) {
+            return;
+        }
+        final var url = HttpUrl.parse(sosUrl);
+        if (url == null) {
+            return;
+        }
+        Log.d(Config.LOGTAG, account.getJid().asBareJid() + ": fetching service outage " + url);
+        Futures.addCallback(
+                ServiceOutageStatus.fetch(getApplicationContext(), url),
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(final ServiceOutageStatus sos) {
+                        Log.d(Config.LOGTAG, "fetched " + sos);
+                        account.setServiceOutageStatus(sos);
+                        updateAccountUi();
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Throwable throwable) {
+                        Log.d(Config.LOGTAG, "error fetching sos", throwable);
+                    }
+                },
+                MoreExecutors.directExecutor());
     }
 
     public boolean processUnifiedPushMessage(
@@ -2584,14 +2627,17 @@ public class XmppConnectionService extends Service {
 
     public void fetchBookmarks(final Account account) {
         final Iq iqPacket = new Iq(Iq.Type.GET);
-        final Element query = iqPacket.query("jabber:iq:private");
-        query.addChild("storage", Namespace.BOOKMARKS);
+        iqPacket.addExtension(new PrivateStorage()).addExtension(new Storage());
         final Consumer<Iq> callback =
                 (response) -> {
                     if (response.getType() == Iq.Type.RESULT) {
-                        final Element query1 = response.query();
-                        final Element storage = query1.findChild("storage", "storage:bookmarks");
-                        Map<Jid, Bookmark> bookmarks = Bookmark.parseFromStorage(storage, account);
+                        final var privateStorage = response.getExtension(PrivateStorage.class);
+                        if (privateStorage == null) {
+                            return;
+                        }
+                        final var bookmarkStorage = privateStorage.getExtension(Storage.class);
+                        Map<Jid, Bookmark> bookmarks =
+                                Bookmark.parseFromStorage(bookmarkStorage, account);
                         processBookmarksInitial(account, bookmarks, false);
                     } else {
                         Log.d(
@@ -2609,7 +2655,7 @@ public class XmppConnectionService extends Service {
                 retrieve,
                 (response) -> {
                     if (response.getType() == Iq.Type.RESULT) {
-                        final Element pubsub = response.findChild("pubsub", Namespace.PUBSUB);
+                        final var pubsub = response.getExtension(PubSub.class);
                         final Map<Jid, Bookmark> bookmarks =
                                 Bookmark.parseFromPubSub(pubsub, account);
                         processBookmarksInitial(account, bookmarks, true);
@@ -2627,30 +2673,34 @@ public class XmppConnectionService extends Service {
                     if (response.getType() != Iq.Type.RESULT) {
                         return;
                     }
-                    final var pubSub = response.findChild("pubsub", Namespace.PUBSUB);
-                    final Element items = pubSub == null ? null : pubSub.findChild("items");
-                    if (items == null
-                            || !Namespace.MDS_DISPLAYED.equals(items.getAttribute("node"))) {
+                    final var pubsub = response.getExtension(PubSub.class);
+                    if (pubsub == null) {
                         return;
                     }
-                    for (final Element child : items.getChildren()) {
-                        if ("item".equals(child.getName())) {
-                            processMdsItem(account, child);
+                    final var items = pubsub.getItems();
+                    if (items == null) {
+                        return;
+                    }
+                    if (Namespace.MDS_DISPLAYED.equals(items.getNode())) {
+                        for (final var item :
+                                items.getItemMap(
+                                                im.conversations.android.xmpp.model.mds.Displayed
+                                                        .class)
+                                        .entrySet()) {
+                            processMdsItem(account, item);
                         }
                     }
                 });
     }
 
-    public void processMdsItem(final Account account, final Element item) {
-        final Jid jid =
-                item == null ? null : Jid.Invalid.getNullForInvalid(item.getAttributeAsJid("id"));
+    public void processMdsItem(final Account account, final Map.Entry<String, Displayed> item) {
+        final Jid jid = Jid.Invalid.getNullForInvalid(Jid.ofOrInvalid(item.getKey()));
         if (jid == null) {
             return;
         }
-        final Element displayed = item.findChild("displayed", Namespace.MDS_DISPLAYED);
-        final Element stanzaId =
-                displayed == null ? null : displayed.findChild("stanza-id", Namespace.STANZA_IDS);
-        final String id = stanzaId == null ? null : stanzaId.getAttribute("id");
+        final var displayed = item.getValue();
+        final var stanzaId = displayed.getStanzaId();
+        final String id = stanzaId == null ? null : stanzaId.getId();
         final Conversation conversation = find(account, jid);
         if (id != null && conversation != null) {
             conversation.setDisplayState(id);
@@ -5556,16 +5606,20 @@ public class XmppConnectionService extends Service {
                 packet,
                 new Consumer<Iq>() {
 
-                    private Avatar parseAvatar(Iq packet) {
-                        Element pubsub =
-                                packet.findChild("pubsub", "http://jabber.org/protocol/pubsub");
-                        if (pubsub != null) {
-                            Element items = pubsub.findChild("items");
-                            if (items != null) {
-                                return Avatar.parseMetadata(items);
-                            }
+                    private Avatar parseAvatar(final Iq packet) {
+                        final var pubsub = packet.getExtension(PubSub.class);
+                        if (pubsub == null) {
+                            return null;
                         }
-                        return null;
+                        final var items = pubsub.getItems();
+                        if (items == null) {
+                            return null;
+                        }
+                        final var item = items.getFirstItemWithId(Metadata.class);
+                        if (item == null) {
+                            return null;
+                        }
+                        return Avatar.parseMetadata(item.getKey(), item.getValue());
                     }
 
                     private boolean errorIsItemNotFound(Iq packet) {
@@ -5805,30 +5859,39 @@ public class XmppConnectionService extends Service {
                 account,
                 packet,
                 response -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        Element pubsub =
-                                response.findChild("pubsub", "http://jabber.org/protocol/pubsub");
-                        if (pubsub != null) {
-                            Element items = pubsub.findChild("items");
-                            if (items != null) {
-                                Avatar avatar = Avatar.parseMetadata(items);
-                                if (avatar != null) {
-                                    avatar.owner = account.getJid().asBareJid();
-                                    if (fileBackend.isAvatarCached(avatar)) {
-                                        if (account.setAvatar(avatar.getFilename())) {
-                                            databaseBackend.updateAccount(account);
-                                        }
-                                        getAvatarService().clear(account);
-                                        callback.success(avatar);
-                                    } else {
-                                        fetchAvatarPep(account, avatar, callback);
-                                    }
-                                    return;
-                                }
-                            }
-                        }
+                    if (response.getType() != Iq.Type.RESULT) {
+                        callback.error(0, null);
                     }
-                    callback.error(0, null);
+                    final var pubsub = packet.getExtension(PubSub.class);
+                    if (pubsub == null) {
+                        callback.error(0, null);
+                        return;
+                    }
+                    final var items = pubsub.getItems();
+                    if (items == null) {
+                        callback.error(0, null);
+                        return;
+                    }
+                    final var item = items.getFirstItemWithId(Metadata.class);
+                    if (item == null) {
+                        callback.error(0, null);
+                        return;
+                    }
+                    final var avatar = Avatar.parseMetadata(item.getKey(), item.getValue());
+                    if (avatar == null) {
+                        callback.error(0, null);
+                        return;
+                    }
+                    avatar.owner = account.getJid().asBareJid();
+                    if (fileBackend.isAvatarCached(avatar)) {
+                        if (account.setAvatar(avatar.getFilename())) {
+                            databaseBackend.updateAccount(account);
+                        }
+                        getAvatarService().clear(account);
+                        callback.success(avatar);
+                    } else {
+                        fetchAvatarPep(account, avatar, callback);
+                    }
                 });
     }
 

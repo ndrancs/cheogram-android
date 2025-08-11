@@ -2,61 +2,56 @@ package eu.siacs.conversations.xml;
 
 import android.util.Log;
 import android.util.Xml;
-
 import eu.siacs.conversations.Config;
-
 import im.conversations.android.xmpp.ExtensionFactory;
-import im.conversations.android.xmpp.model.Extension;
 import im.conversations.android.xmpp.model.StreamElement;
-
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 public class XmlReader implements Closeable {
-	private final XmlPullParser parser;
-	private InputStream is;
+    private final XmlPullParser parser;
+    private InputStream is;
 
-	public XmlReader() {
-		this.parser = Xml.newPullParser();
-		try {
-			this.parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
-		} catch (XmlPullParserException e) {
-			Log.d(Config.LOGTAG, "error setting namespace feature on parser");
-		}
-	}
+    public XmlReader() {
+        this.parser = Xml.newPullParser();
+        try {
+            this.parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
+        } catch (XmlPullParserException e) {
+            Log.d(Config.LOGTAG, "error setting namespace feature on parser");
+        }
+    }
 
-	public void setInputStream(InputStream inputStream) throws IOException {
-		if (inputStream == null) {
-			throw new IOException();
-		}
-		this.is = inputStream;
-		try {
-			parser.setInput(new InputStreamReader(this.is));
-		} catch (XmlPullParserException e) {
-			throw new IOException("error resetting parser");
-		}
-	}
+    public void setInputStream(InputStream inputStream) throws IOException {
+        if (inputStream == null) {
+            throw new IOException();
+        }
+        this.is = inputStream;
+        try {
+            parser.setInput(new InputStreamReader(this.is));
+        } catch (XmlPullParserException e) {
+            throw new IOException("error resetting parser");
+        }
+    }
 
-	public void reset() throws IOException {
-		if (this.is == null) {
-			throw new IOException();
-		}
-		try {
-			parser.setInput(new InputStreamReader(this.is));
-		} catch (XmlPullParserException e) {
-			throw new IOException("error resetting parser");
-		}
-	}
+    public void reset() throws IOException {
+        if (this.is == null) {
+            throw new IOException();
+        }
+        try {
+            parser.setInput(new InputStreamReader(this.is));
+        } catch (XmlPullParserException e) {
+            throw new IOException("error resetting parser");
+        }
+    }
 
-	@Override
-	public void close() {
-		this.is = null;
-	}
+    @Override
+    public void close() {
+        this.is = null;
+    }
 
 	public Tag readTag() throws IOException {
 		try {
@@ -88,21 +83,27 @@ public class XmlReader implements Closeable {
 				}
 			}
 
-		} catch (Throwable throwable) {
-			throw new IOException("xml parser mishandled "+throwable.getClass().getSimpleName()+"("+throwable.getMessage()+")", throwable);
-		}
-		return null;
-	}
+        } catch (Throwable throwable) {
+            throw new IOException(
+                    "xml parser mishandled "
+                            + throwable.getClass().getSimpleName()
+                            + "("
+                            + throwable.getMessage()
+                            + ")",
+                    throwable);
+        }
+        return null;
+    }
 
-	public <T extends StreamElement> T readElement(final Tag current, final Class<T> clazz)
-			throws IOException {
-		final Element element = readElement(current);
-		if (clazz.isInstance(element)) {
-			return clazz.cast(element);
-		}
-		throw new IOException(
-				String.format("Read unexpected {%s}%s", element.getNamespace(), element.getName()));
-	}
+    public <T extends StreamElement> T readElement(final Tag current, final Class<T> clazz)
+            throws IOException {
+        final Element element = readElement(current);
+        if (clazz.isInstance(element)) {
+            return clazz.cast(element);
+        }
+        throw new IOException(
+                String.format("Read unexpected {%s}%s", element.getNamespace(), element.getName()));
+    }
 
 	public Element readElement(final Tag currentTag) throws IOException {
 		final var attributes = currentTag.getAttributes();

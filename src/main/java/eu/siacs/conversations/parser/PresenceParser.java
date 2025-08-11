@@ -83,8 +83,8 @@ public class PresenceParser extends AbstractParser
                     Element item = x.findChild("item");
                     if (item != null && !from.isBareJid()) {
                         mucOptions.setError(MucOptions.Error.NONE);
-                        MucOptions.User user = parseItem(conversation, item, from, occupantIdEl, nick == null ? null : nick.getContent(), hats);
-                        final var occupant = packet.getExtension(OccupantId.class);
+                        final MucOptions.User user = parseItem(conversation, item, from, occupantIdEl, nick == null ? null : nick.getContent(), hats);
+                        final var occupant = packet.getOnlyExtension(OccupantId.class);
                         final String occupantId =
                                 mucOptions.occupantId() && occupant != null
                                         ? occupant.getId()

@@ -141,6 +141,8 @@ public final class Config {
 
     public static final boolean IGNORE_ID_REWRITE_IN_MUC = true;
     public static final boolean MUC_LEAVE_BEFORE_JOIN = false;
+    // if this is set to true messages that contain multiple bodies (per language) will be ignored
+    public static final boolean TREAT_MULTI_CONTENT_AS_INVALID = false;
 
     public static final boolean USE_LMC_VERSION_1_1 = true;
 
