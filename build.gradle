@@ -163,8 +163,9 @@ android {
 
     splits {
         abi {
+            def isBuildingBundle = gradle.startParameter.taskNames.any { it.toLowerCase().contains("bundle") }
             universalApk true
-            enable true
+            enable !isBuildingBundle
             reset()
             //noinspection ChromeOsAbiSupport
             include project.ext.abiCodes.keySet() as String[]
