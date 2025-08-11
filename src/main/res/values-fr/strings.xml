@@ -1086,8 +1086,6 @@
     <string name="pref_category_application">Application</string>
     <string name="pref_category_interaction">Interaction</string>
     <string name="pref_category_on_this_device">Sur l\'appareil</string>
-    <string name="pref_accept_invites_from_strangers">Invitations d\'inconnu·es</string>
-    <string name="pref_accept_invites_from_strangers_summary">Accepter les invitations aux conversations de groupes provenant d\'inconnu·es</string>
     <string name="pref_large_font">Grande police</string>
     <string name="pref_large_font_summary">Augmenter la taille de la police dans les bulles de message</string>
     <string name="allow_private_messages">Autoriser les messages privés</string>

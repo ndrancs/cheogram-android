@@ -1061,8 +1061,6 @@
     <string name="send_encrypted_message">Verschlüsselt schreiben…</string>
     <string name="pref_large_font_summary">Schriftgröße der Nachrichten erhöhen</string>
     <string name="pref_large_font">Große Schrift</string>
-    <string name="pref_accept_invites_from_strangers">Einladungen von Unbekannten</string>
-    <string name="pref_accept_invites_from_strangers_summary">Einladungen zu Gruppenchats von Unbekannten annehmen</string>
     <string name="pref_backup_summary">Einmalig erstellen, wiederkehrend planen</string>
     <string name="pref_backup_recurring">Wiederkehrende Sicherung</string>
     <string name="pref_fullscreen_notification">Benachrichtigungen im Vollbildmodus</string>

@@ -408,7 +408,6 @@
     <string name="pref_title_trust_system_ca_store">Sertifitseerimiskeskused</string>
     <string name="pref_title_trust_system_ca_store_summary">Usalda süsteemi sertifitseerimiskeskuseid</string>
     <string name="pref_allow_screenshots">Luba ekraanitõmmiste tegemine</string>
-    <string name="pref_accept_invites_from_strangers_summary">Nõustu kutsetega võõrastelt vestlusrühmas osalemiseks</string>
     <string name="edit_name_and_topic">Muuda nime ja teemat</string>
     <string name="could_not_add_reaction">Reaktsiooni lisamine ei õnnestunud</string>
     <string name="add_reaction">Lisa reaktsioon…</string>
@@ -1003,7 +1002,6 @@
     <string name="pref_large_font">Suur font</string>
     <string name="pref_large_font_summary">Näita jutumullides tekste suuremana</string>
     <string name="pref_up_long_summary">Toimides UnifiedPushi levitajana, kasutatakse meie püsivat, usaldusväärset ja akusõbralikku XMPP-ühendust teiste UnifiedPushiga ühilduvate rakenduste (Tusky, Ltt.rs, FluffyChat ja paljud teised) äratamiseks.</string>
-    <string name="pref_accept_invites_from_strangers">Kutsed tundmatutelt saatjatelt</string>
     <string name="error_trustkey_hint_mutual">Vihje: mõnel juhul õnnestub seda viga parandada, kui mõlemad osapooled üksteist oma kontaktiloendisse lisavad.</string>
     <string name="disable_encryption_message">Kas sa oled kindel, et soovid OMEMO-põhise krüptimise selle vestluse jaoks välja lülitada?
 \nSee võimaldab sinu serveri haldajal seinu sõnumeid lugeda, kuid see võib olla ainus võimalus suhelda osapooltega, kes kasutavad aegunud sõnumikliente.</string>

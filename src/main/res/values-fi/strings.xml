@@ -1072,8 +1072,6 @@
     <string name="pref_large_font_summary">Suurenna viestikuplien kirjasinkokoa</string>
     <string name="custom_notifications_enable">Otetaanko mukautetut ilmoitusasetukset (tärkeys, ääni, värinä) käyttöön tälle keskustelulle?</string>
     <string name="could_not_modify_call">Puhelua ei voitu muokata</string>
-    <string name="pref_accept_invites_from_strangers_summary">Hyväksy kutsut ryhmäpikakeskusteluihin tuntemattomilta</string>
-    <string name="pref_accept_invites_from_strangers">Kutsut tuntemattomilta</string>
     <string name="allow_private_messages">Salli yksityisviestit</string>
     <string name="pref_large_font">Suuri fontti</string>
     <string name="unsupported_operation">Toimintoa ei tueta</string>

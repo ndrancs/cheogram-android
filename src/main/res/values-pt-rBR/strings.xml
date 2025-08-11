@@ -1054,8 +1054,6 @@
     <string name="this_account_is_logged_out">Você desconectou desta conta</string>
     <string name="pref_use_colorful_bubbles">Bolhas de conversa coloridas</string>
     <string name="pref_use_colorful_bubbles_summary">Cores de fundo distintas para mensagens enviadas e recebidas</string>
-    <string name="pref_accept_invites_from_strangers">Convites de estranhos</string>
-    <string name="pref_accept_invites_from_strangers_summary">Aceitar convites de estranhos para conversas em grupo</string>
     <string name="title_undo_swipe_out_chat">Conversa arquivada</string>
     <string name="pref_large_font">Texto grande</string>
     <string name="pref_large_font_summary">Aumentar o tamanho do texto em bolhas de mensagem</string>

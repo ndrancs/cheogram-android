@@ -1056,8 +1056,6 @@
     <string name="send_encrypted_message">发送加密消息</string>
     <string name="pref_large_font">大字体</string>
     <string name="pref_large_font_summary">增大消息气泡中的字体大小</string>
-    <string name="pref_accept_invites_from_strangers">陌生人的邀请</string>
-    <string name="pref_accept_invites_from_strangers_summary">接受来自陌生人的群聊邀请</string>
     <string name="pref_create_backup_one_off_summary">创建一次性备份</string>
     <string name="pref_backup_recurring">定期备份</string>
     <string name="pref_fullscreen_notification">全屏通知</string>

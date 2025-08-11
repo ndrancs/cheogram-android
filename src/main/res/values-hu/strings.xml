@@ -999,8 +999,6 @@
     <string name="help">Segítség</string>
     <string name="could_not_modify_call">Nem sikerült módosítani a hívást</string>
     <string name="allow_private_messages">Privát üzenetek engedélyezése</string>
-    <string name="pref_accept_invites_from_strangers_summary">Idegenek meghívásainak elfogadása csoportos csevegésekre</string>
-    <string name="pref_accept_invites_from_strangers">Meghívók idegenektől</string>
     <string name="rtp_state_contact_offline">A partner nem elérhető</string>
     <string name="rtp_state_connectivity_lost_error">A kapcsolat megszakadt</string>
     <string name="pref_large_font">Nagy betűtípus</string>

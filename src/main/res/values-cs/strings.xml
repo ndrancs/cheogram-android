@@ -1084,8 +1084,6 @@
     <string name="pref_fullscreen_notification">Oznámení na celou obrazovku</string>
     <string name="unsupported_operation">Nepodporovaná operace</string>
     <string name="pref_fullscreen_notification_summary">Povolit této aplikaci zobrazit oznámení o příchozích hovorech přes celou obrazovku, když je zařízení uzamčeno.</string>
-    <string name="pref_accept_invites_from_strangers">Pozvánky od neznámých</string>
-    <string name="pref_accept_invites_from_strangers_summary">Přijímat pozvánky do skupinových chatů od neznámých kontaktů</string>
     <string name="pref_large_font">Velké písmo</string>
     <string name="pref_large_font_summary">Zvětšit písmo v chatových bublinách</string>
     <string name="server_info_bind2">XEP-0386: Bind 2</string>

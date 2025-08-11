@@ -1054,8 +1054,6 @@
     <string name="unified_push_summary">Notification relay for UnifiedPush compatible third party apps</string>
     <string name="report_spam">Spam rapporteren</string>
     <string name="allow_private_messages">Privéberichten toestaan</string>
-    <string name="pref_accept_invites_from_strangers_summary">Accepteer uitnodigingen om chats van vreemden te groeperen</string>
-    <string name="pref_accept_invites_from_strangers">Uitnodigingen van vreemden</string>
     <string name="pref_large_font">Groot lettertype</string>
     <string name="pref_large_font_summary">Vergroot de lettergrootte in berichtbubbels</string>
     <string name="unverified_devices">Je gebruikt niet-geverifieerde apparaten. Scan de QR-code op jouw andere apparaten om verificatie uit te voeren en actieve MITM-aanvallen te belemmeren.</string>

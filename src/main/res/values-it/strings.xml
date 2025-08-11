@@ -1075,8 +1075,6 @@
     <string name="pref_title_trust_system_ca_store">Autorità di certificazione</string>
     <string name="pref_large_font">Caratteri grandi</string>
     <string name="pref_large_font_summary">Aumenta la dimensione dei caratteri nei messaggi</string>
-    <string name="pref_accept_invites_from_strangers">Inviti da estranei</string>
-    <string name="pref_accept_invites_from_strangers_summary">Accetta inviti a chat di gruppo da estranei</string>
     <string name="pref_backup_summary">Crea una volta sola, Programma ricorrenze</string>
     <string name="pref_backup_recurring">Backup ricorrente</string>
     <string name="pref_fullscreen_notification">Notifiche a schermo intero</string>

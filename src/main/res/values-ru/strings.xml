@@ -1103,7 +1103,6 @@
     <string name="pref_title_trust_system_ca_store_summary">Доверять сертификатам системных УЦ</string>
     <string name="pref_connection_summary_w_cd">Имя хоста и порт, Tor, обзор каналов</string>
     <string name="allow_private_messages">Разрешить личные сообщения</string>
-    <string name="pref_accept_invites_from_strangers_summary">Принимать приглашения в конференции от неизвестных</string>
     <string name="unsupported_operation">Операция не поддерживается</string>
     <string name="pref_fullscreen_notification">Полноэкранные уведомления</string>
     <string name="pref_backup_recurring">Регулярные резервные копии</string>
@@ -1112,7 +1111,6 @@
     <string name="detect_mim">Требовать привязку канала</string>
     <string name="detect_mim_summary">Привязка канала может обнаружить некоторые атаки посредником</string>
     <string name="pref_category_server_connection">Соединение с сервером</string>
-    <string name="pref_accept_invites_from_strangers">Приглашения от неизвестных</string>
     <string name="pref_category_engagement_notifications">Уведомления о взаимодействии</string>
     <string name="server_info_login_mechanism">Способ входа</string>
     <string name="call_is_using_earpiece_tap_to_switch_to_speaker">Звонок через наушники. Нажмите для переключения на динамик.</string>
