@@ -184,7 +184,7 @@
 \nВаши собеседники не смогут больше отправлять вам зашифрованные OpenPGP сообщения.</string>
     <string name="openpgp_has_been_published">Публичный ключ OpenPGP опубликован.</string>
     <string name="mgmt_account_enable">Включить аккаунт</string>
-    <string name="mgmt_account_delete_confirm_text">Удалить свой аккаунт? Удаление аккаунта также сотрёт все беседы.</string>
+    <string name="mgmt_account_delete_confirm_text">Удалить свой аккаунт? Удаление аккаунта также сотрёт все историю бесед.</string>
     <string name="attach_record_voice">Записать голос</string>
     <string name="account_settings_jabber_id">XMPP-адрес</string>
     <string name="block_jabber_id">Заблокировать XMPP-адрес</string>
@@ -1011,7 +1011,7 @@
     <string name="could_not_delete_account_from_server">Невозможно удалить аккаунт на сервере</string>
     <string name="delete_from_server">Удалить аккаунт на сервере</string>
     <string name="pref_autojoin">Синхронизировать закладки</string>
-    <string name="pref_autojoin_summary">Устанавливать флаг \"автоприсоединение\" при входе и выходе из MUC, и реагировать на изменения от других клиентов</string>
+    <string name="pref_autojoin_summary">Устанавливать флаг \"автоприсоединение\" при входе и выходе из группового чата, и реагировать на изменения от других клиентов</string>
     <string name="search_group_chats">Поиск конференций</string>
     <string name="download_failed_invalid_file">Загрузка не выполнена: файл испорчен</string>
     <string name="rtp_state_content_add_video">Перейти на видеовызов\?</string>

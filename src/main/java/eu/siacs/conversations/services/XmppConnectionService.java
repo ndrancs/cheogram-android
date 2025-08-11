@@ -117,6 +117,7 @@ import io.ipfs.cid.Cid;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.Config;
@@ -234,6 +235,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -583,7 +585,7 @@ public class XmppConnectionService extends Service {
     private LruCache<String, Drawable> mDrawableCache;
     private final BroadcastReceiver mInternalEventReceiver = new InternalEventReceiver();
     private final BroadcastReceiver mInternalRestrictedEventReceiver =
-            new RestrictedEventReceiver(Arrays.asList(TorServiceUtils.ACTION_STATUS));
+            new RestrictedEventReceiver(List.of(TorServiceUtils.ACTION_STATUS));
     private final BroadcastReceiver mInternalScreenEventReceiver = new InternalEventReceiver();
     private EmojiSearch emojiSearch = null;
 
@@ -5136,7 +5138,7 @@ public class XmppConnectionService extends Service {
                                         if (packet.getType() == Iq.Type.RESULT) {
                                             callback.onPushSucceeded();
                                         } else {
-                                            Log.d(Config.LOGTAG, "failed: " + packet.toString());
+                                            Log.d(Config.LOGTAG, "failed: " + packet);
                                             callback.onPushFailed();
                                         }
                                     }
@@ -5761,7 +5763,7 @@ public class XmppConnectionService extends Service {
                         if (error == null) {
                             Log.d(Config.LOGTAG, ERROR + "(server error)");
                         } else {
-                            Log.d(Config.LOGTAG, ERROR + error.toString());
+                            Log.d(Config.LOGTAG, ERROR + error);
                         }
                     }
                     if (callback != null) {
@@ -6669,6 +6671,14 @@ public class XmppConnectionService extends Service {
             return;
         }
         connection.sendCreateAccountWithCaptchaPacket(id, data);
+    }
+
+    public ListenableFuture<Iq> sendIqPacket(final Account account, final Iq request) {
+        final XmppConnection connection = account.getXmppConnection();
+        if (connection == null) {
+            return Futures.immediateFailedFuture(new TimeoutException());
+        }
+        return connection.sendIqPacket(request);
     }
 
     public void sendIqPacket(final Account account, final Iq packet, final Consumer<Iq> callback) {

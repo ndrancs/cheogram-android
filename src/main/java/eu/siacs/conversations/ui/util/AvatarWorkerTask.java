@@ -9,23 +9,19 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.widget.ImageView;
-
 import androidx.annotation.DimenRes;
-
-import java.lang.ref.WeakReference;
-import java.util.concurrent.RejectedExecutionException;
-
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.services.AvatarService;
 import eu.siacs.conversations.ui.XmppActivity;
+import java.lang.ref.WeakReference;
+import java.util.concurrent.RejectedExecutionException;
 
 public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, Drawable> {
     private final WeakReference<ImageView> imageViewReference;
     private final WeakReference<XmppActivity> activityReference;
     private AvatarService.Avatarable avatarable = null;
-    private @DimenRes
-    final int size;
+    private @DimenRes final int size;
 
     public AvatarWorkerTask(ImageView imageView, @DimenRes int size) {
         imageViewReference = new WeakReference<>(imageView);
@@ -47,7 +43,8 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
         if (activity == null) {
             return null;
         }
-        return activity.avatarService().get(avatarable, (int) activity.getResources().getDimension(size), isCancelled());
+        return activity.avatarService()
+                .get(avatarable, (int) activity.getResources().getDimension(size), isCancelled());
     }
 
     @Override
@@ -70,11 +67,12 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
         }
     }
 
-    public static boolean cancelPotentialWork(AvatarService.Avatarable avatarable, ImageView imageView) {
+    public static boolean cancelPotentialWork(
+            AvatarService.Avatarable avatarable, ImageView imageView) {
         final AvatarWorkerTask workerTask = getBitmapWorkerTask(imageView);
 
         if (workerTask != null) {
-            final AvatarService.Avatarable old= workerTask.avatarable;
+            final AvatarService.Avatarable old = workerTask.avatarable;
             if (old == null || avatarable != old) {
                 workerTask.cancel(true);
             } else {
@@ -87,15 +85,17 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
     public static AvatarWorkerTask getBitmapWorkerTask(ImageView imageView) {
         if (imageView != null) {
             final Drawable drawable = imageView.getDrawable();
-            if (drawable instanceof AsyncDrawable) {
-                final AsyncDrawable asyncDrawable = (AsyncDrawable) drawable;
+            if (drawable instanceof AsyncDrawable asyncDrawable) {
                 return asyncDrawable.getAvatarWorkerTask();
             }
         }
         return null;
     }
 
-    public static void loadAvatar(final AvatarService.Avatarable avatarable, final ImageView imageView, final @DimenRes int size) {
+    public static void loadAvatar(
+            final AvatarService.Avatarable avatarable,
+            final ImageView imageView,
+            final @DimenRes int size) {
         if (cancelPotentialWork(avatarable, imageView)) {
             final XmppActivity activity = XmppActivity.find(imageView);
             if (activity == null) {
@@ -114,7 +114,8 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
                 imageView.setBackgroundColor(avatarable.getAvatarBackgroundColor());
                 imageView.setImageDrawable(null);
                 final AvatarWorkerTask task = new AvatarWorkerTask(imageView, size);
-                final AsyncDrawable asyncDrawable = new AsyncDrawable(activity.getResources(), null, task);
+                final AsyncDrawable asyncDrawable =
+                        new AsyncDrawable(activity.getResources(), null, task);
                 imageView.setImageDrawable(asyncDrawable);
                 try {
                     task.execute(avatarable);
@@ -124,12 +125,14 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
         }
     }
 
-    private static void setContentDescription(final AvatarService.Avatarable avatarable, final ImageView imageView) {
+    private static void setContentDescription(
+            final AvatarService.Avatarable avatarable, final ImageView imageView) {
         final Context context = imageView.getContext();
         if (avatarable instanceof Account) {
             imageView.setContentDescription(context.getString(R.string.your_avatar));
         } else {
-            imageView.setContentDescription(context.getString(R.string.avatar_for_x, avatarable.getAvatarName()));
+            imageView.setContentDescription(
+                    context.getString(R.string.avatar_for_x, avatarable.getAvatarName()));
         }
     }
 

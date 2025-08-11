@@ -204,7 +204,7 @@ public class IqParser extends AbstractParser implements Consumer<Iq> {
                                         + "Encountered invalid <device> node in PEP ("
                                         + e.getMessage()
                                         + "):"
-                                        + device.toString()
+                                        + device
                                         + ", skipping...");
                     }
                 }
@@ -328,7 +328,7 @@ public class IqParser extends AbstractParser implements Consumer<Iq> {
                         AxolotlService.LOGPREFIX
                                 + " : "
                                 + "could not parse preKeyId from preKey "
-                                + preKeyPublicElement.toString());
+                                + preKeyPublicElement);
             } catch (Throwable e) {
                 Log.e(
                         Config.LOGTAG,

@@ -18,6 +18,22 @@ import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import eu.siacs.conversations.Config;
+import eu.siacs.conversations.R;
+import eu.siacs.conversations.crypto.axolotl.AxolotlService;
+import eu.siacs.conversations.entities.Account;
+import eu.siacs.conversations.entities.Bookmark;
+import eu.siacs.conversations.entities.Conversation;
+import eu.siacs.conversations.entities.DownloadableFile;
+import eu.siacs.conversations.services.MessageArchiveService;
+import eu.siacs.conversations.services.XmppConnectionService;
+import eu.siacs.conversations.xml.Element;
+import eu.siacs.conversations.xml.Namespace;
+import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.forms.Data;
+import eu.siacs.conversations.xmpp.pep.Avatar;
+import im.conversations.android.xmpp.model.stanza.Iq;
+import im.conversations.android.xmpp.model.upload.Request;
 import java.nio.ByteBuffer;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
@@ -494,13 +510,13 @@ public class IqGenerator extends AbstractGenerator {
         return packet;
     }
 
-    public Iq requestHttpUploadLegacySlot(Jid host, DownloadableFile file, String mime) {
+    public Iq requestHttpUploadSlot(
+            final Jid host, final DownloadableFile file, final String mime) {
         final Iq packet = new Iq(Iq.Type.GET);
         packet.setTo(host);
-        Element request = packet.addChild("request", Namespace.HTTP_UPLOAD_LEGACY);
-        request.addChild("filename").setContent(convertFilename(file.getName()));
-        request.addChild("size").setContent(String.valueOf(file.getExpectedSize()));
-        request.addChild("content-type").setContent(mime);
+        final var request = packet.addExtension(new Request());
+        request.setFilename(convertFilename(file.getName()));
+        request.setSize(file.getExpectedSize());
         return packet;
     }
 

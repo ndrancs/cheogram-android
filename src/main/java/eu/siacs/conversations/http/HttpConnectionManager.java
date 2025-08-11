@@ -127,10 +127,7 @@ public class HttpConnectionManager extends AbstractConnectionManager {
                 }
             }
             HttpUploadConnection connection =
-                    new HttpUploadConnection(
-                            message,
-                            Method.determine(message.getConversation().getAccount()),
-                            this, cb);
+                    new HttpUploadConnection(message, this, cb);
             connection.init(delay);
             this.uploadConnections.add(connection);
         }

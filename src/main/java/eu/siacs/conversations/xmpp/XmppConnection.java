@@ -70,6 +70,8 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import de.gultsch.common.Patterns;
 import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.BuildConfig;
@@ -150,6 +152,45 @@ import im.conversations.android.xmpp.model.streams.StreamError;
 import im.conversations.android.xmpp.model.tls.Proceed;
 import im.conversations.android.xmpp.model.tls.StartTls;
 import im.conversations.android.xmpp.processor.BindProcessor;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.ConnectException;
+import java.net.IDN;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.X509KeyManager;
+import javax.net.ssl.X509TrustManager;
 import okhttp3.HttpUrl;
 
 public class XmppConnection implements Runnable {
@@ -2571,6 +2612,21 @@ public class XmppConnection implements Runnable {
         return String.format("%s.%s", BuildConfig.APP_NAME, CryptoHelper.random(3));
     }
 
+    public ListenableFuture<Iq> sendIqPacket(final Iq request) {
+        final SettableFuture<Iq> settable = SettableFuture.create();
+        this.sendIqPacket(
+                request,
+                response -> {
+                    final var type = response.getType();
+                    switch (type) {
+                        case RESULT -> settable.set(response);
+                        case TIMEOUT -> settable.setException(new TimeoutException());
+                        default -> settable.setException(new IqErrorResponseException(response));
+                    }
+                });
+        return settable;
+    }
+
     public String sendIqPacket(final Iq packet, final Consumer<Iq> callback) {
         return sendIqPacket(packet, callback, null);
     }
@@ -2773,6 +2829,18 @@ public class XmppConnection implements Runnable {
                 }
             }
             return items;
+        }
+    }
+
+    public Entry<Jid, ServiceDiscoveryResult> getServiceDiscoveryResultByFeature(
+            final String feature) {
+        synchronized (this.disco) {
+            for (final var cursor : this.disco.entrySet()) {
+                if (cursor.getValue().getFeatures().contains(feature)) {
+                    return cursor;
+                }
+            }
+            return null;
         }
     }
 
@@ -3208,66 +3276,54 @@ public class XmppConnection implements Runnable {
             return HttpUrl.parse(address);
         }
 
-        public boolean httpUpload(long filesize) {
+        public boolean httpUpload(long fileSize) {
             if (Config.DISABLE_HTTP_UPLOAD) {
                 return false;
-            } else {
-                for (String namespace :
-                        new String[] {Namespace.HTTP_UPLOAD, Namespace.HTTP_UPLOAD_LEGACY}) {
-                    List<Entry<Jid, ServiceDiscoveryResult>> items =
-                            findDiscoItemsByFeature(namespace);
-                    if (!items.isEmpty()) {
-                        try {
-                            long maxsize =
-                                    Long.parseLong(
-                                            items.get(0)
-                                                    .getValue()
-                                                    .getExtendedDiscoInformation(
-                                                            namespace, "max-file-size"));
-                            if (filesize <= maxsize) {
-                                return true;
-                            } else {
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid()
-                                                + ": http upload is not available for files with"
-                                                + " size "
-                                                + filesize
-                                                + " (max is "
-                                                + maxsize
-                                                + ")");
-                                return false;
-                            }
-                        } catch (Exception e) {
-                            return true;
-                        }
-                    }
-                }
+            }
+            final var result = getServiceDiscoveryResultByFeature(Namespace.HTTP_UPLOAD);
+            if (result == null) {
                 return false;
             }
-        }
-
-        public boolean useLegacyHttpUpload() {
-            return findDiscoItemByFeature(Namespace.HTTP_UPLOAD) == null
-                    && findDiscoItemByFeature(Namespace.HTTP_UPLOAD_LEGACY) != null;
+            final long maxSize;
+            try {
+                maxSize =
+                        Long.parseLong(
+                                result.getValue()
+                                        .getExtendedDiscoInformation(
+                                                Namespace.HTTP_UPLOAD, "max-file-size"));
+            } catch (final Exception e) {
+                return true;
+            }
+            if (fileSize <= maxSize) {
+                return true;
+            } else {
+                Log.d(
+                        Config.LOGTAG,
+                        account.getJid().asBareJid()
+                                + ": http upload is not available for files with"
+                                + " size "
+                                + fileSize
+                                + " (max is "
+                                + maxSize
+                                + ")");
+                return false;
+            }
         }
 
         public long getMaxHttpUploadSize() {
-            for (String namespace :
-                    new String[] {Namespace.HTTP_UPLOAD, Namespace.HTTP_UPLOAD_LEGACY}) {
-                List<Entry<Jid, ServiceDiscoveryResult>> items = findDiscoItemsByFeature(namespace);
-                if (!items.isEmpty()) {
-                    try {
-                        return Long.parseLong(
-                                items.get(0)
-                                        .getValue()
-                                        .getExtendedDiscoInformation(namespace, "max-file-size"));
-                    } catch (Exception e) {
-                        // ignored
-                    }
-                }
+            final var result = getServiceDiscoveryResultByFeature(Namespace.HTTP_UPLOAD);
+            if (result == null) {
+                return -1;
             }
-            return -1;
+            try {
+                return Long.parseLong(
+                        result.getValue()
+                                .getExtendedDiscoInformation(
+                                        Namespace.HTTP_UPLOAD, "max-file-size"));
+            } catch (final Exception e) {
+                return -1;
+                // ignored
+            }
         }
 
         public boolean stanzaIds() {
