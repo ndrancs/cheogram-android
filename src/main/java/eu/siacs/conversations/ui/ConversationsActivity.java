@@ -69,6 +69,7 @@ import com.google.common.collect.ImmutableList;
 import io.michaelrocks.libphonenumber.android.NumberParseException;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.color.MaterialColors;
+import com.google.android.material.elevation.SurfaceColors;
 
 import org.jetbrains.annotations.NotNull;
 import org.openintents.openpgp.util.OpenPgpApi;
@@ -1108,6 +1109,7 @@ public class ConversationsActivity extends XmppActivity
         OmemoSetting.load(this);
         this.binding = DataBindingUtil.setContentView(this, R.layout.activity_conversations);
         Activities.setStatusAndNavigationBarColors(this, binding.getRoot());
+        ((androidx.drawerlayout.widget.DrawerLayout) binding.getRoot()).setStatusBarBackgroundColor(SurfaceColors.SURFACE_0.getColor(this));
         setSupportActionBar(binding.toolbar);
         configureActionBar(getSupportActionBar());
         this.getFragmentManager().addOnBackStackChangedListener(this::invalidateActionBarTitle);
