@@ -68,7 +68,6 @@ import eu.siacs.conversations.crypto.axolotl.XmppAxolotlSession;
 import eu.siacs.conversations.databinding.ActivityEditAccountBinding;
 import eu.siacs.conversations.databinding.DialogPresenceBinding;
 import eu.siacs.conversations.entities.Account;
-import eu.siacs.conversations.entities.Presence;
 import eu.siacs.conversations.entities.PresenceTemplate;
 import eu.siacs.conversations.services.BarcodeProvider;
 import eu.siacs.conversations.services.QuickConversationsService;
@@ -102,6 +101,11 @@ import eu.siacs.conversations.xmpp.pep.Avatar;
 import static eu.siacs.conversations.utils.PermissionUtils.allGranted;
 import static eu.siacs.conversations.utils.PermissionUtils.writeGranted;
 
+import im.conversations.android.xmpp.model.stanza.Presence;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import okhttp3.HttpUrl;
 import okhttp3.HttpUrl;
 import org.openintents.openpgp.util.OpenPgpUtils;
@@ -438,7 +442,7 @@ public class EditAccountActivity extends OmemoActivity
             };
 
     private static void setAvailabilityRadioButton(
-            Presence.Status status, DialogPresenceBinding binding) {
+            Presence.Availability status, DialogPresenceBinding binding) {
         if (status == null) {
             binding.online.setChecked(true);
             return;
@@ -458,15 +462,15 @@ public class EditAccountActivity extends OmemoActivity
         }
     }
 
-    private static Presence.Status getAvailabilityRadioButton(DialogPresenceBinding binding) {
+    private static Presence.Availability getAvailabilityRadioButton(DialogPresenceBinding binding) {
         if (binding.dnd.isChecked()) {
-            return Presence.Status.DND;
+            return Presence.Availability.DND;
         } else if (binding.xa.isChecked()) {
-            return Presence.Status.XA;
+            return Presence.Availability.XA;
         } else if (binding.away.isChecked()) {
-            return Presence.Status.AWAY;
+            return Presence.Availability.AWAY;
         } else {
-            return Presence.Status.ONLINE;
+            return Presence.Availability.ONLINE;
         }
     }
 

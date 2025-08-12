@@ -102,6 +102,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 import com.google.common.io.Files;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.MoreExecutors;
 
 import com.otaliastudios.autocomplete.Autocomplete;
 import com.otaliastudios.autocomplete.AutocompleteCallback;
@@ -149,7 +152,6 @@ import eu.siacs.conversations.entities.DownloadableFile;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.MucOptions;
 import eu.siacs.conversations.entities.MucOptions.User;
-import eu.siacs.conversations.entities.Presence;
 import eu.siacs.conversations.entities.Presences;
 import eu.siacs.conversations.entities.ReadByMarker;
 import eu.siacs.conversations.entities.Transferable;
@@ -204,10 +206,24 @@ import eu.siacs.conversations.xmpp.jingle.Media;
 import eu.siacs.conversations.xmpp.jingle.OngoingRtpSession;
 import eu.siacs.conversations.xmpp.jingle.RtpCapability;
 import eu.siacs.conversations.xmpp.jingle.RtpEndUserState;
+import eu.siacs.conversations.xmpp.manager.DiscoManager;
 
+import im.conversations.android.xmpp.Entity;
+import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import im.conversations.android.xmpp.model.stanza.Iq;
 
 import org.jetbrains.annotations.NotNull;
+import im.conversations.android.xmpp.model.stanza.Presence;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ConversationFragment extends XmppFragment
         implements EditMessage.KeyboardListener,
@@ -2342,21 +2358,32 @@ public class ConversationFragment extends XmppFragment
     }
 
     private void refreshFeatureDiscovery() {
-        Set<Map.Entry<String, Presence>> presences = conversation.getContact().getPresences().getPresencesMap().entrySet();
-        if (presences.isEmpty()) {
-            presences = new HashSet<>();
-            presences.add(new AbstractMap.SimpleEntry("", null));
+        final var connection = conversation.getContact().getAccount().getXmppConnection();
+        if (connection == null) return;
+
+        var jids = conversation.getContact().getPresences().getFullJids();
+        if (jids.isEmpty()) {
+            jids = new HashSet<>();
+            jids.add(conversation.getContact().getJid());
         }
-        for (Map.Entry<String, Presence> entry : presences) {
-            Jid jid = conversation.getContact().getJid();
-            if (!entry.getKey().equals("")) jid = jid.withResource(entry.getKey());
-            activity.xmppConnectionService.fetchCaps(conversation.getAccount(), jid, entry.getValue(), () -> {
-                if (activity == null) return;
-                activity.runOnUiThread(() -> {
-                    refresh();
-                    refreshCommands(true);
-                });
-            });
+        for (final var jid : jids) {
+            Futures.addCallback(
+                connection.getManager(DiscoManager.class).info(Entity.presence(jid), null, null),
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(InfoQuery disco) {
+                        if (activity == null) return;
+                        activity.runOnUiThread(() -> {
+                            refresh();
+                            refreshCommands(true);
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Throwable throwable) {}
+                },
+                MoreExecutors.directExecutor()
+            );
         }
     }
 
@@ -4100,7 +4127,7 @@ public class ConversationFragment extends XmppFragment
         boolean hasAttachments =
                 mediaPreviewAdapter != null && mediaPreviewAdapter.hasAttachments();
         final Conversation c = this.conversation;
-        final Presence.Status status;
+        final Presence.Availability status;
         final String text =
                 this.binding.textinput == null ? "" : this.binding.textinput.getText().toString();
         final SendButtonAction action;
@@ -4113,17 +4140,17 @@ public class ConversationFragment extends XmppFragment
             if (activity != null
                     && activity.xmppConnectionService != null
                     && activity.xmppConnectionService.getMessageArchiveService().isCatchingUp(c)) {
-                status = Presence.Status.OFFLINE;
+                status = Presence.Availability.OFFLINE;
             } else if (c.getMode() == Conversation.MODE_SINGLE) {
                 status = c.getContact().getShownStatus();
             } else {
                 status =
                         c.getMucOptions().online()
-                                ? Presence.Status.ONLINE
-                                : Presence.Status.OFFLINE;
+                                ? Presence.Availability.ONLINE
+                                : Presence.Availability.OFFLINE;
             }
         } else {
-            status = Presence.Status.OFFLINE;
+            status = Presence.Availability.OFFLINE;
         }
         this.binding.textSendButton.setTag(action);
         this.binding.textSendButton.setIconTint(ColorStateList.valueOf(SendButtonTool.getSendButtonColor(this.binding.textSendButton, status)));

@@ -22,6 +22,17 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import eu.siacs.conversations.Config;
+import eu.siacs.conversations.android.AbstractPhoneContact;
+import eu.siacs.conversations.android.JabberIdContact;
+import eu.siacs.conversations.services.QuickConversationsService;
+import eu.siacs.conversations.utils.JidHelper;
+import eu.siacs.conversations.utils.UIHelper;
+import eu.siacs.conversations.xml.Element;
+import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.jingle.RtpCapability;
+import eu.siacs.conversations.xmpp.pep.Avatar;
+import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -73,7 +84,7 @@ public class Contact implements ListItem, Blockable {
     private final JSONObject keys;
     private JSONArray groups = new JSONArray();
     private JSONArray systemTags = new JSONArray();
-    private final Presences presences = new Presences();
+    private final Presences presences = new Presences(this);
     protected Account account;
     protected Avatar avatar;
 
@@ -231,7 +242,7 @@ public class Contact implements ListItem, Blockable {
         for (final String tag : getSystemTags(true)) {
             tags.add(new Tag(tag));
         }
-        Presence.Status status = getShownStatus();
+        final var status = getShownStatus();
         if (!showInRoster() && getSystemAccount() != null) {
             tags.add(new Tag("Android"));
         }
@@ -308,6 +319,7 @@ public class Contact implements ListItem, Blockable {
 
     public void updatePresence(final String resource, final Presence presence) {
         this.presences.updatePresence(resource, presence);
+        refreshCaps();
     }
 
     public void removePresence(final String resource) {
@@ -321,7 +333,7 @@ public class Contact implements ListItem, Blockable {
         refreshCaps();
     }
 
-    public Presence.Status getShownStatus() {
+    public im.conversations.android.xmpp.model.stanza.Presence.Availability getShownStatus() {
         return this.presences.getShownStatus();
     }
 

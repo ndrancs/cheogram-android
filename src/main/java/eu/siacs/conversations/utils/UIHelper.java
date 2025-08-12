@@ -40,7 +40,6 @@ import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Conversational;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.MucOptions;
-import eu.siacs.conversations.entities.Presence;
 import eu.siacs.conversations.entities.Reaction;
 import eu.siacs.conversations.entities.RtpSessionStatus;
 import eu.siacs.conversations.entities.Transferable;
@@ -48,6 +47,7 @@ import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.ui.util.QuoteHelper;
 import eu.siacs.conversations.worker.ExportBackupWorker;
 import eu.siacs.conversations.xmpp.Jid;
+import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -600,7 +600,7 @@ public class UIHelper {
         return LOCATION_QUESTIONS.contains(body);
     }
 
-    public static void setStatus(final TextView textView, Presence.Status status) {
+    public static void setStatus(final TextView textView, Presence.Availability status) {
         final @StringRes int text;
         final @ColorRes int color =
                 switch (status) {

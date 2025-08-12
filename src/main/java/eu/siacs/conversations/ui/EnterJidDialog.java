@@ -43,14 +43,14 @@ import eu.siacs.conversations.databinding.DialogEnterJidBinding;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
-import eu.siacs.conversations.entities.Presence;
-import eu.siacs.conversations.entities.ServiceDiscoveryResult;
 import eu.siacs.conversations.ui.adapter.KnownHostsAdapter;
 import eu.siacs.conversations.ui.interfaces.OnBackendConnected;
 import eu.siacs.conversations.ui.util.DelayedHintHelper;
 import eu.siacs.conversations.utils.PhoneNumberUtilWrapper;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.OnGatewayResult;
+import eu.siacs.conversations.xmpp.manager.DiscoManager;
+import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 
 public class EnterJidDialog extends DialogFragment implements OnBackendConnected, TextWatcher {
 
@@ -305,7 +305,7 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
             });
         };
 
-        Pair<String,Pair<Jid,Presence>> p = gatewayListAdapter.getSelected();
+        final var p = gatewayListAdapter.getSelected();
         final String type = gatewayListAdapter.getSelectedType();
 
         // Resolve based on local settings before submission
@@ -320,7 +320,7 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
         } else if (p.first != null) { // Gateway already responsed to jabber:iq:gateway once
             final Account acct = ((XmppActivity) getActivity()).xmppConnectionService.findAccountByJid(accountJid);
             ((XmppActivity) getActivity()).xmppConnectionService.fetchFromGateway(acct, p.second.first, binding.jid.getText().toString().trim(), finish);
-        } else if (p.second.first.isDomainJid() && p.second.second.getServiceDiscoveryResult().getFeatures().contains("jid\\20escaping")) {
+        } else if (p.second.first.isDomainJid() && p.second.second.hasFeature("jid\\20escaping")) {
             finish.onGatewayResult(Jid.ofLocalAndDomain(binding.jid.getText().toString().trim(), p.second.first.getDomain().toString()).toString(), null);
         } else if (p.second.first.isDomainJid()) {
             finish.onGatewayResult(Jid.ofLocalAndDomain(binding.jid.getText().toString().trim().replace("@", "%"), p.second.first.getDomain().toString()).toString(), null);
@@ -537,9 +537,13 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
         public List<String> getTypes(Contact gateway) {
             List<String> types = new ArrayList<>();
 
-            for(Presence p : gateway.getPresences().getPresences()) {
-                if(p.getServiceDiscoveryResult() != null) {
-                    for (ServiceDiscoveryResult.Identity id : p.getServiceDiscoveryResult().getIdentities()) {
+            final var connection = gateway.getAccount().getXmppConnection();
+            if (connection == null) return types;
+
+            for(final var jid : gateway.getPresences().getFullJids()) {
+                final var disco = connection.getManager(DiscoManager.class).get(jid);
+                if(disco != null) {
+                    for (final var id : disco.getIdentities()) {
                         if ("gateway".equals(id.getCategory())) types.add(id.getType());
                     }
                 }
@@ -552,31 +556,25 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
             return getType(selected);
         }
 
-        public Pair<String, Pair<Jid,Presence>> getSelected() {
+        public Pair<String, Pair<Jid, InfoQuery>> getSelected() {
             if(this.selected == 0) {
                 return null; // No gateway, just use direct JID entry
             }
 
             Pair<Contact,String> gateway = this.gateways.get(this.selected - 1);
+            final var connection = gateway.first.getAccount().getXmppConnection();
+            if (connection == null) return null;
 
-            Pair<Jid,Presence> presence = null;
-            for (Map.Entry<String,Presence> e : gateway.first.getPresences().getPresencesMap().entrySet()) {
-                Presence p = e.getValue();
-                if (p.getServiceDiscoveryResult() != null) {
-                    if (p.getServiceDiscoveryResult().getFeatures().contains("jabber:iq:gateway")) {
-                        if (e.getKey().equals("")) {
-                            presence = new Pair<>(gateway.first.getJid(), p);
-                        } else {
-                            presence = new Pair<>(gateway.first.getJid().withResource(e.getKey()), p);
-                        }
+            Pair<Jid,InfoQuery> presence = null;
+            for (final var jid  : gateway.first.getPresences().getFullJids()) {
+                final var disco = connection.getManager(DiscoManager.class).get(jid);
+                if (disco != null) {
+                    if (disco.hasFeature("jabber:iq:gateway")) {
+                        presence = new Pair<>(jid, disco);
                         break;
                     }
-                    if (p.getServiceDiscoveryResult().hasIdentity("gateway", null)) {
-                        if (e.getKey().equals("")) {
-                            presence = new Pair<>(gateway.first.getJid(), p);
-                        } else {
-                            presence = new Pair<>(gateway.first.getJid().withResource(e.getKey()), p);
-                        }
+                    if (disco.hasIdentityWithCategoryAndType("gateway", null)) {
+                        presence = new Pair<>(jid, disco);
                     }
                 }
             }

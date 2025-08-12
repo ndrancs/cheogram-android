@@ -1,15 +1,26 @@
 package eu.siacs.conversations.entities;
 
 import android.util.Pair;
-
+import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
+import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.manager.DiscoManager;
+import im.conversations.android.xmpp.model.disco.info.Identity;
+import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Hashtable;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class Presences {
-    private final Hashtable<String, Presence> presences = new Hashtable<>();
+    private final HashMap<String, Presence> presences = new HashMap<>();
+    private final Contact contact;
+
+    public Presences(final Contact contact) {
+        this.contact = contact;
+    }
 
     private static String nameWithoutVersion(String name) {
         String[] parts = name.split(" ");
@@ -63,18 +74,19 @@ public class Presences {
         }
     }
 
-    public Presence.Status getShownStatus() {
-        Presence.Status status = Presence.Status.OFFLINE;
+    public Presence.Availability getShownStatus() {
+        Presence.Availability highestAvailability = Presence.Availability.OFFLINE;
         synchronized (this.presences) {
-            for (Presence p : presences.values()) {
-                if (p.getStatus() == Presence.Status.DND) {
-                    return p.getStatus();
-                } else if (p.getStatus().compareTo(status) < 0) {
-                    status = p.getStatus();
+            for (final Presence p : presences.values()) {
+                final var availability = p.getAvailability();
+                if (availability == Presence.Availability.DND) {
+                    return availability;
+                } else if (availability.compareTo(highestAvailability) < 0) {
+                    highestAvailability = availability;
                 }
             }
         }
-        return status;
+        return highestAvailability;
     }
 
     public int size() {
@@ -100,10 +112,12 @@ public class Presences {
     public List<PresenceTemplate> asTemplates() {
         synchronized (this.presences) {
             ArrayList<PresenceTemplate> templates = new ArrayList<>(presences.size());
-            for (Presence p : presences.values()) {
-                if (p.getMessage() != null && !p.getMessage().trim().isEmpty()) {
-                    templates.add(new PresenceTemplate(p.getStatus(), p.getMessage()));
+            for (Presence presence : this.presences.values()) {
+                String message = Strings.nullToEmpty(presence.getStatus()).trim();
+                if (Strings.isNullOrEmpty(message)) {
+                    continue;
                 }
+                templates.add(new PresenceTemplate(presence.getAvailability(), message));
             }
             return templates;
         }
@@ -115,24 +129,46 @@ public class Presences {
         }
     }
 
-    public List<String> getStatusMessages() {
-        ArrayList<String> messages = new ArrayList<>();
+    public Set<String> getStatusMessages() {
+        Set<String> messages = new HashSet<>();
         synchronized (this.presences) {
             for (Presence presence : this.presences.values()) {
-                String message = presence.getMessage() == null ? null : presence.getMessage().trim();
-                if (message != null && !message.isEmpty() && !messages.contains(message)) {
-                    messages.add(message);
+                String message = Strings.nullToEmpty(presence.getStatus()).trim();
+                if (Strings.isNullOrEmpty(message)) {
+                    continue;
                 }
+                messages.add(message);
             }
         }
         return messages;
     }
 
-    public boolean allOrNonSupport(String namespace) {
+    public Set<Jid> getFullJids() {
+        final Set<Jid> jids = new HashSet<>();
         synchronized (this.presences) {
-            for (Presence presence : this.presences.values()) {
-                ServiceDiscoveryResult disco = presence.getServiceDiscoveryResult();
-                if (disco == null || !disco.getFeatures().contains(namespace)) {
+            for (var resource : this.presences.keySet()) {
+                final var jid = Strings.isNullOrEmpty(resource) ? contact.getJid().asBareJid() : contact.getJid().withResource(resource);
+                jids.add(jid);
+            }
+        }
+        return jids;
+    }
+
+    public boolean allOrNonSupport(String namespace) {
+        final var connection = this.contact.getAccount().getXmppConnection();
+        if (connection == null) {
+            return true;
+        }
+        synchronized (this.presences) {
+            for (var resource : this.presences.keySet()) {
+                final var disco =
+                        connection
+                                .getManager(DiscoManager.class)
+                                .get(
+                                        Strings.isNullOrEmpty(resource)
+                                                ? contact.getJid().asBareJid()
+                                                : contact.getJid().withResource(resource));
+                if (disco == null || !disco.getFeatureStrings().contains(namespace)) {
                     return false;
                 }
             }
@@ -141,45 +177,46 @@ public class Presences {
     }
 
     public boolean anySupport(final String namespace) {
-        synchronized (this.presences) {
-            if (this.presences.size() == 0) {
+        final var connection = this.contact.getAccount().getXmppConnection();
+        if (connection == null) {
+            return false;
+        }
+        final var jids = getFullJids();
+        if (jids.size() == 0) {
+            return true;
+        }
+        for (final var jid : jids) {
+            final var disco = connection.getManager(DiscoManager.class).get(jid);
+            if (disco != null && disco.getFeatures().contains(namespace)) {
                 return true;
-            }
-            for (Presence presence : this.presences.values()) {
-                ServiceDiscoveryResult disco = presence.getServiceDiscoveryResult();
-                if (disco != null && disco.getFeatures().contains(namespace)) {
-                    return true;
-                }
             }
         }
         return false;
     }
 
     public String firstWhichSupport(final String namespace) {
-        synchronized (this.presences) {
-            for (Map.Entry<String, Presence> entry : this.presences.entrySet()) {
-                String resource = entry.getKey();
-                Presence presence = entry.getValue();
-                ServiceDiscoveryResult disco = presence.getServiceDiscoveryResult();
-                if (disco != null && disco.getFeatures().contains(namespace)) {
-                    return resource;
-                }
+        final var connection = this.contact.getAccount().getXmppConnection();
+        if (connection == null) {
+            return null;
+        }
+        for (final var jid : getFullJids()) {
+            final var disco = connection.getManager(DiscoManager.class).get(jid);
+            if (disco != null && disco.getFeatures().contains(namespace)) {
+                return jid.getResource();
             }
         }
         return null;
     }
 
     public boolean anyIdentity(final String category, final String type) {
-        synchronized (this.presences) {
-            if (this.presences.size() == 0) {
-                // https://github.com/iNPUTmice/Conversations/issues/4230
-                return false;
-            }
-            for (Presence presence : this.presences.values()) {
-                ServiceDiscoveryResult disco = presence.getServiceDiscoveryResult();
-                if (disco != null && disco.hasIdentity(category, type)) {
-                    return true;
-                }
+        final var connection = this.contact.getAccount().getXmppConnection();
+        if (connection == null) {
+            return false;
+        }
+        for (final var jid : getFullJids()) {
+            final var disco = connection.getManager(DiscoManager.class).get(jid);
+            if (disco != null && disco.hasIdentityWithCategoryAndType(category, type)) {
+                return true;
             }
         }
         return false;
@@ -188,15 +225,25 @@ public class Presences {
     public Pair<Map<String, String>, Map<String, String>> toTypeAndNameMap() {
         Map<String, String> typeMap = new HashMap<>();
         Map<String, String> nameMap = new HashMap<>();
+        final var connection = this.contact.getAccount().getXmppConnection();
+        if (connection == null) {
+            return new Pair<>(typeMap, nameMap);
+        }
         synchronized (this.presences) {
-            for (Map.Entry<String, Presence> presenceEntry : this.presences.entrySet()) {
-                String resource = presenceEntry.getKey();
-                Presence presence = presenceEntry.getValue();
-                ServiceDiscoveryResult serviceDiscoveryResult = presence == null ? null : presence.getServiceDiscoveryResult();
-                if (serviceDiscoveryResult != null && serviceDiscoveryResult.getIdentities().size() > 0) {
-                    ServiceDiscoveryResult.Identity identity = serviceDiscoveryResult.getIdentities().get(0);
+            for (final String resource : this.presences.keySet()) {
+                final var serviceDiscoveryResult =
+                        connection
+                                .getManager(DiscoManager.class)
+                                .get(
+                                        Strings.isNullOrEmpty(resource)
+                                                ? contact.getJid().asBareJid()
+                                                : contact.getJid().withResource(resource));
+                if (serviceDiscoveryResult != null
+                        && !serviceDiscoveryResult.getIdentities().isEmpty()) {
+                    final Identity identity =
+                            Iterables.getFirst(serviceDiscoveryResult.getIdentities(), null);
                     String type = identity.getType();
-                    String name = identity.getName();
+                    String name = identity.getIdentityName();
                     if (type != null) {
                         typeMap.put(resource, type);
                     }

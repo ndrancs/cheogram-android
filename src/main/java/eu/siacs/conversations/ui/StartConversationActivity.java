@@ -75,7 +75,6 @@ import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.ListItem;
 import eu.siacs.conversations.entities.MucOptions;
-import eu.siacs.conversations.entities.Presence;
 import eu.siacs.conversations.services.QuickConversationsService;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.services.XmppConnectionService.OnRosterUpdate;
@@ -97,6 +96,7 @@ import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
 import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.forms.Data;
 
+import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1332,13 +1332,15 @@ public class StartConversationActivity extends XmppActivity
         }
         boolean foundSopranica = false;
         for (final Account account : accounts) {
+            if (!account.isEnabled()) continue;
+
             for (Contact contact : account.getRoster().getContacts()) {
-                Presence.Status s = contact.getShownStatus();
+                final var s = contact.getShownStatus();
                 if (contact.showInContactList()
                     && contact.match(this, needle)
                     && (!this.mHideOfflineContacts
                         || (needle != null && !needle.trim().isEmpty())
-                        || s.compareTo(Presence.Status.OFFLINE) < 0)) {
+                        || s.compareTo(Presence.Availability.OFFLINE) < 0)) {
                     this.contacts.add(contact);
                     tags.addAll(contact.getTags(this));
                 }

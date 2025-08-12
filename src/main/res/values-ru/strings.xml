@@ -184,7 +184,7 @@
 \nВаши собеседники не смогут больше отправлять вам зашифрованные OpenPGP сообщения.</string>
     <string name="openpgp_has_been_published">Публичный ключ OpenPGP опубликован.</string>
     <string name="mgmt_account_enable">Включить аккаунт</string>
-    <string name="mgmt_account_delete_confirm_text">Удалить свой аккаунт? Удаление аккаунта также сотрёт все историю бесед.</string>
+    <string name="mgmt_account_delete_confirm_text">Удалить свой аккаунт? Удаление аккаунта также сотрёт всю историю бесед.</string>
     <string name="attach_record_voice">Записать голос</string>
     <string name="account_settings_jabber_id">XMPP-адрес</string>
     <string name="block_jabber_id">Заблокировать XMPP-адрес</string>
@@ -1155,7 +1155,7 @@
     <string name="show_to_contacts_only">Показывать только контактам</string>
     <string name="account_status_connection_timeout">Истекло время ожидания подключения</string>
     <string name="retry_with_p2p">Повторить через P2P</string>
-    <string name="account_status_channel_binding">Привязка канала недоступна</string>
+    <string name="account_status_channel_binding">Нет привязки канала</string>
     <string name="word_document">Документ Word</string>
     <string name="restore_omemo_key">Восстановить ключи OMEMO</string>
     <string name="non_quicksy_backup">Quicksy может восстанавливать резервные копии только для аккаунтов quicksy.im</string>
