@@ -125,7 +125,7 @@ dependencies {
     implementation 'me.xdrop:fuzzywuzzy:1.4.0'
     implementation 'net.fellbaum:jemoji:1.4.1'
     implementation 'com.github.natario1:Autocomplete:v1.1.0'
-    implementation 'com.mikepenz:materialdrawer:9.0.1'
+    implementation 'com.mikepenz:materialdrawer:10.0.0-b01'
     implementation 'androidx.browser:browser:1.8.0'
     implementation 'io.github.nishkarsh:android-permissions:2.1.6'
 
