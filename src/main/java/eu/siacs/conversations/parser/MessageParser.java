@@ -1098,7 +1098,6 @@ public class MessageParser extends AbstractParser
                             replacedMessage.setSubject(message.getSubject());
                             replacedMessage.setThread(message.getThread());
                             replacedMessage.putEdited(replacedMessage.getRemoteMsgId(), replacedMessage.getServerMsgId());
-                            replacedMessage.setRemoteMsgId(remoteMsgId);
                             if (replaceElement != null && !replaceElement.getName().equals("replace")) {
                                 mXmppConnectionService.getFileBackend().deleteFile(replacedMessage);
                                 mXmppConnectionService.evictPreview(message.getUuid());
