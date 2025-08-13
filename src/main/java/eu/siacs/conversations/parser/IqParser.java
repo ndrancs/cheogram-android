@@ -1,6 +1,5 @@
 package eu.siacs.conversations.parser;
 
-import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
 import androidx.annotation.NonNull;
@@ -10,14 +9,16 @@ import eu.siacs.conversations.Config;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
-import eu.siacs.conversations.entities.Room;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
-import eu.siacs.conversations.xmpp.forms.Data;
+import eu.siacs.conversations.xmpp.XmppConnection;
+import eu.siacs.conversations.xmpp.manager.DiscoManager;
+import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import im.conversations.android.xmpp.model.stanza.Iq;
+import im.conversations.android.xmpp.model.version.Version;
 import java.io.ByteArrayInputStream;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -53,8 +54,8 @@ import org.whispersystems.libsignal.state.PreKeyBundle;
 
 public class IqParser extends AbstractParser implements Consumer<Iq> {
 
-    public IqParser(final XmppConnectionService service, final Account account) {
-        super(service, account);
+    public IqParser(final XmppConnectionService service, final XmppConnection connection) {
+        super(service, connection);
     }
 
     public static List<Jid> items(final Iq packet) {
@@ -72,38 +73,6 @@ public class IqParser extends AbstractParser implements Consumer<Iq> {
             }
         }
         return items;
-    }
-
-    public static Room parseRoom(Iq packet) {
-        final Element query = packet.findChild("query", Namespace.DISCO_INFO);
-        if (query == null) {
-            return null;
-        }
-        final Element x = query.findChild("x");
-        if (x == null) {
-            return null;
-        }
-        final Element identity = query.findChild("identity");
-        Data data = Data.parse(x);
-        String address = packet.getFrom().toString();
-        String name = identity == null ? null : identity.getAttribute("name");
-        String roomName = data.getValue("muc#roomconfig_roomname");
-        String description = data.getValue("muc#roominfo_description");
-        String language = data.getValue("muc#roominfo_lang");
-        String occupants = data.getValue("muc#roominfo_occupants");
-        int nusers;
-        try {
-            nusers = occupants == null ? 0 : Integer.parseInt(occupants);
-        } catch (NumberFormatException e) {
-            nusers = 0;
-        }
-
-        return new Room(
-                address,
-                TextUtils.isEmpty(roomName) ? name : roomName,
-                description,
-                language,
-                nusers);
     }
 
     private void rosterItems(final Account account, final Element query) {
@@ -427,6 +396,7 @@ public class IqParser extends AbstractParser implements Consumer<Iq> {
 
     @Override
     public void accept(final Iq packet) {
+        final var account = getAccount();
         final boolean isGet = packet.getType() == Iq.Type.GET;
         if (packet.getType() == Iq.Type.ERROR || packet.getType() == Iq.Type.TIMEOUT) {
             return;
@@ -454,7 +424,7 @@ public class IqParser extends AbstractParser implements Consumer<Iq> {
             // Otherwise, just update the existing blocklist.
             if (packet.getType() == Iq.Type.RESULT) {
                 account.clearBlocklist();
-                account.getXmppConnection().getFeatures().setBlockListRequested(true);
+                connection.getFeatures().setBlockListRequested(true);
             }
             if (items != null) {
                 final Collection<Jid> jids = new ArrayList<>(items.size());
@@ -514,13 +484,10 @@ public class IqParser extends AbstractParser implements Consumer<Iq> {
                 || packet.hasChild("data", "http://jabber.org/protocol/ibb")
                 || packet.hasChild("close", "http://jabber.org/protocol/ibb")) {
             mXmppConnectionService.getJingleConnectionManager().deliverIbbPacket(account, packet);
-        } else if (packet.hasChild("query", "http://jabber.org/protocol/disco#info")) {
-            final Iq response =
-                    mXmppConnectionService.getIqGenerator().discoResponse(account, packet);
-            mXmppConnectionService.sendIqPacket(account, response, null);
-        } else if (packet.hasChild("query", "jabber:iq:version") && isGet) {
-            final Iq response = mXmppConnectionService.getIqGenerator().versionResponse(packet);
-            mXmppConnectionService.sendIqPacket(account, response, null);
+        } else if (packet.hasExtension(InfoQuery.class) && isGet) {
+            this.getManager(DiscoManager.class).handleInfoQuery(packet);
+        } else if (packet.hasExtension(Version.class) && isGet) {
+            this.getManager(DiscoManager.class).handleVersionRequest(packet);
         } else if (packet.hasChild("ping", "urn:xmpp:ping") && isGet) {
             final Iq response = packet.generateResponse(Iq.Type.RESULT);
             mXmppConnectionService.sendIqPacket(account, response, null);
@@ -564,7 +531,7 @@ public class IqParser extends AbstractParser implements Consumer<Iq> {
                 final Element error = response.addChild("error");
                 error.setAttribute("type", "cancel");
                 error.addChild("feature-not-implemented", "urn:ietf:params:xml:ns:xmpp-stanzas");
-                account.getXmppConnection().sendIqPacket(response, null);
+                connection.sendIqPacket(response, null);
             }
         }
     }

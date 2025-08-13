@@ -20,7 +20,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ClassToInstanceMap;
-import com.google.common.collect.ImmutableClassToInstanceMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
@@ -121,11 +120,14 @@ import eu.siacs.conversations.xmpp.bind.Bind2;
 import eu.siacs.conversations.xmpp.forms.Data;
 import eu.siacs.conversations.xmpp.jingle.OnJinglePacketReceived;
 import eu.siacs.conversations.xmpp.manager.AbstractManager;
+import eu.siacs.conversations.xmpp.manager.CarbonsManager;
 import eu.siacs.conversations.xmpp.manager.DiscoManager;
+import eu.siacs.conversations.xmpp.manager.PingManager;
 import im.conversations.android.xmpp.Entity;
 import im.conversations.android.xmpp.model.AuthenticationFailure;
 import im.conversations.android.xmpp.model.AuthenticationRequest;
 import im.conversations.android.xmpp.model.AuthenticationStreamFeature;
+import im.conversations.android.xmpp.model.Extension;
 import im.conversations.android.xmpp.model.StreamElement;
 import im.conversations.android.xmpp.model.bind2.Bind;
 import im.conversations.android.xmpp.model.bind2.Bound;
@@ -264,16 +266,14 @@ public class XmppConnection implements Runnable {
         this.account = account;
         this.mXmppConnectionService = service;
         this.appSettings = mXmppConnectionService.getAppSettings();
-        this.presenceListener = new PresenceParser(service, account);
-        this.unregisteredIqListener = new IqParser(service, account);
-        this.messageListener = new MessageParser(service, account);
-        this.bindListener = new BindProcessor(service, account);
-        this.managers =
-                new ImmutableClassToInstanceMap.Builder<AbstractManager>()
-                        .put(
-                                DiscoManager.class,
-                                new DiscoManager(service, this))
-                        .build();
+        this.presenceListener = new PresenceParser(service, this);
+        // TODO rename this to Iq request handler (it handles only IQ get and set; throw assert
+        // error in handler just to be safe)
+        // TODO requires roster and blocking not to be handled by this
+        this.unregisteredIqListener = new IqParser(service, this);
+        this.messageListener = new MessageParser(service, this);
+        this.bindListener = new BindProcessor(service, this);
+        this.managers = Managers.get(service, this);
     }
 
     private static void fixResource(final Context context, final Account account) {
@@ -956,7 +956,6 @@ public class XmppConnection implements Runnable {
                             Config.LOGTAG,
                             account.getJid().asBareJid()
                                     + ": successfully enabled carbons (via Bind 2.0)");
-                    features.carbonsEnabled = true;
                 } else if (currentLoginInfo.inlineBindFeatures != null
                         && currentLoginInfo.inlineBindFeatures.contains(Namespace.CARBONS)) {
                     negotiatedCarbons = true;
@@ -964,7 +963,6 @@ public class XmppConnection implements Runnable {
                             Config.LOGTAG,
                             account.getJid().asBareJid()
                                     + ": successfully enabled carbons (via Bind 2.0/implicit)");
-                    features.carbonsEnabled = true;
                 } else {
                     negotiatedCarbons = false;
                 }
@@ -2252,7 +2250,7 @@ public class XmppConnection implements Runnable {
 
     private void sendPostBindInitialization(
             final boolean waitForDisco, final boolean carbonsEnabled) {
-        features.carbonsEnabled = carbonsEnabled;
+        getManager(CarbonsManager.class).setEnabledOnBind(carbonsEnabled);
         features.blockListRequested = false;
         getManager(DiscoManager.class).clear();
         Log.d(Config.LOGTAG, account.getJid().asBareJid() + ": starting service discovery");
@@ -2442,33 +2440,13 @@ public class XmppConnection implements Runnable {
                 advancedStreamFeaturesLoadedListeners) {
             listener.onAdvancedStreamFeaturesAvailable(account);
         }
-        if (getFeatures().carbons() && !features.carbonsEnabled) {
-            sendEnableCarbons();
+        final var carbonsManager = getManager(CarbonsManager.class);
+        if (carbonsManager.hasFeature() && !carbonsManager.isEnabled()) {
+            carbonsManager.enable();
         }
         if (getFeatures().commands()) {
             discoverCommands();
         }
-    }
-
-    private void sendEnableCarbons() {
-        final Iq iq = new Iq(Iq.Type.SET);
-        iq.addChild("enable", Namespace.CARBONS);
-        this.sendIqPacket(
-                iq,
-                (packet) -> {
-                    if (packet.getType() == Iq.Type.RESULT) {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid() + ": successfully enabled carbons");
-                        features.carbonsEnabled = true;
-                    } else {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid()
-                                        + ": could not enable carbons "
-                                        + packet);
-                    }
-                });
     }
 
     private void processStreamError(final StreamError streamError) throws IOException {
@@ -2602,6 +2580,10 @@ public class XmppConnection implements Runnable {
         return String.format("%s.%s", BuildConfig.APP_NAME, CryptoHelper.random(3));
     }
 
+    public void sendRequestStanza() {
+        this.sendPacket(new Request());
+    }
+
     public ListenableFuture<Iq> sendIqPacket(final Iq request) {
         final SettableFuture<Iq> settable = SettableFuture.create();
         this.sendIqPacket(
@@ -2653,6 +2635,36 @@ public class XmppConnection implements Runnable {
         }
         this.sendPacket(packet, force);
         return packet.getId();
+    }
+
+    public void sendResultFor(final Iq request, final Extension... extensions) {
+        final var from = request.getFrom();
+        final var id = request.getId();
+        final var response = new Iq(Iq.Type.RESULT);
+        response.setTo(from);
+        response.setId(id);
+        for (final Extension extension : extensions) {
+            response.addExtension(extension);
+        }
+        this.sendPacket(response);
+    }
+
+    public void sendErrorFor(
+            final Iq request,
+            final im.conversations.android.xmpp.model.error.Error.Type type,
+            final Condition condition,
+            final im.conversations.android.xmpp.model.error.Error.Extension... extensions) {
+        final var from = request.getFrom();
+        final var id = request.getId();
+        final var response = new Iq(Iq.Type.ERROR);
+        response.setTo(from);
+        response.setId(id);
+        final var error =
+                response.addExtension(new im.conversations.android.xmpp.model.error.Error());
+        error.setType(type);
+        error.setCondition(condition);
+        error.addExtensions(extensions);
+        this.sendPacket(response);
     }
 
     public void sendMessagePacket(final im.conversations.android.xmpp.model.stanza.Message packet) {
@@ -2719,12 +2731,7 @@ public class XmppConnection implements Runnable {
     }
 
     public void sendPing() {
-        if (!r()) {
-            final Iq iq = new Iq(Iq.Type.GET);
-            iq.setFrom(account.getJid());
-            iq.addChild("ping", Namespace.PING);
-            this.sendIqPacket(iq, null);
-        }
+        this.getManager(PingManager.class).ping();
         this.lastPingSent = SystemClock.elapsedRealtime();
     }
 
@@ -2938,17 +2945,16 @@ public class XmppConnection implements Runnable {
 
     public void trackOfflineMessageRetrieval(boolean trackOfflineMessageRetrieval) {
         if (trackOfflineMessageRetrieval) {
-            final Iq iqPing = new Iq(Iq.Type.GET);
-            iqPing.addChild("ping", Namespace.PING);
-            this.sendIqPacket(
-                    iqPing,
-                    (response) -> {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid()
-                                        + ": got ping response after sending initial presence");
-                        XmppConnection.this.offlineMessagesRetrieved = true;
-                    });
+            getManager(PingManager.class)
+                    .ping(
+                            () -> {
+                                Log.d(
+                                        Config.LOGTAG,
+                                        account.getJid().asBareJid()
+                                                + ": got ping response after sending initial"
+                                                + " presence");
+                                this.offlineMessagesRetrieved = true;
+                            });
         } else {
             this.offlineMessagesRetrieved = true;
         }
@@ -2990,6 +2996,10 @@ public class XmppConnection implements Runnable {
 
     public Account getAccount() {
         return this.account;
+    }
+
+    public Features getStreamFeatures() {
+        return this.features;
     }
 
     private class MyKeyManager implements X509KeyManager {
@@ -3139,8 +3149,9 @@ public class XmppConnection implements Runnable {
     }
 
     public class Features {
-        XmppConnection connection;
-        private boolean carbonsEnabled = false;
+        private final XmppConnection connection;
+
+        // TODO move these three into their respective managers or into XmppConnection
         private boolean encryptionEnabled = false;
         private boolean blockListRequested = false;
 
@@ -3151,10 +3162,6 @@ public class XmppConnection implements Runnable {
         private boolean hasDiscoFeature(final Jid server, final String feature) {
             final var infoQuery = getManager(DiscoManager.class).get(server);
             return infoQuery != null && infoQuery.getFeatureStrings().contains(feature);
-        }
-
-        public boolean carbons() {
-            return hasDiscoFeature(account.getDomain(), Namespace.CARBONS);
         }
 
         public boolean commands() {

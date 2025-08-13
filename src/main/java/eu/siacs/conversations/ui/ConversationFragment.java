@@ -210,6 +210,7 @@ import eu.siacs.conversations.xmpp.manager.DiscoManager;
 
 import im.conversations.android.xmpp.Entity;
 import im.conversations.android.xmpp.model.disco.info.InfoQuery;
+import im.conversations.android.xmpp.model.disco.items.Item;
 import im.conversations.android.xmpp.model.stanza.Iq;
 
 import org.jetbrains.annotations.NotNull;
@@ -3573,28 +3574,40 @@ public class ConversationFragment extends XmppFragment
         } else {
             if (!delayShow) conversation.showViewPager();
             binding.commandsViewProgressbar.setVisibility(View.VISIBLE);
-            activity.xmppConnectionService.fetchCommands(conversation.getAccount(), commandJid, (iq) -> {
-                if (activity == null) return;
+            final var discoManager = conversation.getAccount().getXmppConnection().getManager(DiscoManager.class);
+            final var future = discoManager.items(Entity.discoItem(commandJid), Namespace.COMMANDS);
+            Futures.addCallback(
+                    future,
+                    new FutureCallback<>() {
+                        @Override
+                        public void onSuccess(Collection<Item> result) {
+                            if (activity == null) return;
 
-                activity.runOnUiThread(() -> {
-                    binding.commandsViewProgressbar.setVisibility(View.GONE);
-                    commandAdapter.clear();
-                    if (iq.getType() == Iq.Type.RESULT) {
-                        for (Element child : iq.query().getChildren()) {
-                            if (!"item".equals(child.getName()) || !Namespace.DISCO_ITEMS.equals(child.getNamespace())) continue;
-                            commandAdapter.add(new CommandAdapter.Command0050(child));
+                            activity.runOnUiThread(() -> {
+                                binding.commandsViewProgressbar.setVisibility(View.GONE);
+                                commandAdapter.clear();
+                                for (final var command : result) {
+                                    commandAdapter.add(new CommandAdapter.Command0050(command));
+                                }
+
+                                if (mucConfig != null) commandAdapter.add(mucConfig);
+
+                                if (commandAdapter.getCount() < 1) {
+                                    conversation.hideViewPager();
+                                } else if (delayShow) {
+                                    conversation.showViewPager();
+                                }
+                            });
+
                         }
-                    }
 
-                    if (mucConfig != null) commandAdapter.add(mucConfig);
-
-                    if (commandAdapter.getCount() < 1) {
-                        conversation.hideViewPager();
-                    } else if (delayShow) {
-                        conversation.showViewPager();
-                    }
-                });
-            });
+                        @Override
+                        public void onFailure(@NonNull Throwable throwable) {
+                            Log.d(Config.LOGTAG, "Failed to get commands: " + throwable);
+                        }
+                    },
+                    MoreExecutors.directExecutor()
+            );
         }
     }
 

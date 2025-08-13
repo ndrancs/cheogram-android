@@ -19,7 +19,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import eu.siacs.conversations.Config;
-import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Bookmark;
@@ -68,46 +67,6 @@ public class IqGenerator extends AbstractGenerator {
 
     public IqGenerator(final XmppConnectionService service) {
         super(service);
-    }
-
-    public Iq discoResponse(final Account account, final Iq request) {
-        final var packet = new Iq(Iq.Type.RESULT);
-        packet.setId(request.getId());
-        packet.setTo(request.getFrom());
-        final Element query = packet.addChild("query", "http://jabber.org/protocol/disco#info");
-        query.setAttribute("node", request.query().getAttribute("node"));
-        final Element identity = query.addChild("identity");
-        identity.setAttribute("category", "client");
-        identity.setAttribute("type", getIdentityType());
-        identity.setAttribute("name", getIdentityName());
-        for (final String feature : getFeatures(account)) {
-            query.addChild("feature").setAttribute("var", feature);
-        }
-        return packet;
-    }
-
-    public Iq versionResponse(final Iq request) {
-        final var packet = request.generateResponse(Iq.Type.RESULT);
-        Element query = packet.query("jabber:iq:version");
-        query.addChild("name").setContent(mXmppConnectionService.getString(R.string.app_name));
-        query.addChild("version").setContent(getIdentityVersion());
-        final StringBuilder os = new StringBuilder();
-        if ("chromium".equals(android.os.Build.BRAND)) {
-            os.append("Chrome OS");
-        } else {
-            os.append("Android");
-        }
-        os.append(" ");
-        os.append(android.os.Build.VERSION.RELEASE);
-        if (QuickConversationsService.isPlayStoreFlavor()) {
-            os.append(" (");
-            os.append(android.os.Build.BOARD);
-            os.append(", ");
-            os.append(android.os.Build.FINGERPRINT);
-            os.append(")");
-            query.addChild("os").setContent(os.toString());
-        }
-        return packet;
     }
 
     public Iq entityTimeResponse(final Iq request) {
@@ -662,27 +621,6 @@ public class IqGenerator extends AbstractGenerator {
         if (data != null) {
             configure.addChild(data);
         }
-        return packet;
-    }
-
-    public Iq queryDiscoItems(final Jid jid) {
-        final Iq packet = new Iq(Iq.Type.GET);
-        packet.setTo(jid);
-        packet.query(Namespace.DISCO_ITEMS);
-        return packet;
-    }
-
-    public Iq queryDiscoItems(Jid jid, String node) {
-        final var packet = queryDiscoItems(jid);
-        final var query = packet.query(Namespace.DISCO_ITEMS);
-        query.setAttribute("node", node);
-        return packet;
-    }
-
-    public Iq queryDiscoInfo(final Jid jid) {
-        final Iq packet = new Iq(Iq.Type.GET);
-        packet.setTo(jid);
-        packet.addChild("query", Namespace.DISCO_INFO);
         return packet;
     }
 

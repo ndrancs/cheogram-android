@@ -1454,7 +1454,7 @@ public class XmppConnectionService extends Service {
     public void discoverChannels(
             String query,
             ChannelDiscoveryService.Method method,
-            Map<Jid, Account> mucServices,
+            Map<Jid, XmppConnection> mucServices,
             ChannelDiscoveryService.OnChannelSearchResultsFound onChannelSearchResultsFound) {
         mChannelDiscoveryService.discover(
                 Strings.nullToEmpty(query).trim(), method, mucServices, onChannelSearchResultsFound);
@@ -4176,6 +4176,7 @@ public class XmppConnectionService extends Service {
                 return;
             }
         }
+        // TODO use PingManager
         final Jid self = conversation.getMucOptions().getSelf().getFullJid();
         final Iq ping = new Iq(Iq.Type.GET);
         ping.setTo(self);
@@ -4795,6 +4796,10 @@ public class XmppConnectionService extends Service {
                     conversation.getAccount().getJid().asBareJid()
                             + ": leaving muc "
                             + conversation.getJid());
+            final var connection = account.getXmppConnection();
+            if (connection != null) {
+                connection.getManager(DiscoManager.class).clear(conversation.getJid().asBareJid());
+            }
         } else {
             synchronized (account.pendingConferenceLeaves) {
                 account.pendingConferenceLeaves.add(conversation);
@@ -4957,14 +4962,34 @@ public class XmppConnectionService extends Service {
             return;
         }
 
-        final var request = mIqGenerator.queryDiscoInfo(jid.asBareJid());
-        sendIqPacket(account, request, (reply) -> {
-            final var result = reply.getExtension(InfoQuery.class);
-            cb.accept(
-                result.hasFeature("http://jabber.org/protocol/muc") &&
-                result.hasIdentityWithCategory("conference")
-            );
-        });
+        final var connection = account.getXmppConnection();
+        if (connection == null) {
+            cb.accept(false); // hmmm...
+            return;
+        }
+        final ListenableFuture<InfoQuery> future =
+                connection
+                        .getManager(DiscoManager.class)
+                        .info(Entity.discoItem(jid), null);
+
+        Futures.addCallback(
+                future,
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(InfoQuery result) {
+                        cb.accept(
+                            result.hasFeature("http://jabber.org/protocol/muc") &&
+                            result.hasIdentityWithCategory("conference")
+                        );
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Throwable throwable) {
+                        cb.accept(false);
+                    }
+                },
+                MoreExecutors.directExecutor()
+        );
     }
 
     public void fetchConferenceConfiguration(final Conversation conversation) {
@@ -4973,7 +4998,6 @@ public class XmppConnectionService extends Service {
 
     public void fetchConferenceConfiguration(
             final Conversation conversation, final OnConferenceConfigurationFetched callback) {
-        final Iq request = mIqGenerator.queryDiscoInfo(conversation.getJid().asBareJid());
         final var account = conversation.getAccount();
         final var connection = account.getXmppConnection();
         if (connection == null) {
@@ -4985,7 +5009,7 @@ public class XmppConnectionService extends Service {
                         .info(Entity.discoItem(conversation.getJid().asBareJid()), null);
         Futures.addCallback(
                 future,
-                new FutureCallback<InfoQuery>() {
+                new FutureCallback<>() {
                     @Override
                     public void onSuccess(InfoQuery result) {
                         final MucOptions mucOptions = conversation.getMucOptions();
@@ -6181,11 +6205,11 @@ public class XmppConnectionService extends Service {
     }
 
     public boolean confirmMessages() {
-        return getBooleanPreference("confirm_messages", R.bool.confirm_messages);
+        return appSettings.isConfirmMessages();
     }
 
     public boolean allowMessageCorrection() {
-        return getBooleanPreference("allow_message_correction", R.bool.allow_message_correction);
+        return appSettings.isAllowMessageCorrection();
     }
 
     public boolean sendChatStates() {
@@ -6193,11 +6217,11 @@ public class XmppConnectionService extends Service {
     }
 
     public boolean useTorToConnect() {
-        return getBooleanPreference("use_tor", R.bool.use_tor);
+        return appSettings.isUseTor();
     }
 
     public boolean broadcastLastActivity() {
-        return getBooleanPreference(AppSettings.BROADCAST_LAST_ACTIVITY, R.bool.last_activity);
+        return appSettings.isBroadcastLastActivity();
     }
 
     public int unreadCount() {
@@ -6977,11 +7001,6 @@ public class XmppConnectionService extends Service {
                 callback.onGatewayResult(null, error == null ? null : error.findChildContent("text"));
             }
         });
-    }
-
-    public void fetchCommands(Account account, final Jid jid, Consumer<Iq> callback) {
-        final var request = mIqGenerator.queryDiscoItems(jid, "http://jabber.org/protocol/commands");
-        sendIqPacket(account, request, callback);
     }
 
     public void fetchMamPreferences(final Account account, final OnMamPreferencesFetched callback) {

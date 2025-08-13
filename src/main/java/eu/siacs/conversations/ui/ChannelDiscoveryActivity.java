@@ -41,6 +41,7 @@ import eu.siacs.conversations.ui.util.PendingItem;
 import eu.siacs.conversations.ui.util.SoftKeyboardUtils;
 import eu.siacs.conversations.utils.AccountUtils;
 import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.XmppConnection;
 
 public class ChannelDiscoveryActivity extends XmppActivity
         implements MenuItem.OnActionExpandListener,
@@ -58,7 +59,7 @@ public class ChannelDiscoveryActivity extends XmppActivity
 
     private String[] pendingServices = null;
     private ChannelDiscoveryService.Method method = ChannelDiscoveryService.Method.LOCAL_SERVER;
-    private HashMap<Jid, Account> mucServices = null;
+    private HashMap<Jid, XmppConnection> mucServices = null;
 
     private boolean optedIn = false;
 
@@ -70,7 +71,7 @@ public class ChannelDiscoveryActivity extends XmppActivity
         if (pendingServices != null) {
             mucServices = new HashMap<>();
             for (int i = 0; i < pendingServices.length; i += 2) {
-                mucServices.put(Jid.of(pendingServices[i]), xmppConnectionService.findAccountByJid(Jid.of(pendingServices[i+1])));
+                mucServices.put(Jid.of(pendingServices[i]), xmppConnectionService.findAccountByJid(Jid.of(pendingServices[i+1])).getXmppConnection());
             }
         }
 

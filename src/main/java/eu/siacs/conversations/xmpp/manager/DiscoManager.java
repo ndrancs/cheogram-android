@@ -4,27 +4,38 @@ import android.content.Context;
 import android.util.Log;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
+import eu.siacs.conversations.AppSettings;
+import eu.siacs.conversations.BuildConfig;
 import eu.siacs.conversations.Config;
+import eu.siacs.conversations.R;
+import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
+import eu.siacs.conversations.services.QuickConversationsService;
 import eu.siacs.conversations.services.XmppConnectionService;
 import im.conversations.android.xmpp.Entity;
 import im.conversations.android.xmpp.EntityCapabilities;
 import im.conversations.android.xmpp.EntityCapabilities2;
+import im.conversations.android.xmpp.ServiceDescription;
 import im.conversations.android.xmpp.model.Hash;
 import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import im.conversations.android.xmpp.model.disco.items.Item;
 import im.conversations.android.xmpp.model.disco.items.ItemsQuery;
+import im.conversations.android.xmpp.model.error.Condition;
+import im.conversations.android.xmpp.model.error.Error;
 import im.conversations.android.xmpp.model.stanza.Iq;
+import im.conversations.android.xmpp.model.version.Version;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +45,44 @@ import org.jspecify.annotations.Nullable;
 
 public class DiscoManager extends AbstractManager {
 
-    public static final String CAPABILITY_NODE = "http://conversations.im";
+    public static final String CAPABILITY_NODE = "https://cheogram.com";
+
+    private final List<String> STATIC_FEATURES =
+            Arrays.asList(
+                    Namespace.JINGLE,
+                    Namespace.JINGLE_APPS_FILE_TRANSFER,
+                    Namespace.JINGLE_TRANSPORTS_S5B,
+                    Namespace.JINGLE_TRANSPORTS_IBB,
+                    Namespace.JINGLE_ENCRYPTED_TRANSPORT,
+                    Namespace.JINGLE_ENCRYPTED_TRANSPORT_OMEMO,
+                    "http://jabber.org/protocol/muc",
+                    "jabber:x:conference",
+                    Namespace.OOB,
+                    Namespace.ENTITY_CAPABILITIES,
+                    Namespace.ENTITY_CAPABILITIES_2,
+                    Namespace.DISCO_INFO,
+                    "urn:xmpp:avatar:metadata+notify",
+                    Namespace.NICK + "+notify",
+                    Namespace.PING,
+                    Namespace.VERSION,
+                    Namespace.CHAT_STATES,
+                    Namespace.REACTIONS);
+    private final List<String> MESSAGE_CONFIRMATION_FEATURES =
+            Arrays.asList(Namespace.CHAT_MARKERS, Namespace.DELIVERY_RECEIPTS);
+    private final List<String> MESSAGE_CORRECTION_FEATURES =
+            Collections.singletonList(Namespace.LAST_MESSAGE_CORRECTION);
+    private final List<String> PRIVACY_SENSITIVE =
+            Collections.singletonList(
+                    "urn:xmpp:time" // XEP-0202: Entity Time leaks time zone
+                    );
+    private final List<String> VOIP_NAMESPACES =
+            Arrays.asList(
+                    Namespace.JINGLE_TRANSPORT_ICE_UDP,
+                    Namespace.JINGLE_FEATURE_AUDIO,
+                    Namespace.JINGLE_FEATURE_VIDEO,
+                    Namespace.JINGLE_APPS_RTP,
+                    Namespace.JINGLE_APPS_DTLS,
+                    Namespace.JINGLE_MESSAGE);
 
     // this is the runtime cache that stores disco information for all entities seen during a
     // session
@@ -93,7 +141,7 @@ public class DiscoManager extends AbstractManager {
     public ListenableFuture<Void> infoOrCache(
             final Entity entity, final String node, final EntityCapabilities.Hash hash) {
         final var cached = getDatabase().getInfoQuery(hash);
-        if (cached != null) {
+        if (cached != null && Config.ENABLE_CAPS_CACHE) {
             if (node == null || hash != null) {
                 this.put(entity.address, cached);
             }
@@ -110,7 +158,7 @@ public class DiscoManager extends AbstractManager {
 
     public ListenableFuture<InfoQuery> info(
             final Entity entity, @Nullable final String node, final EntityCapabilities.Hash hash) {
-        final var requestNode = hash != null && node != null ? hash.capabilityNode(node) : node;
+        final var requestNode = hash != null ? hash.capabilityNode(node) : node;
         final var iqRequest = new Iq(Iq.Type.GET);
         iqRequest.setTo(entity.address);
         final InfoQuery infoQueryRequest = iqRequest.addExtension(new InfoQuery());
@@ -261,6 +309,114 @@ public class DiscoManager extends AbstractManager {
                 MoreExecutors.directExecutor());
     }
 
+    ServiceDescription getServiceDescription() {
+        final var appSettings = new AppSettings(context);
+        final var account = connection.getAccount();
+        final ImmutableList.Builder<String> features = ImmutableList.builder();
+        features.add("http://jabber.org/protocol/xhtml-im");
+        features.add("urn:xmpp:bob");
+        if (Config.MESSAGE_DISPLAYED_SYNCHRONIZATION) {
+            features.add(Namespace.MDS_DISPLAYED + "+notify");
+        }
+        if (appSettings.isConfirmMessages()) {
+            features.addAll(MESSAGE_CONFIRMATION_FEATURES);
+        }
+        if (appSettings.isAllowMessageCorrection()) {
+            features.addAll(MESSAGE_CORRECTION_FEATURES);
+        }
+        if (Config.supportOmemo()) {
+            features.add(AxolotlService.PEP_DEVICE_LIST_NOTIFY);
+        }
+        if (!appSettings.isUseTor() && !account.isOnion()) {
+            features.addAll(PRIVACY_SENSITIVE);
+            features.addAll(VOIP_NAMESPACES);
+            features.add(Namespace.JINGLE_TRANSPORT_WEBRTC_DATA_CHANNEL);
+        }
+        if (appSettings.isBroadcastLastActivity()) {
+            features.add(Namespace.IDLE);
+        }
+        if (connection.getFeatures().bookmarks2()) {
+            features.add(Namespace.BOOKMARKS2 + "+notify");
+        } else {
+            features.add(Namespace.BOOKMARKS + "+notify");
+        }
+        return new ServiceDescription(
+                features.build(),
+                new ServiceDescription.Identity(BuildConfig.APP_NAME, "client", getIdentityType()));
+    }
+
+    String getIdentityVersion() {
+        return BuildConfig.VERSION_NAME;
+    }
+
+    String getIdentityType() {
+        if ("chromium".equals(android.os.Build.BRAND)) {
+            return "pc";
+        } else if (context.getResources().getBoolean(R.bool.is_device_table)) {
+            return "tablet";
+        } else {
+            return "phone";
+        }
+    }
+
+    public void handleVersionRequest(final Iq request) {
+        final var version = new Version();
+        version.setSoftwareName(context.getString(R.string.app_name));
+        version.setVersion(getIdentityVersion());
+        final StringBuilder os = new StringBuilder();
+        if ("chromium".equals(android.os.Build.BRAND)) {
+            os.append("Chrome OS");
+        } else {
+            os.append("Android");
+        }
+        os.append(" ");
+        os.append(android.os.Build.VERSION.RELEASE);
+        if (QuickConversationsService.isPlayStoreFlavor()) {
+            os.append(" (");
+            os.append(android.os.Build.BOARD);
+            os.append(", ");
+            os.append(android.os.Build.FINGERPRINT);
+            os.append(")");
+        }
+        version.setOs(os.toString());
+
+        Log.d(Config.LOGTAG, "responding to version request from " + request.getFrom());
+        connection.sendResultFor(request, version);
+    }
+
+    public void handleInfoQuery(final Iq request) {
+        final var infoQueryRequest = request.getExtension(InfoQuery.class);
+        final var nodeRequest = infoQueryRequest.getNode();
+        final ServiceDescription serviceDescription;
+        if (Strings.isNullOrEmpty(nodeRequest)) {
+            serviceDescription = getServiceDescription();
+            Log.d(Config.LOGTAG, "responding to disco request w/o node from " + request.getFrom());
+        } else {
+            final var hash = buildHashFromNode(nodeRequest);
+            final var cachedServiceDescription =
+                    hash != null
+                            ? getManager(PresenceManager.class).getCachedServiceDescription(hash)
+                            : null;
+            if (cachedServiceDescription != null) {
+                Log.d(
+                        Config.LOGTAG,
+                        "responding to disco request from "
+                                + request.getFrom()
+                                + " to node "
+                                + nodeRequest
+                                + " using hash "
+                                + hash.getClass().getName());
+                serviceDescription = cachedServiceDescription;
+            } else {
+                connection.sendErrorFor(request, Error.Type.CANCEL, new Condition.ItemNotFound());
+                return;
+            }
+        }
+        final var infoQuery = serviceDescription.asInfoQuery();
+        infoQuery.setNode(nodeRequest);
+        connection.sendResultFor(request, infoQuery);
+    }
+
     public Map<Jid, InfoQuery> getServerItems() {
         final var builder = new ImmutableMap.Builder<Jid, InfoQuery>();
         final var domain = connection.getAccount().getDomain();
@@ -280,6 +436,11 @@ public class DiscoManager extends AbstractManager {
             builder.put(item, infoQuery);
         }
         return builder.buildKeepingLast();
+    }
+
+    public boolean hasServerFeature(final String feature) {
+        final var infoQuery = this.get(getAccount().getDomain());
+        return infoQuery != null && infoQuery.hasFeature(feature);
     }
 
     private void put(final Jid address, final InfoQuery infoQuery) {
@@ -303,6 +464,22 @@ public class DiscoManager extends AbstractManager {
     public void clear() {
         synchronized (this.entityInformation) {
             this.entityInformation.clear();
+        }
+    }
+
+    public void clear(final Jid address) {
+        synchronized (this.entityInformation) {
+            if (address.isFullJid()) {
+                this.entityInformation.remove(address);
+            } else {
+                final var iterator = this.entityInformation.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    final var entry = iterator.next();
+                    if (entry.getKey().asBareJid().equals(address)) {
+                        iterator.remove();
+                    }
+                }
+            }
         }
     }
 

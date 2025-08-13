@@ -5,24 +5,34 @@ import androidx.annotation.NonNull;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Ordering;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Room;
 import eu.siacs.conversations.http.HttpConnectionManager;
 import eu.siacs.conversations.http.services.MuclumbusService;
-import eu.siacs.conversations.parser.IqParser;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
+import im.conversations.android.xmpp.model.disco.info.InfoQuery;
+import im.conversations.android.xmpp.model.disco.items.Item;
+import im.conversations.android.xmpp.model.disco.items.ItemsQuery;
 import im.conversations.android.xmpp.model.stanza.Iq;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import okhttp3.OkHttpClient;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
@@ -71,7 +81,7 @@ public class ChannelDiscoveryService {
     void discover(
             @NonNull final String query,
             Method method,
-            Map<Jid, Account> mucServices,
+            Map<Jid, XmppConnection> mucServices,
             OnChannelSearchResultsFound onChannelSearchResultsFound) {
         final List<Room> result = cache.getIfPresent(key(method, mucServices, query));
         if (result != null) {
@@ -164,8 +174,8 @@ public class ChannelDiscoveryService {
     }
 
     private void discoverChannelsLocalServers(
-            final String query, Map<Jid, Account> mucServices, final OnChannelSearchResultsFound listener) {
-        final Map<Jid, Account> localMucService = mucServices == null ? getLocalMucServices() : mucServices;
+            final String query, Map<Jid, XmppConnection> mucServices, final OnChannelSearchResultsFound listener) {
+        final var localMucService = mucServices == null ? getLocalMucServices() : mucServices;
         Log.d(Config.LOGTAG, "checking with " + localMucService.size() + " muc services");
         if (localMucService.isEmpty()) {
             listener.onChannelSearchResultsFound(Collections.emptyList());
@@ -179,58 +189,105 @@ public class ChannelDiscoveryService {
                 listener.onChannelSearchResultsFound(results);
             }
         }
-        final AtomicInteger queriesInFlight = new AtomicInteger();
-        final List<Room> rooms = new ArrayList<>();
-        for (final Map.Entry<Jid, Account> entry : localMucService.entrySet()) {
-            Iq itemsRequest = service.getIqGenerator().queryDiscoItems(entry.getKey());
-            queriesInFlight.incrementAndGet();
-            final var account = entry.getValue();
-            service.sendIqPacket(
-                    account,
-                    itemsRequest,
-                    (itemsResponse) -> {
-                        if (itemsResponse.getType() == Iq.Type.RESULT) {
-                            final List<Jid> items = IqParser.items(itemsResponse);
-                            for (final Jid item : items) {
-                                if (item.isDomainJid()) continue; // Only looking for MUCs for now, and by spec they have a localpart
-                                final Iq infoRequest =
-                                        service.getIqGenerator().queryDiscoInfo(item);
-                                queriesInFlight.incrementAndGet();
-                                service.sendIqPacket(
-                                        account,
-                                        infoRequest,
-                                        infoResponse -> {
-                                            if (infoResponse.getType() == Iq.Type.RESULT) {
-                                                final Room room = IqParser.parseRoom(infoResponse);
-                                                if (room != null) {
-                                                    rooms.add(room);
-                                                }
-                                                if (queriesInFlight.decrementAndGet() <= 0) {
-                                                    finishDiscoSearch(rooms, query, mucServices, listener);
-                                                }
-                                            } else {
-                                                queriesInFlight.decrementAndGet();
-                                            }
-                                        }, 20L);
+        final var roomsRoomsFuture =
+                Futures.successfulAsList(
+                        Collections2.transform(
+                                localMucService.entrySet(),
+                                e -> discoverRooms(e.getValue(), e.getKey())));
+        final var roomsFuture =
+                Futures.transform(
+                        roomsRoomsFuture,
+                        rooms -> {
+                            final var builder = new ImmutableList.Builder<Room>();
+                            for (final var inner : rooms) {
+                                if (inner == null) {
+                                    continue;
+                                }
+                                builder.addAll(inner);
                             }
-                        }
-                        if (queriesInFlight.decrementAndGet() <= 0) {
-                            finishDiscoSearch(rooms, query, mucServices, listener);
-                        }
-                    });
-        }
+                            return builder.build();
+                        },
+                        MoreExecutors.directExecutor());
+        Futures.addCallback(
+                roomsFuture,
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(ImmutableList<Room> rooms) {
+                        finishDiscoSearch(rooms, query, mucServices, listener);
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Throwable throwable) {
+                        Log.d(Config.LOGTAG, "could not perform room search", throwable);
+                    }
+                },
+                MoreExecutors.directExecutor());
+    }
+
+    private ListenableFuture<Collection<Room>> discoverRooms(
+            final XmppConnection connection, final Jid server) {
+        final var request = new Iq(Iq.Type.GET);
+        request.addExtension(new ItemsQuery());
+        request.setTo(server);
+        final ListenableFuture<Collection<Item>> itemsFuture =
+                Futures.transform(
+                        connection.sendIqPacket(request),
+                        iq -> {
+                            final var itemsQuery = iq.getExtension(ItemsQuery.class);
+                            if (itemsQuery == null) {
+                                return Collections.emptyList();
+                            }
+                            final var items = itemsQuery.getExtensions(Item.class);
+                            return Collections2.filter(items, i -> Objects.nonNull(i.getJid()));
+                        },
+                        MoreExecutors.directExecutor());
+        final var roomsFutures =
+                Futures.transformAsync(
+                        itemsFuture,
+                        items -> {
+                            final var infoFutures =
+                                    Collections2.transform(
+                                            items, i -> discoverRoom(connection, i.getJid()));
+                            return Futures.successfulAsList(infoFutures);
+                        },
+                        MoreExecutors.directExecutor());
+        return Futures.transform(
+                roomsFutures,
+                rooms -> Collections2.filter(rooms, Objects::nonNull),
+                MoreExecutors.directExecutor());
+    }
+
+    private ListenableFuture<Room> discoverRoom(final XmppConnection connection, final Jid room) {
+        final var request = new Iq(Iq.Type.GET);
+        request.addExtension(new InfoQuery());
+        request.setTo(room);
+        final var infoQueryResponseFuture = connection.sendIqPacket(request);
+        return Futures.transform(
+                infoQueryResponseFuture,
+                result -> {
+                    final var infoQuery = result.getExtension(InfoQuery.class);
+                    if (infoQuery == null) {
+                        return null;
+                    }
+                    return Room.of(room, infoQuery);
+                },
+                MoreExecutors.directExecutor());
     }
 
     private void finishDiscoSearch(
-            List<Room> rooms, String query, Map<Jid, Account> mucServices, OnChannelSearchResultsFound listener) {
-        Collections.sort(rooms);
-        cache.put(key(Method.LOCAL_SERVER, mucServices, ""), rooms);
+            final List<Room> rooms,
+            final String query,
+            Map<Jid, XmppConnection> mucServices,
+            final OnChannelSearchResultsFound listener) {
+        Log.d(Config.LOGTAG, "finishDiscoSearch with " + rooms.size() + " rooms");
+        final var sorted = Ordering.natural().sortedCopy(rooms);
+        cache.put(key(Method.LOCAL_SERVER, mucServices, ""), sorted);
         if (query.isEmpty()) {
-            listener.onChannelSearchResultsFound(rooms);
+            listener.onChannelSearchResultsFound(sorted);
         } else {
-            List<Room> results = copyMatching(rooms, query);
+            List<Room> results = copyMatching(sorted, query);
             cache.put(key(Method.LOCAL_SERVER, mucServices, query), results);
-            listener.onChannelSearchResultsFound(rooms);
+            listener.onChannelSearchResultsFound(sorted);
         }
     }
 
@@ -244,26 +301,24 @@ public class ChannelDiscoveryService {
         return result;
     }
 
-    private Map<Jid, Account> getLocalMucServices() {
-        final HashMap<Jid, Account> localMucServices = new HashMap<>();
-        for (Account account : service.getAccounts()) {
-            if (account.isEnabled()) {
-                final XmppConnection xmppConnection = account.getXmppConnection();
-                if (xmppConnection == null) {
-                    continue;
-                }
-                for (final String mucService : xmppConnection.getMucServers()) {
-                    final Jid jid = Jid.of(mucService);
-                    if (!localMucServices.containsKey(jid)) {
-                        localMucServices.put(jid, account);
+    private Map<Jid, XmppConnection> getLocalMucServices() {
+        final ImmutableMap.Builder<Jid, XmppConnection> localMucServices =
+                new ImmutableMap.Builder<>();
+        for (final var account : service.getAccounts()) {
+            final var connection = account.getXmppConnection();
+            if (connection != null && account.isEnabled()) {
+                for (final String mucService : connection.getMucServers()) {
+                    final Jid jid = Jid.ofOrInvalid(mucService);
+                    if (Jid.Invalid.isValid(jid)) {
+                        localMucServices.put(jid, connection);
                     }
                 }
             }
         }
-        return localMucServices;
+        return localMucServices.buildKeepingLast();
     }
 
-    private static String key(Method method, Map<Jid, Account> mucServices, String query) {
+    private static String key(Method method, Map<Jid, XmppConnection> mucServices, String query) {
         final String servicesKey = mucServices == null ? "\00" : String.join("\00", mucServices.keySet());
         return String.format("%s\00%s\00%s", method, servicesKey, query);
     }
