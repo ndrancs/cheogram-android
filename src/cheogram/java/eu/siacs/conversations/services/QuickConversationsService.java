@@ -130,7 +130,7 @@ public class QuickConversationsService extends AbstractQuickConversationsService
         mRunningSyncJobs.incrementAndGet();
 
         mLastSyncAttempt.put(account.getUuid(), Attempt.create(hash));
-        final List<Contact> withSystemAccounts = account.getRoster().getWithSystemAccounts(PhoneNumberContact.class);
+        final List<Contact> withSystemAccounts = new ArrayList<>(account.getRoster().getWithSystemAccounts(PhoneNumberContact.class));
         for (Map.Entry<String, PhoneNumberContact> item : contacts.entrySet()) {
             PhoneNumberContact phoneContact = item.getValue();
             for(String gateway : gateways) {
