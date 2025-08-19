@@ -19,8 +19,13 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 
-
 import java.io.IOException;
+
+import de.gultsch.common.FutureMerger;
+import eu.siacs.conversations.Config;
+import eu.siacs.conversations.Conversations;
+import eu.siacs.conversations.xmpp.Jid;
+
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -283,7 +288,7 @@ public class Resolver {
         final var startTls = resolveSrvAsFuture(domain, false);
         final var directTls = resolveSrvAsFuture(domain, true);
 
-        final var combined = merge(ImmutableList.of(startTls, directTls));
+        final var combined = FutureMerger.successfulAsList(ImmutableList.of(startTls, directTls));
 
         final var combinedWithFallback =
                 Futures.transformAsync(
@@ -374,7 +379,7 @@ public class Resolver {
             futuresBuilder.add(ipv6s);
         }
         final ImmutableList<ListenableFuture<List<Result>>> futures = futuresBuilder.build();
-        return merge(futures);
+        return FutureMerger.successfulAsList(futures);
     }
 
     private static ListenableFuture<List<Result>> merge(
@@ -450,13 +455,13 @@ public class Resolver {
                                         Lists.transform(
                                                 ImmutableList.copyOf(result.getAnswersOrEmptySet()),
                                                 cname -> resolveNoSrvAsFuture(cname.target, false));
-                                return merge(test);
+                                return FutureMerger.successfulAsList(test);
                             },
                             MoreExecutors.directExecutor());
             futuresBuilder.add(cNameRecordResults);
         }
         final ImmutableList<ListenableFuture<List<Result>>> futures = futuresBuilder.build();
-        final var noSrvFallbacks = merge(futures);
+        final var noSrvFallbacks = FutureMerger.successfulAsList(futures);
         return Futures.transform(
                 noSrvFallbacks,
                 results -> {

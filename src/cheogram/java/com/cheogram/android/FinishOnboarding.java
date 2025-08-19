@@ -97,7 +97,7 @@ public class FinishOnboarding {
 						xmppConnectionService.sendIqPacket(newAccount, iq3, (iq4) -> {
 							Element command4 = iq4.findChild("command", "http://jabber.org/protocol/commands");
 							if (command4 != null && command4.getAttribute("status") != null && command4.getAttribute("status").equals("completed")) {
-								xmppConnectionService.createContact(newAccount.getRoster().getContact(iq4.getFrom().asBareJid()), true);
+								xmppConnectionService.createContact(newAccount.getRoster().getContact(iq4.getFrom().asBareJid()));
 								Conversation withCheogram = xmppConnectionService.findOrCreateConversation(newAccount, iq4.getFrom().asBareJid(), true, true, true);
 								xmppConnectionService.markRead(withCheogram);
 								xmppConnectionService.clearConversationHistory(withCheogram);

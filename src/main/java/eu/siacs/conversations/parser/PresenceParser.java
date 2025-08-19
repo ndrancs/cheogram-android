@@ -15,7 +15,6 @@ import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.MucOptions;
-import eu.siacs.conversations.generator.IqGenerator;
 import eu.siacs.conversations.generator.PresenceGenerator;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.utils.XmppUri;
@@ -23,10 +22,15 @@ import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
+import eu.siacs.conversations.xmpp.manager.AvatarManager;
 import eu.siacs.conversations.xmpp.manager.DiscoManager;
-import eu.siacs.conversations.xmpp.pep.Avatar;
+import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
+import eu.siacs.conversations.xmpp.manager.PresenceManager;
+import eu.siacs.conversations.xmpp.manager.RosterManager;
 import im.conversations.android.xmpp.Entity;
+import im.conversations.android.xmpp.model.muc.user.MucUser;
 import im.conversations.android.xmpp.model.occupant.OccupantId;
+import im.conversations.android.xmpp.model.vcard.update.VCardUpdate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -48,6 +52,7 @@ public class PresenceParser extends AbstractParser
                         ? null
                         : mXmppConnectionService.find(account, packet.getFrom().asBareJid());
         if (conversation == null) {
+            Log.d(Config.LOGTAG, "conversation not found for parsing conference presence");
             return;
         }
         final MucOptions mucOptions = conversation.getMucOptions();
@@ -77,27 +82,26 @@ public class PresenceParser extends AbstractParser
         final Jid from = packet.getFrom();
         if (!from.isBareJid()) {
             final String type = packet.getAttribute("type");
-            final Element x = packet.findChild("x", Namespace.MUC_USER);
+            final var x = packet.getExtension(MucUser.class);
+            final var vCardUpdate = packet.getExtension(VCardUpdate.class);
             final Element nick = packet.findChild("nick", Namespace.NICK);
             Element hats = packet.findChild("hats", "urn:xmpp:hats:0");
             if (hats == null) {
                 hats = packet.findChild("hats", "xmpp:prosody.im/protocol/hats:1");
             }
             if (hats == null) hats = new Element("hats", "urn:xmpp:hats:0");
-            final Element occupantIdEl = packet.findChild("occupant-id", "urn:xmpp:occupant-id:0");
-            Avatar avatar = Avatar.parsePresence(packet.findChild("x", "vcard-temp:x:update"));
-            final List<String> codes = getStatusCodes(x);
-            if (type == null) {
-                if (x != null) {
-                    Element item = x.findChild("item");
-                    if (item != null && !from.isBareJid()) {
-                        mucOptions.setError(MucOptions.Error.NONE);
-                        final MucOptions.User user = parseItem(conversation, item, from, occupantIdEl, nick == null ? null : nick.getContent(), hats);
-                        final var occupant = packet.getOnlyExtension(OccupantId.class);
-                        final String occupantId =
+            final var occupant = packet.getOnlyExtension(OccupantId.class);
+            final String occupantId =
                                 mucOptions.occupantId() && occupant != null
                                         ? occupant.getId()
                                         : null;
+            final List<String> codes = getStatusCodes(x);
+            if (type == null) {
+                if (x != null) {
+                    final var item = x.getItem();
+                    if (item != null && !from.isBareJid()) {
+                        mucOptions.setError(MucOptions.Error.NONE);
+                        final var user = MultiUserChatManager.itemToUser(conversation, item, from, occupantId, nick == null ? null : nick.getContent(), hats);
                         user.setOccupantId(occupantId);
                         if (codes.contains(MucOptions.STATUS_CODE_SELF_PRESENCE)
                                 || (codes.contains(MucOptions.STATUS_CODE_ROOM_CREATED)
@@ -137,16 +141,17 @@ public class PresenceParser extends AbstractParser
                         }
                         if (codes.contains(MucOptions.STATUS_CODE_ROOM_CREATED)
                                 && mucOptions.autoPushConfiguration()) {
+                            final var address = mucOptions.getConversation().getJid().asBareJid();
                             Log.d(
                                     Config.LOGTAG,
                                     account.getJid().asBareJid()
                                             + ": room '"
-                                            + mucOptions.getConversation().getJid().asBareJid()
+                                            + address
                                             + "' created. pushing default configuration");
-                            mXmppConnectionService.pushConferenceConfiguration(
-                                    mucOptions.getConversation(),
-                                    IqGenerator.defaultChannelConfiguration(),
-                                    null);
+                            getManager(MultiUserChatManager.class)
+                                    .pushConfiguration(
+                                            conversation,
+                                            MultiUserChatManager.defaultChannelConfiguration());
                         }
                         if (mXmppConnectionService.getPgpEngine() != null) {
                             Element signed = packet.findChild("x", "jabber:x:signed");
@@ -165,28 +170,8 @@ public class PresenceParser extends AbstractParser
                                 }
                             }
                         }
-                        if (avatar != null) {
-                            avatar.owner = from;
-                            if (mXmppConnectionService.getFileBackend().isAvatarCached(avatar)) {
-                                if (user.setAvatar(avatar)) {
-                                    mXmppConnectionService.getAvatarService().clear(user);
-                                }
-                                if (user.getRealJid() != null) {
-                                    final Contact c =
-                                            conversation
-                                                    .getAccount()
-                                                    .getRoster()
-                                                    .getContact(user.getRealJid());
-                                    if (c.setAvatar(avatar)) {
-                                        mXmppConnectionService.syncRoster(
-                                                conversation.getAccount());
-                                        mXmppConnectionService.getAvatarService().clear(c);
-                                    }
-                                    mXmppConnectionService.updateRosterUi(XmppConnectionService.UpdateRosterReason.AVATAR);
-                                }
-                            } else if (mXmppConnectionService.isDataSaverDisabled()) {
-                                mXmppConnectionService.fetchAvatar(mucOptions.getAccount(), avatar);
-                            }
+                        if (vCardUpdate != null) {
+                            getManager(AvatarManager.class).handleVCardUpdate(from, vCardUpdate);
                         }
                     }
                 }
@@ -221,7 +206,7 @@ public class PresenceParser extends AbstractParser
                                         + " online="
                                         + wasOnline);
                         if (wasOnline) {
-                            mXmppConnectionService.mucSelfPingAndRejoin(conversation);
+                            getManager(MultiUserChatManager.class).pingAndRejoin(conversation);
                         }
                     } else if (codes.contains(MucOptions.STATUS_CODE_KICKED)) {
                         mucOptions.setError(MucOptions.Error.KICKED);
@@ -238,12 +223,13 @@ public class PresenceParser extends AbstractParser
                         Log.d(Config.LOGTAG, "unknown error in conference: " + packet);
                     }
                 } else if (!from.isBareJid()) {
-                    Element item = x.findChild("item");
+                    final var item = x.getItem();
                     if (item != null) {
-						mucOptions.updateUser(parseItem(conversation, item, from, occupantIdEl, nick == null ? null : nick.getContent(), hats));
+                        mucOptions.updateUser(
+                                MultiUserChatManager.itemToUser(conversation, item, from, occupantId, nick == null ? null : nick.getContent(), hats));
                     }
                     MucOptions.User user = mucOptions.deleteUser(from);
-                    if (user != null && occupantIdEl == null) {
+                    if (user != null && occupantId == null) {
                         mXmppConnectionService.getAvatarService().clear(user);
                     }
                 }
@@ -344,29 +330,6 @@ public class PresenceParser extends AbstractParser
         final Contact contact = account.getRoster().getContact(from);
         if (type == null) {
             final String resource = from.isBareJid() ? "" : from.getResource();
-            final Avatar avatar =
-                    Avatar.parsePresence(packet.findChild("x", "vcard-temp:x:update"));
-            if (avatar != null && (!contact.isSelf() || account.getAvatar() == null)) {
-                avatar.owner = from.asBareJid();
-                if (mXmppConnectionService.getFileBackend().isAvatarCached(avatar)) {
-                    if (avatar.owner.equals(account.getJid().asBareJid())) {
-                        account.setAvatar(avatar.getFilename());
-                        mXmppConnectionService.databaseBackend.updateAccount(account);
-                        mXmppConnectionService.getAvatarService().clear(account);
-                        mXmppConnectionService.updateConversationUi();
-                        mXmppConnectionService.updateAccountUi();
-                    } else {
-                        if (contact.setAvatar(avatar)) {
-                            mXmppConnectionService.syncRoster(account);
-                            mXmppConnectionService.getAvatarService().clear(contact);
-                            mXmppConnectionService.updateConversationUi();
-                            mXmppConnectionService.updateRosterUi(XmppConnectionService.UpdateRosterReason.AVATAR);
-                        }
-                    }
-                } else if (mXmppConnectionService.isDataSaverDisabled()) {
-                    mXmppConnectionService.fetchAvatar(account, avatar);
-                }
-            }
 
             if (mXmppConnectionService.isMuc(account, from)) {
                 return;
@@ -377,8 +340,7 @@ public class PresenceParser extends AbstractParser
             contact.updatePresence(resource, packet);
 
             final var nodeHash = packet.getCapabilities();
-            final var connection = account.getXmppConnection();
-            if (nodeHash != null && connection != null) {
+            if (nodeHash != null) {
                 final var discoFuture =
                         this.getManager(DiscoManager.class)
                                 .infoOrCache(Entity.presence(from), nodeHash.node, nodeHash.hash);
@@ -416,7 +378,7 @@ public class PresenceParser extends AbstractParser
                                     + contact.getJid()
                                     + " "
                                     + OpenPgpUtils.convertKeyIdToHex(keyId));
-                    mXmppConnectionService.syncRoster(account);
+                    this.connection.getManager(RosterManager.class).writeToDatabaseAsync();
                 }
             }
             boolean online = sizeBefore < contact.getPresences().size();
@@ -446,12 +408,13 @@ public class PresenceParser extends AbstractParser
                 return;
             }
             if (contact.setPresenceName(packet.findChildContent("nick", Namespace.NICK))) {
-                mXmppConnectionService.syncRoster(account);
+                this.getManager(RosterManager.class).writeToDatabaseAsync();
                 mXmppConnectionService.getAvatarService().clear(contact);
             }
             if (contact.getOption(Contact.Options.PREEMPTIVE_GRANT)) {
-                mXmppConnectionService.sendPresencePacket(
-                        account, mPresenceGenerator.sendPresenceUpdatesTo(contact));
+                connection
+                        .getManager(PresenceManager.class)
+                        .subscribed(contact.getJid().asBareJid());
             } else {
                 contact.setOption(Contact.Options.PENDING_SUBSCRIPTION_REQUEST);
                 final Conversation conversation =

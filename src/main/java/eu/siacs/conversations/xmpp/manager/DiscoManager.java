@@ -7,7 +7,10 @@ import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -57,6 +60,8 @@ public class DiscoManager extends AbstractManager {
                     Namespace.JINGLE_ENCRYPTED_TRANSPORT_OMEMO,
                     "http://jabber.org/protocol/muc",
                     "jabber:x:conference",
+                    "http://jabber.org/protocol/xhtml-im",
+                    "urn:xmpp:bob",
                     Namespace.OOB,
                     Namespace.ENTITY_CAPABILITIES,
                     Namespace.ENTITY_CAPABILITIES_2,
@@ -73,7 +78,7 @@ public class DiscoManager extends AbstractManager {
             Collections.singletonList(Namespace.LAST_MESSAGE_CORRECTION);
     private final List<String> PRIVACY_SENSITIVE =
             Collections.singletonList(
-                    "urn:xmpp:time" // XEP-0202: Entity Time leaks time zone
+                    Namespace.TIME // XEP-0202: Entity Time leaks time zone
                     );
     private final List<String> VOIP_NAMESPACES =
             Arrays.asList(
@@ -91,6 +96,7 @@ public class DiscoManager extends AbstractManager {
 
     private final Map<Jid, InfoQuery> entityInformation = new HashMap<>();
     private final Map<Jid, ImmutableSet<Jid>> discoItems = new HashMap<>();
+    private final Map<String, Jid> commands = new HashMap<>();
 
     public DiscoManager(XmppConnectionService context, XmppConnection connection) {
         super(context, connection);
@@ -313,8 +319,7 @@ public class DiscoManager extends AbstractManager {
         final var appSettings = new AppSettings(context);
         final var account = connection.getAccount();
         final ImmutableList.Builder<String> features = ImmutableList.builder();
-        features.add("http://jabber.org/protocol/xhtml-im");
-        features.add("urn:xmpp:bob");
+        features.addAll(STATIC_FEATURES);
         if (Config.MESSAGE_DISPLAYED_SYNCHRONIZATION) {
             features.add(Namespace.MDS_DISPLAYED + "+notify");
         }
@@ -335,7 +340,7 @@ public class DiscoManager extends AbstractManager {
         if (appSettings.isBroadcastLastActivity()) {
             features.add(Namespace.IDLE);
         }
-        if (connection.getFeatures().bookmarks2()) {
+        if (getManager(NativeBookmarkManager.class).hasFeature()) {
             features.add(Namespace.BOOKMARKS2 + "+notify");
         } else {
             features.add(Namespace.BOOKMARKS + "+notify");
@@ -443,6 +448,11 @@ public class DiscoManager extends AbstractManager {
         return infoQuery != null && infoQuery.hasFeature(feature);
     }
 
+    public boolean hasAccountFeature(final String feature) {
+        final var infoQuery = this.get(getAccount().getJid().asBareJid());
+        return infoQuery != null && infoQuery.hasFeature(feature);
+    }
+
     private void put(final Jid address, final InfoQuery infoQuery) {
         synchronized (this.entityInformation) {
             this.entityInformation.put(address, infoQuery);
@@ -461,9 +471,18 @@ public class DiscoManager extends AbstractManager {
         }
     }
 
+    public Jid getAddressForCommand(final String node) {
+        synchronized (this.commands) {
+            return this.commands.get(node);
+        }
+    }
+
     public void clear() {
         synchronized (this.entityInformation) {
             this.entityInformation.clear();
+        }
+        synchronized (this.commands) {
+            this.commands.clear();
         }
     }
 
@@ -481,6 +500,43 @@ public class DiscoManager extends AbstractManager {
                 }
             }
         }
+    }
+
+    public Map<Jid, InfoQuery> findDiscoItemsByFeature(final String feature) {
+        return Maps.filterValues(getServerItems(), v -> v.hasFeature(feature));
+    }
+
+    public Map.Entry<Jid, InfoQuery> findDiscoItemByFeature(final String feature) {
+        final var items = findDiscoItemsByFeature(feature);
+        return Iterables.getFirst(items.entrySet(), null);
+    }
+
+    public boolean hasServerCommands() {
+        return hasServerFeature(Namespace.COMMANDS);
+    }
+
+    public void fetchServerCommands() {
+        final var future = commands(Entity.discoItem(getAccount().getDomain()));
+        Futures.addCallback(
+                future,
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(Map<String, Jid> result) {
+                        synchronized (commands) {
+                            commands.clear();
+                            commands.putAll(result);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@androidx.annotation.NonNull Throwable throwable) {
+                        Log.d(
+                                Config.LOGTAG,
+                                getAccount().getJid().asBareJid() + ": could not fetch commands",
+                                throwable);
+                    }
+                },
+                MoreExecutors.directExecutor());
     }
 
     public static final class CapsHashMismatchException extends IllegalStateException {

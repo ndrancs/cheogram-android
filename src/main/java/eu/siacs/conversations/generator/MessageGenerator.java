@@ -18,6 +18,7 @@ import eu.siacs.conversations.xmpp.jingle.JingleRtpConnection;
 import eu.siacs.conversations.xmpp.jingle.Media;
 import eu.siacs.conversations.xmpp.jingle.stanzas.Reason;
 import im.conversations.android.xmpp.model.correction.Replace;
+import im.conversations.android.xmpp.model.hints.NoStore;
 import im.conversations.android.xmpp.model.hints.Store;
 import im.conversations.android.xmpp.model.reactions.Reaction;
 import im.conversations.android.xmpp.model.reactions.Reactions;
@@ -107,7 +108,7 @@ public class MessageGenerator extends AbstractGenerator {
         }
         packet.setAxolotlMessage(axolotlMessage.toElement());
         packet.setBody(OMEMO_FALLBACK_MESSAGE);
-        packet.addChild("store", "urn:xmpp:hints");
+        packet.addExtension(new Store());
         packet.addChild("encryption", "urn:xmpp:eme:0")
                 .setAttribute("name", "OMEMO")
                 .setAttribute("namespace", AxolotlService.PEP_PREFIX);
@@ -121,7 +122,7 @@ public class MessageGenerator extends AbstractGenerator {
         packet.setType(im.conversations.android.xmpp.model.stanza.Message.Type.CHAT);
         packet.setTo(to);
         packet.setAxolotlMessage(axolotlMessage.toElement());
-        packet.addChild("store", "urn:xmpp:hints");
+        packet.addChild(new Store());
         return packet;
     }
 
@@ -191,8 +192,7 @@ public class MessageGenerator extends AbstractGenerator {
         packet.setTo(conversation.getJid().asBareJid());
         packet.setFrom(account.getJid());
         packet.addChild(ChatState.toElement(conversation.getOutgoingChatState()));
-        packet.addChild("no-store", "urn:xmpp:hints");
-        packet.addChild("no-storage", "urn:xmpp:hints"); // wrong! don't copy this. Its *store*
+        packet.addExtension(new NoStore());
         return packet;
     }
 
@@ -218,7 +218,7 @@ public class MessageGenerator extends AbstractGenerator {
         } else {
             displayed.setAttribute("id", message.getRemoteMsgId());
         }
-        packet.addChild("store", "urn:xmpp:hints");
+        packet.addExtension(new Store());
         return packet;
     }
 
@@ -244,18 +244,7 @@ public class MessageGenerator extends AbstractGenerator {
         final var thread = inReplyTo.getThread();
         if (thread != null) packet.addChild(thread);
 
-        packet.addChild("store", "urn:xmpp:hints");
-        return packet;
-    }
-
-    public im.conversations.android.xmpp.model.stanza.Message conferenceSubject(
-            Conversation conversation, String subject) {
-        im.conversations.android.xmpp.model.stanza.Message packet =
-                new im.conversations.android.xmpp.model.stanza.Message();
-        packet.setType(im.conversations.android.xmpp.model.stanza.Message.Type.GROUPCHAT);
-        packet.setTo(conversation.getJid().asBareJid());
-        packet.addChild("subject").setContent(subject);
-        packet.setFrom(conversation.getAccount().getJid().asBareJid());
+        packet.addExtension(new Store());
         return packet;
     }
 
@@ -268,40 +257,6 @@ public class MessageGenerator extends AbstractGenerator {
         form.put("muc#role", "participant");
         form.submit();
         packet.addChild(form);
-        return packet;
-    }
-
-    public im.conversations.android.xmpp.model.stanza.Message directInvite(
-            final Conversation conversation, final Jid contact) {
-        im.conversations.android.xmpp.model.stanza.Message packet =
-                new im.conversations.android.xmpp.model.stanza.Message();
-        packet.setType(im.conversations.android.xmpp.model.stanza.Message.Type.NORMAL);
-        packet.setTo(contact);
-        packet.setFrom(conversation.getAccount().getJid());
-        Element x = packet.addChild("x", "jabber:x:conference");
-        x.setAttribute("jid", conversation.getJid().asBareJid());
-        String password = conversation.getMucOptions().getPassword();
-        if (password != null) {
-            x.setAttribute("password", password);
-        }
-        if (contact.isFullJid()) {
-            packet.addChild("no-store", "urn:xmpp:hints");
-            packet.addChild("no-copy", "urn:xmpp:hints");
-        }
-        return packet;
-    }
-
-    public im.conversations.android.xmpp.model.stanza.Message invite(
-            final Conversation conversation, final Jid contact) {
-        final var packet = new im.conversations.android.xmpp.model.stanza.Message();
-        packet.setTo(conversation.getJid().asBareJid());
-        packet.setFrom(conversation.getAccount().getJid());
-        Element x = new Element("x");
-        x.setAttribute("xmlns", "http://jabber.org/protocol/muc#user");
-        Element invite = new Element("invite");
-        invite.setAttribute("to", contact.asBareJid());
-        x.addChild(invite);
-        packet.addChild(x);
         return packet;
     }
 
@@ -324,7 +279,7 @@ public class MessageGenerator extends AbstractGenerator {
         packet.setFrom(account.getJid());
         packet.setTo(to);
         packet.addChild("received", "urn:xmpp:receipts").setAttribute("id", id);
-        packet.addChild("store", "urn:xmpp:hints");
+        packet.addExtension(new Store());
         return packet;
     }
 
@@ -338,7 +293,7 @@ public class MessageGenerator extends AbstractGenerator {
         finish.setAttribute("id", sessionId);
         final Element reasonElement = finish.addChild("reason", Namespace.JINGLE);
         reasonElement.addChild(reason.toString());
-        packet.addChild("store", "urn:xmpp:hints");
+        packet.addExtension(new Store());
         return packet;
     }
 
@@ -358,7 +313,7 @@ public class MessageGenerator extends AbstractGenerator {
                     .setAttribute("media", media.toString());
         }
         packet.addChild("request", "urn:xmpp:receipts");
-        packet.addChild("store", "urn:xmpp:hints");
+        packet.addExtension(new Store());
         return packet;
     }
 
@@ -373,7 +328,7 @@ public class MessageGenerator extends AbstractGenerator {
         final Element propose = packet.addChild("retract", Namespace.JINGLE_MESSAGE);
         propose.setAttribute("id", proposal.sessionId);
         propose.addChild("description", Namespace.JINGLE_APPS_RTP);
-        packet.addChild("store", "urn:xmpp:hints");
+        packet.addExtension(new Store());
         return packet;
     }
 
@@ -388,7 +343,7 @@ public class MessageGenerator extends AbstractGenerator {
         final Element propose = packet.addChild("reject", Namespace.JINGLE_MESSAGE);
         propose.setAttribute("id", sessionId);
         propose.addChild("description", Namespace.JINGLE_APPS_RTP);
-        packet.addChild("store", "urn:xmpp:hints");
+        packet.addExtension(new Store());
         return packet;
     }
 }

@@ -8,10 +8,28 @@ import io.ipfs.cid.Cid;
 
 import eu.siacs.conversations.utils.CryptoHelper;
 import eu.siacs.conversations.xml.Element;
+import androidx.annotation.NonNull;
+import com.google.common.base.MoreObjects;
 import eu.siacs.conversations.xmpp.Jid;
-import im.conversations.android.xmpp.model.avatar.Metadata;
+import okhttp3.HttpUrl;
 
 public class Avatar {
+
+    @Override
+    @NonNull
+    public String toString() {
+        return MoreObjects.toStringHelper(this)
+                .add("type", type)
+                .add("sha1sum", sha1sum)
+                .add("url", url)
+                .add("image", image)
+                .add("height", height)
+                .add("width", width)
+                .add("size", size)
+                .add("owner", owner)
+                .add("origin", origin)
+                .toString();
+    }
 
     public enum Origin {
         PEP,
@@ -20,6 +38,7 @@ public class Avatar {
 
     public String type;
     public String sha1sum;
+    public HttpUrl url;
     public String image;
     public int height;
     public int width;
@@ -35,42 +54,6 @@ public class Avatar {
         return sha1sum;
     }
 
-    public static Avatar parseMetadata(final String primaryId, final Metadata metadata) {
-        if (primaryId == null || metadata == null) {
-            return null;
-        }
-        for (Element child : metadata.getChildren()) {
-            if (child.getName().equals("info") && primaryId.equals(child.getAttribute("id"))) {
-                Avatar avatar = new Avatar();
-                String height = child.getAttribute("height");
-                String width = child.getAttribute("width");
-                String size = child.getAttribute("bytes");
-                try {
-                    if (height != null) {
-                        avatar.height = Integer.parseInt(height);
-                    }
-                    if (width != null) {
-                        avatar.width = Integer.parseInt(width);
-                    }
-                    if (size != null) {
-                        avatar.size = Long.parseLong(size);
-                    }
-                } catch (NumberFormatException e) {
-                    return null;
-                }
-                avatar.type = child.getAttribute("type");
-                String hash = child.getAttribute("id");
-                if (!isValidSHA1(hash)) {
-                    return null;
-                }
-                avatar.sha1sum = hash;
-                avatar.origin = Origin.PEP;
-                return avatar;
-            }
-        }
-        return null;
-    }
-
     @Override
     public boolean equals(Object object) {
         if (object != null && object instanceof Avatar other) {
@@ -80,31 +63,13 @@ public class Avatar {
         }
     }
 
-	public Cid cid() {
-		if (sha1sum == null) return null;
+    public Cid cid() {
+        if (sha1sum == null) return null;
 
-		try {
-			return CryptoHelper.cid(CryptoHelper.hexToBytes(sha1sum), "sha-1");
-		} catch (final NoSuchAlgorithmException e) {
-			return null;
-		}
-	}
-
-	public static Avatar parsePresence(Element x) {
-		String hash = x == null ? null : x.findChildContent("photo");
-		if (hash == null) {
-			return null;
-		}
-		if (!isValidSHA1(hash)) {
-			return null;
-		}
-		Avatar avatar = new Avatar();
-		avatar.sha1sum = hash;
-		avatar.origin = Origin.VCARD;
-		return avatar;
-	}
-
-    private static boolean isValidSHA1(String s) {
-        return s != null && s.matches("[a-fA-F0-9]{40}");
+        try {
+            return CryptoHelper.cid(CryptoHelper.hexToBytes(sha1sum), "sha-1");
+        } catch (final NoSuchAlgorithmException e) {
+            return null;
+        }
     }
 }

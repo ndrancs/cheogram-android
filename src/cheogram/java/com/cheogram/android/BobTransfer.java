@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -119,7 +120,7 @@ public class BobTransfer implements Transferable {
 							throw new IOException(file.getAbsolutePath());
 						}
 
-						final OutputStream outputStream = AbstractConnectionManager.createOutputStream(new DownloadableFile(file.getAbsolutePath()), false, false);
+						final OutputStream outputStream = new FileOutputStream(file, false);
 
 						if (outputStream != null && bytes != null) {
 							outputStream.write(bytes);

@@ -33,6 +33,7 @@ import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.ui.adapter.UserAdapter;
 import eu.siacs.conversations.ui.util.MucDetailsContextMenuHelper;
 import eu.siacs.conversations.xmpp.Jid;
+import im.conversations.android.xmpp.model.muc.Affiliation;
 
 public class MucUsersActivity extends XmppActivity implements XmppConnectionService.OnMucRosterUpdate, XmppConnectionService.OnAffiliationChanged, MenuItem.OnActionExpandListener, TextWatcher {
 
@@ -60,7 +61,7 @@ public class MucUsersActivity extends XmppActivity implements XmppConnectionServ
 
     private void loadAndSubmitUsers() {
         if (mConversation != null) {
-            allUsers = mConversation.getMucOptions().getUsers(true, mConversation.getMucOptions().getSelf().getAffiliation().ranks(MucOptions.Affiliation.ADMIN));
+            allUsers = mConversation.getMucOptions().getUsers(true, mConversation.getMucOptions().getSelf().ranks(Affiliation.ADMIN));
             submitFilteredList(mSearchEditText != null ? mSearchEditText.getText().toString() : null);
         }
     }

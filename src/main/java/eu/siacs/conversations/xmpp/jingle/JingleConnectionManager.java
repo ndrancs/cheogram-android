@@ -15,6 +15,7 @@ import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableSet;
 
 import eu.siacs.conversations.R;
+import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
@@ -899,6 +900,7 @@ public class JingleConnectionManager extends AbstractConnectionManager {
     }
 
     public void deliverIbbPacket(final Account account, final Iq packet) {
+        // TODO use extensions
         final String sid;
         final Element payload;
         final InbandBytestreamsTransport.PacketType packetType;

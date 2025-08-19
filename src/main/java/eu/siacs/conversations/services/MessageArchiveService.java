@@ -134,7 +134,7 @@ public class MessageArchiveService implements OnAdvancedStreamFeaturesLoaded {
         this.execute(query);
     }
 
-    void catchupMUC(final Conversation conversation) {
+    public void catchupMUC(final Conversation conversation) {
         if (conversation.getLastMessageTransmitted().getTimestamp() < 0
                 && conversation.countMessages() == 0) {
             query(conversation, new MamReference(0), 0, true);
@@ -219,7 +219,7 @@ public class MessageArchiveService implements OnAdvancedStreamFeaturesLoaded {
         }
     }
 
-    void executePendingQueries(final Account account) {
+    public void executePendingQueries(final Account account) {
         final List<Query> pending = new ArrayList<>();
         synchronized (this.pendingQueries) {
             for (Iterator<Query> iterator = this.pendingQueries.iterator(); iterator.hasNext(); ) {
@@ -760,6 +760,17 @@ public class MessageArchiveService implements OnAdvancedStreamFeaturesLoaded {
 
         boolean hasCallback() {
             return this.callback != null;
+        }
+
+        public boolean isImplausibleFrom(final Jid from) {
+            if (muc()) {
+                if (from == null) {
+                    return true;
+                }
+                return !from.asBareJid().equals(getWith());
+            } else {
+                return false;
+            }
         }
     }
 }

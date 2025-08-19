@@ -8,7 +8,6 @@
     <string name="channel_details">Detalhes do canal</string>
     <string name="action_add_account">Adicionar conta</string>
     <string name="action_edit_contact">Editar o nome</string>
-    <string name="action_add_phone_book">Adicionar ao livro de endereços</string>
     <string name="action_delete_contact">Excluir da lista de contatos</string>
     <string name="action_block_contact">Bloquear contato</string>
     <string name="action_unblock_contact">Desbloquear contato</string>
@@ -1142,4 +1141,7 @@
     <string name="account_status_service_outage_scheduled">Tempo de inatividade planejado</string>
     <string name="account_status_service_outage_known">Serviço caído (problema conhecido)</string>
     <string name="sos_scheduled_return">Se espera que o serviço volte às %s</string>
+    <string name="no_contacts_permission">%1$s precisa de acesso aos seus contatos</string>
+    <string name="save_to_contact">Salvar nos contatos</string>
+    <string name="show_in_contacts">Mostrar nos contatos</string>
 </resources>

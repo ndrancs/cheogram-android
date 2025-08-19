@@ -8,11 +8,9 @@ import com.google.common.collect.ImmutableList;
 import eu.siacs.conversations.utils.StringUtils;
 import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.xml.Element;
-import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import im.conversations.android.xmpp.model.bookmark.Storage;
-import im.conversations.android.xmpp.model.bookmark2.Conference;
-import im.conversations.android.xmpp.model.pubsub.PubSub;
+import im.conversations.android.xmpp.model.bookmark2.Extensions;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,7 +24,7 @@ public class Bookmark extends Element implements ListItem {
     private final Account account;
     private WeakReference<Conversation> conversation;
     private Jid jid;
-    protected Element extensions = new Element("extensions", Namespace.BOOKMARKS2);
+    protected Extensions extensions = new Extensions();
 
     public Bookmark(final Account account, final Jid jid) {
         super("conference");
@@ -35,13 +33,14 @@ public class Bookmark extends Element implements ListItem {
         this.account = account;
     }
 
-    private Bookmark(Account account) {
+    public Bookmark(Account account) {
         super("conference");
         this.account = account;
     }
 
     public static Map<Jid, Bookmark> parseFromStorage(
             final Storage storage, final Account account) {
+        // TODO refactor to use extensions. get rid of the 'old' handling
         if (storage == null) {
             return Collections.emptyMap();
         }
@@ -62,26 +61,6 @@ public class Bookmark extends Element implements ListItem {
         return bookmarks;
     }
 
-    public static Map<Jid, Bookmark> parseFromPubSub(final PubSub pubSub, final Account account) {
-        if (pubSub == null) {
-            return Collections.emptyMap();
-        }
-        final var items = pubSub.getItems();
-        if (items == null || !Namespace.BOOKMARKS2.equals(items.getNode())) {
-            return Collections.emptyMap();
-        }
-        final Map<Jid, Bookmark> bookmarks = new HashMap<>();
-        for (final var item : items.getItemMap(Conference.class).entrySet()) {
-            final Bookmark bookmark =
-                    Bookmark.parseFromItem(item.getKey(), item.getValue(), account);
-            if (bookmark == null) {
-                continue;
-            }
-            bookmarks.put(bookmark.jid, bookmark);
-        }
-        return bookmarks;
-    }
-
     public static Bookmark parse(Element element, Account account) {
         Bookmark bookmark = new Bookmark(account);
         bookmark.setAttributes(element.getAttributes());
@@ -93,34 +72,7 @@ public class Bookmark extends Element implements ListItem {
         return bookmark;
     }
 
-    public static Bookmark parseFromItem(
-            final String id, final Conference conference, final Account account) {
-        if (id == null || conference == null) {
-            return null;
-        }
-        final Bookmark bookmark = new Bookmark(account);
-        bookmark.jid = Jid.Invalid.getNullForInvalid(Jid.ofOrInvalid(id));
-        // TODO verify that we only use bare jids and ignore full jids
-        if (bookmark.jid == null) {
-            return null;
-        }
-        bookmark.setBookmarkName(conference.getAttribute("name"));
-        bookmark.setAutojoin(conference.getAttributeAsBoolean("autojoin"));
-        bookmark.setNick(conference.findChildContent("nick"));
-        bookmark.setPassword(conference.findChildContent("password"));
-        final Element extensions = conference.findChild("extensions", Namespace.BOOKMARKS2);
-        if (extensions != null) {
-            for (final Element ext : extensions.getChildren()) {
-                if (ext.getName().equals("group") && ext.getNamespace().equals("jabber:iq:roster")) {
-                    bookmark.addGroup(ext.getContent());
-                }
-            }
-            bookmark.extensions = extensions;
-        }
-        return bookmark;
-    }
-
-    public Element getExtensions() {
+    public Extensions getExtensions() {
         return extensions;
     }
 
@@ -342,5 +294,9 @@ public class Bookmark extends Element implements ListItem {
     @Override
     public String getAvatarName() {
         return getDisplayName();
+    }
+
+    public void setExtensions(Extensions extensions) {
+        this.extensions = extensions;
     }
 }

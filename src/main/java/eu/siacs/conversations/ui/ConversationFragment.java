@@ -206,14 +206,20 @@ import eu.siacs.conversations.xmpp.jingle.Media;
 import eu.siacs.conversations.xmpp.jingle.OngoingRtpSession;
 import eu.siacs.conversations.xmpp.jingle.RtpCapability;
 import eu.siacs.conversations.xmpp.jingle.RtpEndUserState;
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import eu.siacs.conversations.xmpp.manager.DiscoManager;
 
 import im.conversations.android.xmpp.Entity;
 import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import im.conversations.android.xmpp.model.disco.items.Item;
+import im.conversations.android.xmpp.model.muc.Affiliation;
+import im.conversations.android.xmpp.model.muc.Role;
 import im.conversations.android.xmpp.model.stanza.Iq;
 
 import org.jetbrains.annotations.NotNull;
+import eu.siacs.conversations.xmpp.manager.HttpUploadManager;
+import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
+import eu.siacs.conversations.xmpp.manager.PresenceManager;
 import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -222,6 +228,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -536,7 +543,7 @@ public class ConversationFragment extends XmppFragment
                 public void onClick(View v) {
                     final Contact contact = conversation == null ? null : conversation.getContact();
                     if (contact != null) {
-                        activity.xmppConnectionService.createContact(contact, true);
+                        activity.xmppConnectionService.createContact(contact);
                         activity.switchToContactDetails(contact);
                     }
                 }
@@ -548,11 +555,10 @@ public class ConversationFragment extends XmppFragment
                 public void onClick(View v) {
                     final Contact contact = conversation == null ? null : conversation.getContact();
                     if (contact != null) {
-                        activity.xmppConnectionService.sendPresencePacket(
-                                contact.getAccount(),
-                                activity.xmppConnectionService
-                                        .getPresenceGenerator()
-                                        .sendPresenceUpdatesTo(contact));
+                        final var connection = contact.getAccount().getXmppConnection();
+                        connection
+                                .getManager(PresenceManager.class)
+                                .subscribed(contact.getJid().asBareJid());
                         hideSnackbar();
                     }
                 }
@@ -1438,10 +1444,9 @@ public class ConversationFragment extends XmppFragment
                 }
                 menuContactDetails.setVisible(!this.conversation.withSelf());
                 menuMucDetails.setVisible(false);
+                final var connection = this.conversation.getAccount().getXmppConnection();
                 menuInviteContact.setVisible(
-                        service != null
-                                && service.findConferenceServer(conversation.getAccount()) != null);
-                menuArchiveChat.setTitle(R.string.action_archive_chat);
+                        !connection.getManager(MultiUserChatManager.class).getServices().isEmpty());
             }
             if (conversation.isMuted()) {
                 menuMute.setVisible(false);
@@ -1572,14 +1577,14 @@ public class ConversationFragment extends XmppFragment
                     if (!activity.xmppConnectionService.getBooleanPreference("message_autocomplete", R.bool.message_autocomplete)) return;
 
                     final var allUsers = conversation.getMucOptions().getUsers();
-                    if (!conversation.getMucOptions().getUsersByRole(MucOptions.Role.MODERATOR).isEmpty()) {
+                    if (!conversation.getMucOptions().getUsersByRole(Role.MODERATOR).isEmpty()) {
                         final var u = new MucOptions.User(conversation.getMucOptions(), null, "\0role:moderator", "Notify active moderators", new HashSet<>());
-                        u.setRole("participant");
+                        u.setRole(Role.PARTICIPANT);
                         allUsers.add(u);
                     }
-                    if (!allUsers.isEmpty() && conversation.getMucOptions().getSelf() != null && conversation.getMucOptions().getSelf().getAffiliation().ranks(MucOptions.Affiliation.MEMBER)) {
+                    if (!allUsers.isEmpty() && conversation.getMucOptions().getSelf() != null && conversation.getMucOptions().getSelf().ranks(Affiliation.MEMBER)) {
                         final var u = new MucOptions.User(conversation.getMucOptions(), null, "\0attention", "Notify active participants", new HashSet<>());
-                        u.setRole("participant");
+                        u.setRole(Role.PARTICIPANT);
                         allUsers.add(u);
                     }
                     final String needle = query.toString().toLowerCase(Locale.getDefault());
@@ -1636,7 +1641,7 @@ public class ConversationFragment extends XmppFragment
                     }
                     var insert = user.getNick();
                     if ("\0role:moderator".equals(user.getOccupantId())) {
-                        insert = conversation.getMucOptions().getUsersByRole(MucOptions.Role.MODERATOR).stream().map(MucOptions.User::getNick).collect(Collectors.joining(", "));
+                        insert = conversation.getMucOptions().getUsersByRole(Role.MODERATOR).stream().map(MucOptions.User::getNick).collect(Collectors.joining(", "));
                     }
                     editable.replace(Math.max(0, range[0]), Math.min(editable.length(), range[1]), prefix + insert + suffix);
                     return true;
@@ -1903,9 +1908,9 @@ public class ConversationFragment extends XmppFragment
                             && m.getErrorMessage() != null
                             && !Message.ERROR_MESSAGE_CANCELLED.equals(m.getErrorMessage());
             final Conversational conversational = m.getConversation();
+            final var connection = conversational.getAccount().getXmppConnection();
             if (m.getStatus() == Message.STATUS_RECEIVED
                     && conversational instanceof Conversation c) {
-                final XmppConnection connection = c.getAccount().getXmppConnection();
                 if (c.isWithStranger()
                         && m.getServerMsgId() != null
                         && !c.isBlocked()
@@ -1916,7 +1921,7 @@ public class ConversationFragment extends XmppFragment
             }
             if (conversational instanceof Conversation c) {
                 addReaction.setVisible(
-                        !showError
+                        m.getStatus() != Message.STATUS_SEND_FAILED
                                 && !m.isDeleted()
                                 && !m.isPrivateMessage()
                                 && (c.getMode() == Conversational.MODE_SINGLE
@@ -1967,7 +1972,7 @@ public class ConversationFragment extends XmppFragment
                 correctMessage.setVisible(true);
                 retractMessage.setVisible(true);
             }
-            if (conversation.getMode() == Conversation.MODE_MULTI && m.getServerMsgId() != null && m.getModerated() == null && conversation.getMucOptions().getSelf().getRole().ranks(MucOptions.Role.MODERATOR) && conversation.getMucOptions().hasFeature("urn:xmpp:message-moderate:0")) {
+            if (conversation.getMode() == Conversation.MODE_MULTI && m.getServerMsgId() != null && m.getModerated() == null && conversation.getMucOptions().getSelf().ranks(Role.MODERATOR) && conversation.getMucOptions().hasFeature("urn:xmpp:message-moderate:0")) {
                 moderateMessage.setVisible(true);
             }
             if ((m.isFileOrImage() && !deleted && !receiving)
@@ -1978,12 +1983,18 @@ public class ConversationFragment extends XmppFragment
             }
             if (m.getStatus() == Message.STATUS_SEND_FAILED) {
                 sendAgain.setVisible(true);
+                final var httpUploadAvailable =
+                        connection != null
+                                && Objects.nonNull(
+                                        connection
+                                                .getManager(HttpUploadManager.class)
+                                                .getService());
                 final var fileNotUploaded = m.isFileOrImage() && !m.hasFileOnRemoteHost();
                 final var isPeerOnline =
                         conversational.getMode() == Conversation.MODE_SINGLE
                                 && (conversational instanceof Conversation c)
                                 && !c.getContact().getPresences().isEmpty();
-                retryAsP2P.setVisible(fileNotUploaded && isPeerOnline);
+                retryAsP2P.setVisible(fileNotUploaded && isPeerOnline && httpUploadAvailable);
             }
             if (m.hasFileOnRemoteHost()
                     || m.isGeoUri()
@@ -2256,8 +2267,8 @@ public class ConversationFragment extends XmppFragment
                     .setTitle(R.string.block_media)
                     .setMessage("Do you really want to block this avatar?")
                     .setPositiveButton(R.string.yes, (dialog, whichButton) -> {
-                            activity.xmppConnectionService.blockMedia(activity.xmppConnectionService.getFileBackend().getAvatarFile(conversation.getContact().getAvatarFilename()));
-                            activity.xmppConnectionService.getFileBackend().getAvatarFile(conversation.getContact().getAvatarFilename()).delete();
+                            activity.xmppConnectionService.blockMedia(activity.xmppConnectionService.getFileBackend().getAvatarFile(conversation.getContact().getAvatar()));
+                            activity.xmppConnectionService.getFileBackend().getAvatarFile(conversation.getContact().getAvatar()).delete();
                             activity.avatarService().clear(conversation);
                             conversation.getContact().setAvatar(null);
                             activity.xmppConnectionService.updateConversationUi();
@@ -3149,8 +3160,8 @@ public class ConversationFragment extends XmppFragment
                         && xmppConnection != null
                         && conversation.getMode() == Conversational.MODE_SINGLE
                         && (!xmppConnection
-                                        .getFeatures()
-                                        .httpUpload(message.getFileParams().getSize())
+                                        .getManager(HttpUploadManager.class)
+                                        .isAvailableForSize(message.getFileParams().getSize())
                                 || forceP2P)) {
                     activity.selectPresence(
                             conversation,
@@ -3551,7 +3562,7 @@ public class ConversationFragment extends XmppFragment
         if (commandAdapter == null) return;
 
         final CommandAdapter.MucConfig mucConfig =
-            conversation.getMucOptions().getSelf().getAffiliation().ranks(MucOptions.Affiliation.OWNER) ?
+            conversation.getMucOptions().getSelf().ranks(Affiliation.OWNER) ?
             new CommandAdapter.MucConfig() :
             null;
 
@@ -3859,7 +3870,7 @@ public class ConversationFragment extends XmppFragment
                             activity.xmppConnectionService.archiveConversation(conversation);
                             return true;
                         case R.id.add_bookmark:
-                            activity.xmppConnectionService.saveConversationAsBookmark(conversation, "");
+                            conversation.getAccount().getXmppConnection().getManager(BookmarkManager.class).save(conversation, "");
                             updateSnackBar(conversation);
                             return true;
                         case R.id.block_contact:
@@ -4113,9 +4124,14 @@ public class ConversationFragment extends XmppFragment
         mSendingPgpMessage.set(false);
     }
 
-    public long getMaxHttpUploadSize(Conversation conversation) {
-        final XmppConnection connection = conversation.getAccount().getXmppConnection();
-        return connection == null ? -1 : connection.getFeatures().getMaxHttpUploadSize();
+    public Long getMaxHttpUploadSize(final Conversation conversation) {
+
+        final var connection = conversation.getAccount().getXmppConnection();
+        final var httpUploadService = connection.getManager(HttpUploadManager.class).getService();
+        if (httpUploadService == null) {
+            return -1L;
+        }
+        return httpUploadService.getMaxFileSize();
     }
 
     private boolean canWrite() {

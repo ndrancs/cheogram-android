@@ -715,7 +715,7 @@ public class StartConversationActivity extends XmppActivity
                     } else {
                         if (save) {
                             final String preAuth = invite == null ? null : invite.getParameter(XmppUri.PARAMETER_PRE_AUTH);
-                            xmppConnectionService.createContact(contact, true, preAuth);
+                            xmppConnectionService.createContact(contact, preAuth);
                             if (invite != null && invite.hasFingerprints()) {
                                 xmppConnectionService.verifyFingerprints(contact, invite.getFingerprints());
                             }
@@ -955,7 +955,7 @@ public class StartConversationActivity extends XmppActivity
                                     Jid groupJid = Jid.ofLocalAndDomain(jids.stream().map(jid -> jid.getLocal()).sorted().collect(Collectors.joining(",")), "cheogram.com");
                                     Contact group = account.getRoster().getContact(groupJid);
                                     if (name != null && !name.equals("")) group.setServerName(name);
-                                    xmppConnectionService.createContact(group, true);
+                                    xmppConnectionService.createContact(group);
                                     switchToConversation(group);
                                 }).create().show();
                         } else {

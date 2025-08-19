@@ -870,6 +870,7 @@ public class Conversation extends AbstractEntity
     }
 
     @Override
+    @NonNull
     public Jid getBlockedJid() {
         return getContact().getBlockedJid();
     }
@@ -3179,7 +3180,7 @@ public class Conversation extends AbstractEntity
                 Element command = iq.findChild("command", "http://jabber.org/protocol/commands");
                 if (iq.getType() == Iq.Type.RESULT && command != null) {
                     if (mNode.equals("jabber:iq:register") && command.getAttribute("status") != null && command.getAttribute("status").equals("completed")) {
-                        xmppConnectionService.createContact(getAccount().getRoster().getContact(iq.getFrom()), true);
+                        xmppConnectionService.createContact(getAccount().getRoster().getContact(iq.getFrom()));
                     }
 
                     if (xmppConnectionService.isOnboarding() && mNode.equals("jabber:iq:register") && !"canceled".equals(command.getAttribute("status")) && xmppConnectionService.getPreferences().contains("onboarding_action")) {

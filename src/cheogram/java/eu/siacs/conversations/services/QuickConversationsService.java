@@ -26,6 +26,7 @@ import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.utils.SerialSingleThreadExecutor;
 import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.manager.RosterManager;
 
 public class QuickConversationsService extends AbstractQuickConversationsService {
 
@@ -107,7 +108,7 @@ public class QuickConversationsService extends AbstractQuickConversationsService
             if (allContacts == null) allContacts = PhoneNumberContact.load(service);
             refresh(account, gateways, allContacts.values());
             if (!considerSync(account, gateways, allContacts, forced)) {
-                service.syncRoster(account);
+                account.getXmppConnection().getManager(RosterManager.class).writeToDatabaseAsync();
             }
         }
     }
@@ -151,7 +152,7 @@ public class QuickConversationsService extends AbstractQuickConversationsService
         }
 
         mRunningSyncJobs.decrementAndGet();
-        service.syncRoster(account);
+        account.getXmppConnection().getManager(RosterManager.class).writeToDatabaseAsync();
         service.updateRosterUi(XmppConnectionService.UpdateRosterReason.INIT);
         return true;
     }

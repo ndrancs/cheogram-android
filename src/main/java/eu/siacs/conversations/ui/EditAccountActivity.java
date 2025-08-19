@@ -58,6 +58,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 import de.gultsch.common.Linkify;
 import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.Config;
@@ -95,13 +98,16 @@ import eu.siacs.conversations.xmpp.OnKeyStatusUpdated;
 import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
 import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.XmppConnection.Features;
-import eu.siacs.conversations.xmpp.forms.Data;
 import eu.siacs.conversations.xmpp.manager.CarbonsManager;
 import eu.siacs.conversations.xmpp.pep.Avatar;
 
 import static eu.siacs.conversations.utils.PermissionUtils.allGranted;
 import static eu.siacs.conversations.utils.PermissionUtils.writeGranted;
 
+import eu.siacs.conversations.xmpp.manager.HttpUploadManager;
+import eu.siacs.conversations.xmpp.manager.PresenceManager;
+import eu.siacs.conversations.xmpp.manager.RegistrationManager;
+import im.conversations.android.xmpp.model.data.Data;
 import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.Arrays;
 import java.util.List;
@@ -142,22 +148,19 @@ public class EditAccountActivity extends OmemoActivity
                 deleteAccountAndReturnIfNecessary();
                 finish();
             };
-    private final UiCallback<Avatar> mAvatarFetchCallback =
-            new UiCallback<Avatar>() {
 
+    private final FutureCallback<Void> mAvatarFetchCallback =
+            new FutureCallback<>() {
                 @Override
-                public void userInputRequired(final PendingIntent pi, final Avatar avatar) {
-                    finishInitialSetup(avatar);
+                public void onSuccess(Void result) {
+                    Log.d(Config.LOGTAG, "found pre-existing avatar");
+                    finishInitialSetup(true);
                 }
 
                 @Override
-                public void success(final Avatar avatar) {
-                    finishInitialSetup(avatar);
-                }
-
-                @Override
-                public void error(final int errorCode, final Avatar avatar) {
-                    finishInitialSetup(avatar);
+                public void onFailure(@NonNull Throwable t) {
+                    Log.d(Config.LOGTAG, "failed to fetch avatar", t);
+                    finishInitialSetup(false);
                 }
             };
     private final OnClickListener mAvatarClickListener =
@@ -485,7 +488,8 @@ public class EditAccountActivity extends OmemoActivity
         } else if (mInitMode && mAccount != null && mAccount.getStatus() == Account.State.ONLINE) {
             if (!mFetchingAvatar) {
                 mFetchingAvatar = true;
-                xmppConnectionService.checkForAvatar(mAccount, mAvatarFetchCallback);
+                final var future = xmppConnectionService.checkForAvatar(mAccount);
+                Futures.addCallback(future, mAvatarFetchCallback, MoreExecutors.directExecutor());
             }
         }
         if (mAccount != null) {
@@ -552,7 +556,7 @@ public class EditAccountActivity extends OmemoActivity
         refreshUi();
     }
 
-    protected void finishInitialSetup(final Avatar avatar) {
+    protected void finishInitialSetup(final boolean avatar) {
         runOnUiThread(
                 () -> {
                     SoftKeyboardUtils.hideSoftKeyboard(EditAccountActivity.this);
@@ -561,7 +565,7 @@ public class EditAccountActivity extends OmemoActivity
                     final boolean wasFirstAccount =
                             xmppConnectionService != null
                                     && xmppConnectionService.getAccounts().size() == 1;
-                    if (avatar != null || (connection != null && !connection.getFeatures().pep())) {
+                    if (avatar || (connection != null && !connection.getFeatures().pep())) {
                         intent =
                                 new Intent(
                                         getApplicationContext(), StartConversationActivity.class);
@@ -860,10 +864,10 @@ public class EditAccountActivity extends OmemoActivity
                 showBlocklist.setVisible(false);
             }
 
-            if (!mAccount.getXmppConnection().getFeatures().register()) {
-                changePassword.setVisible(false);
-                deleteAccount.setVisible(false);
-            }
+            final var registration =
+                    mAccount.getXmppConnection().getManager(RegistrationManager.class).hasFeature();
+            changePassword.setVisible(registration);
+            deleteAccount.setVisible(registration);
             mamPrefs.setVisible(mAccount.getXmppConnection().getFeatures().mam());
             changePresence.setVisible(!mInitMode);
         } else {
@@ -1430,13 +1434,15 @@ public class EditAccountActivity extends OmemoActivity
             } else {
                 this.binding.serverInfoPep.setText(R.string.server_info_unavailable);
             }
-            if (features.httpUpload(0)) {
-                final long maxFileSize = features.getMaxHttpUploadSize();
-                if (maxFileSize > 0) {
+            final var httpUploadManager = connection.getManager(HttpUploadManager.class);
+            final var uploadService = httpUploadManager.getService();
+            if (uploadService != null) {
+                final Long maxFileSize = uploadService.getMaxFileSize();
+                if (maxFileSize == null) {
+                    this.binding.serverInfoHttpUpload.setText(R.string.server_info_available);
+                } else {
                     this.binding.serverInfoHttpUpload.setText(
                             UIHelper.filesizeToString(maxFileSize));
-                } else {
-                    this.binding.serverInfoHttpUpload.setText(R.string.server_info_available);
                 }
             } else {
                 this.binding.serverInfoHttpUpload.setText(R.string.server_info_unavailable);
@@ -1664,7 +1670,7 @@ public class EditAccountActivity extends OmemoActivity
                     mAccount.setPgpSignId(0);
                     mAccount.unsetPgpSignature();
                     xmppConnectionService.databaseBackend.updateAccount(mAccount);
-                    xmppConnectionService.sendPresence(mAccount);
+                    mAccount.getXmppConnection().getManager(PresenceManager.class).available();
                     refreshUiReal();
                 });
         builder.create().show();
@@ -1751,8 +1757,7 @@ public class EditAccountActivity extends OmemoActivity
     }
 
     @Override
-    public void onCaptchaRequested(
-            final Account account, final String id, final Data data, final Bitmap captcha) {
+    public void onCaptchaRequested(final Account account, final Data data, final Bitmap captcha) {
         runOnUiThread(
                 () -> {
                     if (mCaptchaDialog != null && mCaptchaDialog.isShowing()) {
@@ -1774,34 +1779,15 @@ public class EditAccountActivity extends OmemoActivity
 
                     builder.setPositiveButton(
                             getString(R.string.ok),
-                            (dialog, which) -> {
-                                String rc = input.getText().toString();
-                                data.put("username", account.getUsername());
-                                data.put("password", account.getPassword());
-                                data.put("ocr", rc);
-                                data.submit();
-
-                                if (xmppConnectionServiceBound) {
-                                    xmppConnectionService.sendCreateAccountWithCaptchaPacket(
-                                            account, id, data);
-                                }
-                            });
+                            (dialog, which) ->
+                                    account.getXmppConnection()
+                                            .register(data, input.getText().toString()));
                     builder.setNegativeButton(
                             getString(R.string.cancel),
-                            (dialog, which) -> {
-                                if (xmppConnectionService != null) {
-                                    xmppConnectionService.sendCreateAccountWithCaptchaPacket(
-                                            account, null, null);
-                                }
-                            });
+                            (dialog, which) -> account.getXmppConnection().cancelRegistration());
 
                     builder.setOnCancelListener(
-                            dialog -> {
-                                if (xmppConnectionService != null) {
-                                    xmppConnectionService.sendCreateAccountWithCaptchaPacket(
-                                            account, null, null);
-                                }
-                            });
+                            dialog -> account.getXmppConnection().cancelRegistration());
                     mCaptchaDialog = builder.create();
                     mCaptchaDialog.show();
                     input.requestFocus();

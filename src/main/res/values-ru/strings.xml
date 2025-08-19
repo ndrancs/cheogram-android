@@ -8,7 +8,6 @@
     <string name="channel_details">Сведения о канале</string>
     <string name="action_add_account">Добавить аккаунт</string>
     <string name="action_edit_contact">Изменить контакт</string>
-    <string name="action_add_phone_book">Добавить в адресную книгу</string>
     <string name="action_delete_contact">Удалить из списка</string>
     <string name="action_block_contact">Заблокировать контакт</string>
     <string name="action_unblock_contact">Разблокировать контакт</string>
@@ -1171,4 +1170,7 @@
     <string name="account_status_service_outage_known">Сервис не работает (известная проблема)</string>
     <string name="account_status_service_outage_scheduled">Запланированный простой</string>
     <string name="sos_scheduled_return">Сервис должен заработать %s</string>
+    <string name="no_contacts_permission">%1$s требуется доступ к вашим контактам</string>
+    <string name="save_to_contact">Сохранить в контакты</string>
+    <string name="show_in_contacts">Показать в контактах</string>
 </resources>

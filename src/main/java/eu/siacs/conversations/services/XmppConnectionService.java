@@ -1,12 +1,10 @@
 package eu.siacs.conversations.services;
 
 import static eu.siacs.conversations.utils.Compatibility.s;
-import static eu.siacs.conversations.utils.Random.SECURE_RANDOM;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.AlarmManager;
-import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -43,12 +41,9 @@ import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.provider.DocumentsContract;
 import android.security.KeyChain;
-import android.text.TextUtils;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.LruCache;
 import android.util.Pair;
-import androidx.annotation.BoolRes;
 import androidx.annotation.IntegerRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -138,7 +133,6 @@ import eu.siacs.conversations.entities.Conversational;
 import eu.siacs.conversations.entities.DownloadableFile;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.MucOptions;
-import eu.siacs.conversations.entities.MucOptions.OnRenameListener;
 import eu.siacs.conversations.entities.PresenceTemplate;
 import eu.siacs.conversations.entities.Reaction;
 import eu.siacs.conversations.generator.AbstractGenerator;
@@ -147,7 +141,6 @@ import eu.siacs.conversations.generator.MessageGenerator;
 import eu.siacs.conversations.generator.PresenceGenerator;
 import eu.siacs.conversations.http.HttpConnectionManager;
 import eu.siacs.conversations.http.ServiceOutageStatus;
-import eu.siacs.conversations.parser.AbstractParser;
 import eu.siacs.conversations.parser.IqParser;
 import eu.siacs.conversations.persistance.DatabaseBackend;
 import eu.siacs.conversations.persistance.FileBackend;
@@ -175,10 +168,8 @@ import eu.siacs.conversations.utils.MimeUtils;
 import eu.siacs.conversations.utils.PhoneHelper;
 import eu.siacs.conversations.utils.QuickLoader;
 import eu.siacs.conversations.utils.ReplacingSerialSingleThreadExecutor;
-import eu.siacs.conversations.utils.ReplacingTaskManager;
 import eu.siacs.conversations.utils.Resolver;
 import eu.siacs.conversations.utils.SerialSingleThreadExecutor;
-import eu.siacs.conversations.utils.StringUtils;
 import eu.siacs.conversations.utils.TorServiceUtils;
 import eu.siacs.conversations.utils.ThemeHelper;
 import eu.siacs.conversations.utils.WakeLockHelper;
@@ -186,35 +177,40 @@ import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xml.LocalizedContent;
 import eu.siacs.conversations.xml.Namespace;
-import eu.siacs.conversations.xmpp.IqErrorResponseException;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.OnContactStatusChanged;
 import eu.siacs.conversations.xmpp.OnGatewayResult;
 import eu.siacs.conversations.xmpp.OnKeyStatusUpdated;
-import eu.siacs.conversations.xmpp.OnMessageAcknowledged;
-import eu.siacs.conversations.xmpp.OnStatusChanged;
 import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
 import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.chatstate.ChatState;
 import eu.siacs.conversations.xmpp.forms.Data;
 import eu.siacs.conversations.xmpp.jingle.AbstractJingleConnection;
 import eu.siacs.conversations.xmpp.jingle.JingleConnectionManager;
-import eu.siacs.conversations.xmpp.jingle.JingleRtpConnection;
 import eu.siacs.conversations.xmpp.jingle.Media;
 import eu.siacs.conversations.xmpp.jingle.RtpEndUserState;
 import eu.siacs.conversations.xmpp.mam.MamReference;
+import eu.siacs.conversations.xmpp.manager.AvatarManager;
+import eu.siacs.conversations.xmpp.manager.BlockingManager;
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import eu.siacs.conversations.xmpp.manager.DiscoManager;
+import eu.siacs.conversations.xmpp.manager.MessageDisplayedSynchronizationManager;
+import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
+import eu.siacs.conversations.xmpp.manager.NickManager;
+import eu.siacs.conversations.xmpp.manager.PepManager;
+import eu.siacs.conversations.xmpp.manager.PresenceManager;
+import eu.siacs.conversations.xmpp.manager.RegistrationManager;
+import eu.siacs.conversations.xmpp.manager.RosterManager;
+import eu.siacs.conversations.xmpp.manager.VCardManager;
 import eu.siacs.conversations.xmpp.pep.Avatar;
-import eu.siacs.conversations.xmpp.pep.PublishOptions;
 import im.conversations.android.xmpp.Entity;
-import im.conversations.android.xmpp.model.avatar.Metadata;
-import im.conversations.android.xmpp.model.bookmark.Storage;
 import im.conversations.android.xmpp.model.disco.info.InfoQuery;
-import im.conversations.android.xmpp.model.mds.Displayed;
-import im.conversations.android.xmpp.model.pubsub.PubSub;
+import im.conversations.android.xmpp.model.muc.Affiliation;
+import im.conversations.android.xmpp.model.muc.Role;
 import im.conversations.android.xmpp.model.stanza.Iq;
 import im.conversations.android.xmpp.model.stanza.Presence;
 import im.conversations.android.xmpp.model.storage.PrivateStorage;
+import im.conversations.android.xmpp.model.up.Push;
 import java.io.File;
 import java.security.Security;
 import java.security.cert.CertificateException;
@@ -226,7 +222,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -288,7 +283,7 @@ public class XmppConnectionService extends Service {
     private static final Executor FILE_OBSERVER_EXECUTOR = Executors.newSingleThreadExecutor();
     public static final Executor FILE_ATTACHMENT_EXECUTOR = Executors.newSingleThreadExecutor();
 
-    private final ScheduledExecutorService internalPingExecutor =
+    public final ScheduledExecutorService internalPingExecutor =
             Executors.newSingleThreadScheduledExecutor();
     private static final SerialSingleThreadExecutor VIDEO_COMPRESSION_EXECUTOR =
             new SerialSingleThreadExecutor("VideoCompression");
@@ -298,23 +293,12 @@ public class XmppConnectionService extends Service {
             new SerialSingleThreadExecutor("DatabaseReader");
     private final SerialSingleThreadExecutor mNotificationExecutor =
             new SerialSingleThreadExecutor("NotificationExecutor");
-    private final ReplacingTaskManager mRosterSyncTaskManager = new ReplacingTaskManager();
     private final IBinder mBinder = new XmppConnectionBinder();
     private final List<Conversation> conversations = new CopyOnWriteArrayList<>();
     private final IqGenerator mIqGenerator = new IqGenerator(this);
     private final Set<String> mInProgressAvatarFetches = new HashSet<>();
     private final Set<String> mOmittedPepAvatarFetches = new HashSet<>();
-    private final HashSet<Jid> mLowPingTimeoutMode = new HashSet<>();
-    private final Consumer<Iq> mDefaultIqHandler =
-            (packet) -> {
-                if (packet.getType() != Iq.Type.RESULT) {
-                    final var error = packet.getError();
-                    String text = error != null ? error.findChildContent("text") : null;
-                    if (text != null) {
-                        Log.d(Config.LOGTAG, "received iq error: " + text);
-                    }
-                }
-            };
+    public final HashSet<Jid> mLowPingTimeoutMode = new HashSet<>();
     public DatabaseBackend databaseBackend;
     private Multimap<String, String> mutedMucUsers;
     private final ReplacingSerialSingleThreadExecutor mContactMergerExecutor = new ReplacingSerialSingleThreadExecutor("ContactMerger");
@@ -366,42 +350,6 @@ public class XmppConnectionService extends Service {
                     markFileDeleted(file);
                 }
             };
-    private final OnMessageAcknowledged mOnMessageAcknowledgedListener =
-            new OnMessageAcknowledged() {
-
-                @Override
-                public boolean onMessageAcknowledged(
-                        final Account account, final Jid to, final String id) {
-                    if (id.startsWith(JingleRtpConnection.JINGLE_MESSAGE_PROPOSE_ID_PREFIX)) {
-                        final String sessionId =
-                                id.substring(
-                                        JingleRtpConnection.JINGLE_MESSAGE_PROPOSE_ID_PREFIX
-                                                .length());
-                        mJingleConnectionManager.updateProposedSessionDiscovered(
-                                account,
-                                to,
-                                sessionId,
-                                JingleConnectionManager.DeviceDiscoveryState
-                                        .SEARCHING_ACKNOWLEDGED);
-                    }
-
-                    final Jid bare = to.asBareJid();
-
-                    for (final Conversation conversation : getConversations()) {
-                        if (conversation.getAccount() == account
-                                && conversation.getJid().asBareJid().equals(bare)) {
-                            final Message message = conversation.findUnsentMessageWithUuid(id);
-                            if (message != null) {
-                                message.setStatus(Message.STATUS_SEND);
-                                message.setErrorMessage(null);
-                                databaseBackend.updateMessage(message, false);
-                                return true;
-                            }
-                        }
-                    }
-                    return false;
-                }
-            };
 
     private final AtomicBoolean diallerIntegrationActive = new AtomicBoolean(false);
 
@@ -438,146 +386,6 @@ public class XmppConnectionService extends Service {
     public final Set<String> FILENAMES_TO_IGNORE_DELETION = new HashSet<>();
 
     private final AtomicLong mLastExpiryRun = new AtomicLong(0);
-    private final OnStatusChanged statusListener =
-            new OnStatusChanged() {
-
-                @Override
-                public void onStatusChanged(final Account account) {
-                    final var status = account.getStatus();
-                    if (ServiceOutageStatus.isPossibleOutage(status)) {
-                        fetchServiceOutageStatus(account);
-                    }
-                    XmppConnection connection = account.getXmppConnection();
-                    updateAccountUi();
-
-                    if (account.getStatus() == Account.State.ONLINE
-                            || account.getStatus().isError()) {
-                        mQuickConversationsService.signalAccountStateChange();
-                    }
-
-                    if (account.getStatus() == Account.State.ONLINE) {
-                        synchronized (mLowPingTimeoutMode) {
-                            if (mLowPingTimeoutMode.remove(account.getJid().asBareJid())) {
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid()
-                                                + ": leaving low ping timeout mode");
-                            }
-                        }
-                        if (account.setShowErrorNotification(true)) {
-                            databaseBackend.updateAccount(account);
-                        }
-                        mMessageArchiveService.executePendingQueries(account);
-                        if (connection != null && connection.getFeatures().csi()) {
-                            if (checkListeners()) {
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid() + " sending csi//inactive");
-                                connection.sendInactive();
-                            } else {
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid() + " sending csi//active");
-                                connection.sendActive();
-                            }
-                        }
-                        List<Conversation> conversations = getConversations();
-                        for (Conversation conversation : conversations) {
-                            final boolean inProgressJoin;
-                            synchronized (account.inProgressConferenceJoins) {
-                                inProgressJoin =
-                                        account.inProgressConferenceJoins.contains(conversation);
-                            }
-                            final boolean pendingJoin;
-                            synchronized (account.pendingConferenceJoins) {
-                                pendingJoin = account.pendingConferenceJoins.contains(conversation);
-                            }
-                            if (conversation.getAccount() == account
-                                    && !pendingJoin
-                                    && !inProgressJoin) {
-                                sendUnsentMessages(conversation);
-                            }
-                        }
-                        final List<Conversation> pendingLeaves;
-                        synchronized (account.pendingConferenceLeaves) {
-                            pendingLeaves = new ArrayList<>(account.pendingConferenceLeaves);
-                            account.pendingConferenceLeaves.clear();
-                        }
-                        for (Conversation conversation : pendingLeaves) {
-                            leaveMuc(conversation);
-                        }
-                        final List<Conversation> pendingJoins;
-                        synchronized (account.pendingConferenceJoins) {
-                            pendingJoins = new ArrayList<>(account.pendingConferenceJoins);
-                            account.pendingConferenceJoins.clear();
-                        }
-                        for (Conversation conversation : pendingJoins) {
-                            joinMuc(conversation);
-                        }
-                        scheduleWakeUpCall(
-                                Config.PING_MAX_INTERVAL * 1000L, account.getUuid().hashCode());
-                    } else if (account.getStatus() == Account.State.OFFLINE
-                            || account.getStatus() == Account.State.DISABLED
-                            || account.getStatus() == Account.State.LOGGED_OUT) {
-                        resetSendingToWaiting(account);
-                        if (account.isConnectionEnabled() && isInLowPingTimeoutMode(account)) {
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid()
-                                            + ": went into offline state during low ping mode."
-                                            + " reconnecting now");
-                            reconnectAccount(account, true, false);
-                        } else {
-                            final int timeToReconnect = SECURE_RANDOM.nextInt(10) + 2;
-                            scheduleWakeUpCall(timeToReconnect, account.getUuid().hashCode());
-                        }
-                    } else if (account.getStatus() == Account.State.REGISTRATION_SUCCESSFUL) {
-                        databaseBackend.updateAccount(account);
-                        reconnectAccount(account, true, false);
-                    } else if (account.getStatus() != Account.State.CONNECTING
-                            && account.getStatus() != Account.State.NO_INTERNET) {
-                        resetSendingToWaiting(account);
-                        if (connection != null && account.getStatus().isAttemptReconnect()) {
-                            final boolean aggressive =
-                                    account.getStatus() == Account.State.SEE_OTHER_HOST
-                                            || hasJingleRtpConnection(account);
-                            final int next = connection.getTimeToNextAttempt(aggressive);
-                            final boolean lowPingTimeoutMode = isInLowPingTimeoutMode(account);
-                            if (next <= 0) {
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid()
-                                                + ": error connecting account. reconnecting now."
-                                                + " lowPingTimeout="
-                                                + lowPingTimeoutMode);
-                                reconnectAccount(account, true, false);
-                            } else {
-                                final int attempt = connection.getAttempt() + 1;
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid()
-                                                + ": error connecting account. try again in "
-                                                + next
-                                                + "s for the "
-                                                + attempt
-                                                + " time. lowPingTimeout="
-                                                + lowPingTimeoutMode
-                                                + ", aggressive="
-                                                + aggressive);
-                                scheduleWakeUpCall(next, account.getUuid().hashCode());
-                                if (aggressive) {
-                                    internalPingExecutor.schedule(
-                                            XmppConnectionService.this
-                                                    ::manageAccountConnectionStatesInternal,
-                                            (next * 1000L) + 50,
-                                            TimeUnit.MILLISECONDS);
-                                }
-                            }
-                        }
-                    }
-                    getNotificationService().updateErrorNotification();
-                }
-            };
 
     private OpenPgpServiceConnection pgpServiceConnection;
     private PgpEngine mPgpEngine = null;
@@ -593,7 +401,7 @@ public class XmppConnectionService extends Service {
         return account.getJid().asBareJid() + "_" + avatar.owner + "_" + avatar.sha1sum;
     }
 
-    private boolean isInLowPingTimeoutMode(Account account) {
+    public boolean isInLowPingTimeoutMode(Account account) {
         synchronized (mLowPingTimeoutMode) {
             return mLowPingTimeoutMode.contains(account.getJid().asBareJid());
         }
@@ -1128,7 +936,7 @@ public class XmppConnectionService extends Service {
                         });
             case AudioManager.RINGER_MODE_CHANGED_ACTION:
             case NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED:
-                if (dndOnSilentMode()) {
+                if (appSettings.isDndOnSilentMode() && appSettings.isAutomaticAvailability()) {
                     refreshAllPresences();
                 }
                 break;
@@ -1136,7 +944,7 @@ public class XmppConnectionService extends Service {
                 deactivateGracePeriod();
             case Intent.ACTION_USER_PRESENT:
             case Intent.ACTION_SCREEN_OFF:
-                if (awayWhenScreenLocked()) {
+                if (appSettings.isAwayWhenScreenLocked() && appSettings.isAutomaticAvailability()) {
                     refreshAllPresences();
                 }
                 break;
@@ -1221,7 +1029,7 @@ public class XmppConnectionService extends Service {
         updateConversationUi();
     }
 
-    private void manageAccountConnectionStatesInternal() {
+    public void manageAccountConnectionStatesInternal() {
         manageAccountConnectionStates(ACTION_INTERNAL_PING, null);
     }
 
@@ -1273,7 +1081,7 @@ public class XmppConnectionService extends Service {
             mLastMucPing = SystemClock.elapsedRealtime();
             for (Conversation c : getConversations()) {
                 if (c.getMode() == Conversation.MODE_MULTI && (c.getMucOptions().online() || c.getMucOptions().getError() == MucOptions.Error.SHUTDOWN)) {
-                    mucSelfPingAndRejoin(c);
+                    c.getAccount().getXmppConnection().getManager(MultiUserChatManager.class).pingAndRejoin(c);
                 }
             }
         }
@@ -1288,16 +1096,11 @@ public class XmppConnectionService extends Service {
 
             final var conversation = message.getConversation();
             final var account = conversation.getAccount();
-            final boolean inProgressJoin;
-            synchronized (account.inProgressConferenceJoins) {
-                inProgressJoin = account.inProgressConferenceJoins.contains(conversation);
-            }
-            final boolean pendingJoin;
-            synchronized (account.pendingConferenceJoins) {
-                pendingJoin = account.pendingConferenceJoins.contains(conversation);
-            }
+            final boolean inProgressJoin =
+                conversation instanceof Conversation ? conversation.getAccount().getXmppConnection()
+                        .getManager(MultiUserChatManager.class)
+                        .isJoinInProgress((Conversation) conversation) : false;
             if (conversation.getAccount() == account
-                    && !pendingJoin
                     && !inProgressJoin) {
                 resendMessage(message, false);
             }
@@ -1318,17 +1121,16 @@ public class XmppConnectionService extends Service {
             final boolean isUiAction,
             final boolean isAccountPushed,
             final HashSet<Account> pingCandidates) {
+        final var connection = account.getXmppConnection();
         if (!account.getStatus().isAttemptReconnect()) {
             return false;
         }
         final var requestCode = account.getUuid().hashCode();
         if (!hasInternetConnection()) {
-            account.setStatus(Account.State.NO_INTERNET);
-            statusListener.onStatusChanged(account);
+            connection.setStatusAndTriggerProcessor(Account.State.NO_INTERNET);
         } else {
             if (account.getStatus() == Account.State.NO_INTERNET) {
-                account.setStatus(Account.State.OFFLINE);
-                statusListener.onStatusChanged(account);
+                connection.setStatusAndTriggerProcessor(Account.State.OFFLINE);
             }
             if (account.getStatus() == Account.State.ONLINE) {
                 synchronized (mLowPingTimeoutMode) {
@@ -1379,7 +1181,6 @@ public class XmppConnectionService extends Service {
             } else if (account.getStatus() == Account.State.OFFLINE) {
                 reconnectAccount(account, true, interactive);
             } else if (account.getStatus() == Account.State.CONNECTING) {
-                final var connection = account.getXmppConnection();
                 final var connectionDuration = connection.getConnectionDuration();
                 final var discoDuration = connection.getDiscoDuration();
                 final var connectionTimeout = Config.CONNECT_TIMEOUT * 1000L - connectionDuration;
@@ -1396,7 +1197,7 @@ public class XmppConnectionService extends Service {
                 final boolean aggressive =
                         account.getStatus() == Account.State.SEE_OTHER_HOST
                                 || hasJingleRtpConnection(account);
-                if (account.getXmppConnection().getTimeToNextAttempt(aggressive) <= 0) {
+                if (connection.getTimeToNextAttempt(aggressive) <= 0) {
                     reconnectAccount(account, true, interactive);
                 }
             }
@@ -1414,7 +1215,7 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    private void fetchServiceOutageStatus(final Account account) {
+    public void fetchServiceOutageStatus(final Account account) {
         final var sosUrl = account.getKey(Account.KEY_SOS_URL);
         if (Strings.isNullOrEmpty(sosUrl)) {
             return;
@@ -1443,7 +1244,7 @@ public class XmppConnectionService extends Service {
     }
 
     public boolean processUnifiedPushMessage(
-            final Account account, final Jid transport, final Element push) {
+            final Account account, final Jid transport, final Push push) {
         return unifiedPushBroker.processPushMessage(account, transport, push);
     }
 
@@ -1522,79 +1323,11 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    private boolean dndOnSilentMode() {
-        return getBooleanPreference(AppSettings.DND_ON_SILENT_MODE, R.bool.dnd_on_silent_mode);
-    }
-
-    private boolean manuallyChangePresence() {
-        return getBooleanPreference(
-                AppSettings.MANUALLY_CHANGE_PRESENCE, R.bool.manually_change_presence);
-    }
-
-    private boolean treatVibrateAsSilent() {
-        return getBooleanPreference(
-                AppSettings.TREAT_VIBRATE_AS_SILENT, R.bool.treat_vibrate_as_silent);
-    }
-
-    private boolean awayWhenScreenLocked() {
-        return getBooleanPreference(
-                AppSettings.AWAY_WHEN_SCREEN_IS_OFF, R.bool.away_when_screen_off);
-    }
-
     private String getCompressPicturesPreference() {
         return getPreferences()
                 .getString(
                         "picture_compression",
                         getResources().getString(R.string.picture_compression));
-    }
-
-    private im.conversations.android.xmpp.model.stanza.Presence.Availability getTargetPresence() {
-        if (dndOnSilentMode() && isPhoneSilenced()) {
-            return im.conversations.android.xmpp.model.stanza.Presence.Availability.DND;
-        } else if (awayWhenScreenLocked() && isScreenLocked()) {
-            return im.conversations.android.xmpp.model.stanza.Presence.Availability.AWAY;
-        } else {
-            return im.conversations.android.xmpp.model.stanza.Presence.Availability.ONLINE;
-        }
-    }
-
-    public boolean isScreenLocked() {
-        final KeyguardManager keyguardManager = getSystemService(KeyguardManager.class);
-        final PowerManager powerManager = getSystemService(PowerManager.class);
-        final boolean locked = keyguardManager != null && keyguardManager.isKeyguardLocked();
-        final boolean interactive;
-        try {
-            interactive = powerManager != null && powerManager.isInteractive();
-        } catch (final Exception e) {
-            return false;
-        }
-        return locked || !interactive;
-    }
-
-    private boolean isPhoneSilenced() {
-        final NotificationManager notificationManager = getSystemService(NotificationManager.class);
-        final int filter =
-                notificationManager == null
-                        ? NotificationManager.INTERRUPTION_FILTER_UNKNOWN
-                        : notificationManager.getCurrentInterruptionFilter();
-        final boolean notificationDnd = filter >= NotificationManager.INTERRUPTION_FILTER_PRIORITY;
-        final AudioManager audioManager = getSystemService(AudioManager.class);
-        final int ringerMode =
-                audioManager == null
-                        ? AudioManager.RINGER_MODE_NORMAL
-                        : audioManager.getRingerMode();
-        try {
-            if (treatVibrateAsSilent()) {
-                return notificationDnd || ringerMode != AudioManager.RINGER_MODE_NORMAL;
-            } else {
-                return notificationDnd || ringerMode == AudioManager.RINGER_MODE_SILENT;
-            }
-        } catch (final Throwable throwable) {
-            Log.d(
-                    Config.LOGTAG,
-                    "platform bug in isPhoneSilenced (" + throwable.getMessage() + ")");
-            return notificationDnd;
-        }
     }
 
     private void resetAllAttemptCounts(boolean reallyAll, boolean retryImmediately) {
@@ -1729,9 +1462,10 @@ public class XmppConnectionService extends Service {
         this.databaseBackend = DatabaseBackend.getInstance(getApplicationContext());
         Log.d(Config.LOGTAG, "restoring accounts...");
         this.accounts = databaseBackend.getAccounts();
-        for (Account account : this.accounts) {
+        for (final var account : this.accounts) {
             final int color = getPreferences().getInt("account_color:" + account.getUuid(), 0);
             if (color != 0) account.setColor(color);
+            account.setXmppConnection(createConnection(account));
         }
         final SharedPreferences.Editor editor = getPreferences().edit();
         final boolean hasEnabledAccounts = hasEnabledAccounts();
@@ -1920,7 +1654,7 @@ public class XmppConnectionService extends Service {
     }
 
     public void toggleScreenEventReceiver() {
-        if (awayWhenScreenLocked() && !manuallyChangePresence()) {
+        if (appSettings.isAwayWhenScreenLocked() && appSettings.isAutomaticAvailability()) {
             final IntentFilter filter = new IntentFilter();
             filter.addAction(Intent.ACTION_SCREEN_ON);
             filter.addAction(Intent.ACTION_SCREEN_OFF);
@@ -2052,7 +1786,7 @@ public class XmppConnectionService extends Service {
         int activeAccounts = 0;
         for (final Account account : accounts) {
             if (account.isConnectionEnabled()) {
-                databaseBackend.writeRoster(account.getRoster());
+                account.getXmppConnection().getManager(RosterManager.class).writeToDatabase();
                 activeAccounts++;
             }
             if (account.getXmppConnection() != null) {
@@ -2085,13 +1819,8 @@ public class XmppConnectionService extends Service {
                                     ? PendingIntent.FLAG_IMMUTABLE
                                             | PendingIntent.FLAG_UPDATE_CURRENT
                                     : PendingIntent.FLAG_UPDATE_CURRENT);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAtMillis, pendingIntent);
-            } else {
-                alarmManager.set(
-                        AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAtMillis, pendingIntent);
-            }
+            alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAtMillis, pendingIntent);
         } catch (RuntimeException e) {
             Log.e(Config.LOGTAG, "unable to schedule alarm for post connectivity change", e);
         }
@@ -2150,20 +1879,13 @@ public class XmppConnectionService extends Service {
 
     public XmppConnection createConnection(final Account account) {
         final XmppConnection connection = new XmppConnection(account, this);
-        connection.setOnStatusChangedListener(this.statusListener);
         connection.setOnJinglePacketReceivedListener((mJingleConnectionManager::deliverPacket));
-        connection.setOnMessageAcknowledgeListener(this.mOnMessageAcknowledgedListener);
         connection.addOnAdvancedStreamFeaturesAvailableListener(this.mMessageArchiveService);
-        connection.addOnAdvancedStreamFeaturesAvailableListener(this.mAvatarService);
-        AxolotlService axolotlService = account.getAxolotlService();
-        if (axolotlService != null) {
-            connection.addOnAdvancedStreamFeaturesAvailableListener(axolotlService);
-        }
         return connection;
     }
 
-    public void sendChatState(Conversation conversation) {
-        if (sendChatStates()) {
+    public void sendChatState(final Conversation conversation) {
+        if (appSettings.isSendChatStates()) {
             final var packet = mMessageGenerator.generateChatState(conversation);
             sendMessagePacket(conversation.getAccount(), packet);
         }
@@ -2222,7 +1944,7 @@ public class XmppConnectionService extends Service {
                                 + ": adding "
                                 + contact.getJid()
                                 + " on sending message");
-                createContact(contact, true);
+                createContact(contact);
             }
         }
 
@@ -2240,7 +1962,10 @@ public class XmppConnectionService extends Service {
             }
         }
 
-        final boolean inProgressJoin = isJoinInProgress(conversation);
+        final boolean inProgressJoin =
+                account.getXmppConnection()
+                        .getManager(MultiUserChatManager.class)
+                        .isJoinInProgress(conversation);
 
         if (message.getCounterpart() == null && !message.isPrivateMessage()) {
             message.setCounterpart(message.getConversation().getJid().asBareJid());
@@ -2498,45 +2223,17 @@ public class XmppConnectionService extends Service {
                 mMessageGenerator.addDelay(packet, message.getTimeSent());
             }
             if (conversation.setOutgoingChatState(Config.DEFAULT_CHAT_STATE)) {
-                if (this.sendChatStates()) {
+                if (this.appSettings.isSendChatStates()) {
                     packet.addChild(ChatState.toElement(conversation.getOutgoingChatState()));
                 }
             }
             sendMessagePacket(account, packet);
-            if (message.getConversation().getMode() == Conversation.MODE_MULTI && message.hasCustomEmoji()) {
-                if (message.getConversation() instanceof Conversation) presenceToMuc((Conversation) message.getConversation());
-            }
         }
         if (!waitForPreview && !passedCbOn && cb != null) cb.run();
     }
 
-    private boolean isJoinInProgress(final Conversation conversation) {
-        final Account account = conversation.getAccount();
-        synchronized (account.inProgressConferenceJoins) {
-            if (conversation.getMode() == Conversational.MODE_MULTI) {
-                final boolean inProgress = account.inProgressConferenceJoins.contains(conversation);
-                final boolean pending = account.pendingConferenceJoins.contains(conversation);
-                final boolean inProgressJoin = inProgress || pending;
-                if (inProgressJoin) {
-                    Log.d(
-                            Config.LOGTAG,
-                            account.getJid().asBareJid()
-                                    + ": holding back message to group. inProgress="
-                                    + inProgress
-                                    + ", pending="
-                                    + pending);
-                }
-                return inProgressJoin;
-            } else {
-                return false;
-            }
-        }
-    }
-
-    private void sendUnsentMessages(final Conversation conversation) {
-        synchronized (conversation) {
-            conversation.findWaitingMessages(message -> resendMessage(message, true));
-        }
+    public void sendUnsentMessages(final Conversation conversation) {
+        conversation.findWaitingMessages(message -> resendMessage(message, true));
     }
 
     public void resendMessage(final Message message, final boolean delay) {
@@ -2576,18 +2273,16 @@ public class XmppConnectionService extends Service {
 
     public void requestEasyOnboardingInvite(
             final Account account, final EasyOnboardingInvite.OnInviteRequested callback) {
-        final XmppConnection connection = account.getXmppConnection();
-        final Jid jid =
-                connection == null
-                        ? null
-                        : connection.getJidForCommand(Namespace.EASY_ONBOARDING_INVITE);
-        if (jid == null) {
+        final var connection = account.getXmppConnection();
+        final var discoManager = connection.getManager(DiscoManager.class);
+        final var address = discoManager.getAddressForCommand(Namespace.EASY_ONBOARDING_INVITE);
+        if (address == null) {
             callback.inviteRequestFailed(
                     getString(R.string.server_does_not_support_easy_onboarding_invites));
             return;
         }
         final Iq request = new Iq(Iq.Type.SET);
-        request.setTo(jid);
+        request.setTo(address);
         final Element command = request.addChild("command", Namespace.COMMANDS);
         command.setAttribute("node", Namespace.EASY_ONBOARDING_INVITE);
         command.setAttribute("action", "execute");
@@ -2609,7 +2304,7 @@ public class XmppConnectionService extends Service {
                             if (uri != null) {
                                 final EasyOnboardingInvite invite =
                                         new EasyOnboardingInvite(
-                                                jid.getDomain().toString(), uri, landingUrl);
+                                                address.getDomain().toString(), uri, landingUrl);
                                 callback.inviteRequested(invite);
                                 return;
                             }
@@ -2622,89 +2317,6 @@ public class XmppConnectionService extends Service {
                         callback.inviteRequestFailed(getString(R.string.remote_server_timeout));
                     }
                 });
-    }
-
-    public void fetchBookmarks(final Account account) {
-        final Iq iqPacket = new Iq(Iq.Type.GET);
-        iqPacket.addExtension(new PrivateStorage()).addExtension(new Storage());
-        final Consumer<Iq> callback =
-                (response) -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        final var privateStorage = response.getExtension(PrivateStorage.class);
-                        if (privateStorage == null) {
-                            return;
-                        }
-                        final var bookmarkStorage = privateStorage.getExtension(Storage.class);
-                        Map<Jid, Bookmark> bookmarks =
-                                Bookmark.parseFromStorage(bookmarkStorage, account);
-                        processBookmarksInitial(account, bookmarks, false);
-                    } else {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid() + ": could not fetch bookmarks");
-                    }
-                };
-        sendIqPacket(account, iqPacket, callback);
-    }
-
-    public void fetchBookmarks2(final Account account) {
-        final Iq retrieve = mIqGenerator.retrieveBookmarks();
-        sendIqPacket(
-                account,
-                retrieve,
-                (response) -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        final var pubsub = response.getExtension(PubSub.class);
-                        final Map<Jid, Bookmark> bookmarks =
-                                Bookmark.parseFromPubSub(pubsub, account);
-                        processBookmarksInitial(account, bookmarks, true);
-                    }
-                });
-    }
-
-    public void fetchMessageDisplayedSynchronization(final Account account) {
-        Log.d(Config.LOGTAG, account.getJid() + ": retrieve mds");
-        final var retrieve = mIqGenerator.retrieveMds();
-        sendIqPacket(
-                account,
-                retrieve,
-                (response) -> {
-                    if (response.getType() != Iq.Type.RESULT) {
-                        return;
-                    }
-                    final var pubsub = response.getExtension(PubSub.class);
-                    if (pubsub == null) {
-                        return;
-                    }
-                    final var items = pubsub.getItems();
-                    if (items == null) {
-                        return;
-                    }
-                    if (Namespace.MDS_DISPLAYED.equals(items.getNode())) {
-                        for (final var item :
-                                items.getItemMap(
-                                                im.conversations.android.xmpp.model.mds.Displayed
-                                                        .class)
-                                        .entrySet()) {
-                            processMdsItem(account, item);
-                        }
-                    }
-                });
-    }
-
-    public void processMdsItem(final Account account, final Map.Entry<String, Displayed> item) {
-        final Jid jid = Jid.Invalid.getNullForInvalid(Jid.ofOrInvalid(item.getKey()));
-        if (jid == null) {
-            return;
-        }
-        final var displayed = item.getValue();
-        final var stanzaId = displayed.getStanzaId();
-        final String id = stanzaId == null ? null : stanzaId.getId();
-        final Conversation conversation = find(account, jid);
-        if (id != null && conversation != null) {
-            conversation.setDisplayState(id);
-            markReadUpToStanzaId(conversation, id);
-        }
     }
 
     public void markReadUpToStanzaId(final Conversation conversation, final String stanzaId) {
@@ -2739,250 +2351,15 @@ public class XmppConnectionService extends Service {
         return true;
     }
 
-    public void processBookmarksInitial(
-            final Account account, final Map<Jid, Bookmark> bookmarks, final boolean pep) {
-        final Set<Jid> previousBookmarks = account.getBookmarkedJids();
-        for (final Bookmark bookmark : bookmarks.values()) {
-            previousBookmarks.remove(bookmark.getJid().asBareJid());
-            processModifiedBookmark(bookmark, pep);
-        }
-        if (pep) {
-            processDeletedBookmarks(account, previousBookmarks);
-        }
-        account.setBookmarks(bookmarks);
-    }
-
-    public void processDeletedBookmarks(final Account account, final Collection<Jid> bookmarks) {
-        Log.d(
-                Config.LOGTAG,
-                account.getJid().asBareJid()
-                        + ": "
-                        + bookmarks.size()
-                        + " bookmarks have been removed");
-        for (final Jid bookmark : bookmarks) {
-            processDeletedBookmark(account, bookmark);
-        }
-    }
-
-    public void processDeletedBookmark(final Account account, final Jid jid) {
-        final Conversation conversation = find(account, jid);
-        if (conversation == null) {
-            return;
-        }
-        Log.d(
-                Config.LOGTAG,
-                account.getJid().asBareJid() + ": archiving MUC " + jid + " after PEP update");
-        archiveConversation(conversation, false);
-    }
-
-    private void processModifiedBookmark(final Bookmark bookmark, final boolean pep) {
-        final Account account = bookmark.getAccount();
-        Conversation conversation = find(bookmark);
-        if (conversation != null) {
-            if (conversation.getMode() != Conversation.MODE_MULTI) {
-                return;
-            }
-            bookmark.setConversation(conversation);
-            if (pep && !bookmark.autojoin()) {
-                Log.d(
-                        Config.LOGTAG,
-                        account.getJid().asBareJid()
-                                + ": archiving conference ("
-                                + conversation.getJid()
-                                + ") after receiving pep");
-                archiveConversation(conversation, false);
-            } else {
-                final MucOptions mucOptions = conversation.getMucOptions();
-                if (mucOptions.getError() == MucOptions.Error.NICK_IN_USE) {
-                    final String current = mucOptions.getActualNick();
-                    final String proposed = mucOptions.getProposedNickPure();
-                    if (current != null && !current.equals(proposed)) {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid()
-                                        + ": proposed nick changed after bookmark push "
-                                        + current
-                                        + "->"
-                                        + proposed);
-                        joinMuc(conversation);
-                    }
-                } else {
-                    checkMucRequiresRename(conversation);
-                }
-            }
-        } else if (bookmark.autojoin()) {
-            conversation =
-                    findOrCreateConversation(account, bookmark.getFullJid(), true, true, false);
-            bookmark.setConversation(conversation);
-        }
-    }
-
-    public void processModifiedBookmark(final Bookmark bookmark) {
-        processModifiedBookmark(bookmark, true);
-    }
-
-    public void ensureBookmarkIsAutoJoin(final Conversation conversation) {
-        final var account = conversation.getAccount();
-        final var existingBookmark = conversation.getBookmark();
-        if (existingBookmark == null) {
-            final var bookmark = new Bookmark(account, conversation.getJid().asBareJid());
-            bookmark.setAutojoin(true);
-            createBookmark(account, bookmark);
-        } else {
-            if (existingBookmark.autojoin()) {
-                return;
-            }
-            existingBookmark.setAutojoin(true);
-            createBookmark(account, existingBookmark);
-        }
-    }
-
     public void createBookmark(final Account account, final Bookmark bookmark) {
-        account.putBookmark(bookmark);
-        final XmppConnection connection = account.getXmppConnection();
-        if (connection == null) {
-            Log.d(
-                    Config.LOGTAG,
-                    account.getJid().asBareJid() + ": no connection. ignoring bookmark creation");
-        } else if (connection.getFeatures().bookmarks2()) {
-            Log.d(
-                    Config.LOGTAG,
-                    account.getJid().asBareJid() + ": pushing bookmark via Bookmarks 2");
-            final Element item = mIqGenerator.publishBookmarkItem(bookmark);
-            pushNodeAndEnforcePublishOptions(
-                    account,
-                    Namespace.BOOKMARKS2,
-                    item,
-                    bookmark.getJid().asBareJid().toString(),
-                    PublishOptions.persistentWhitelistAccessMaxItems());
-        } else if (connection.getFeatures().bookmarksConversion()) {
-            pushBookmarksPep(account);
-        } else {
-            pushBookmarksPrivateXml(account);
-        }
+        account.getXmppConnection().getManager(BookmarkManager.class).create(bookmark);
     }
 
     public void deleteBookmark(final Account account, final Bookmark bookmark) {
         if (bookmark.getJid().toString().equals("discuss@conference.soprani.ca")) {
             getPreferences().edit().putBoolean("cheogram_sopranica_bookmark_deleted", true).apply();
         }
-        account.removeBookmark(bookmark);
-        final XmppConnection connection = account.getXmppConnection();
-        if (connection == null) return;
-
-        if (connection.getFeatures().bookmarks2()) {
-            final Iq request =
-                    mIqGenerator.deleteItem(
-                            Namespace.BOOKMARKS2, bookmark.getJid().asBareJid().toString());
-            Log.d(
-                    Config.LOGTAG,
-                    account.getJid().asBareJid() + ": removing bookmark via Bookmarks 2");
-            sendIqPacket(
-                    account,
-                    request,
-                    (response) -> {
-                        if (response.getType() == Iq.Type.ERROR) {
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid()
-                                            + ": unable to delete bookmark "
-                                            + response.getErrorCondition());
-                        }
-                    });
-        } else if (connection.getFeatures().bookmarksConversion()) {
-            pushBookmarksPep(account);
-        } else {
-            pushBookmarksPrivateXml(account);
-        }
-    }
-
-    private void pushBookmarksPrivateXml(Account account) {
-        if (!account.areBookmarksLoaded()) return;
-
-        Log.d(Config.LOGTAG, account.getJid().asBareJid() + ": pushing bookmarks via private xml");
-        final Iq iqPacket = new Iq(Iq.Type.SET);
-        Element query = iqPacket.query("jabber:iq:private");
-        Element storage = query.addChild("storage", "storage:bookmarks");
-        for (final Bookmark bookmark : account.getBookmarks()) {
-            storage.addChild(bookmark);
-        }
-        sendIqPacket(account, iqPacket, mDefaultIqHandler);
-    }
-
-    private void pushBookmarksPep(Account account) {
-        if (!account.areBookmarksLoaded()) return;
-
-        Log.d(Config.LOGTAG, account.getJid().asBareJid() + ": pushing bookmarks via pep");
-        final Element storage = new Element("storage", "storage:bookmarks");
-        for (final Bookmark bookmark : account.getBookmarks()) {
-            storage.addChild(bookmark);
-        }
-        pushNodeAndEnforcePublishOptions(
-                account,
-                Namespace.BOOKMARKS,
-                storage,
-                "current",
-                PublishOptions.persistentWhitelistAccess());
-    }
-
-    private void pushNodeAndEnforcePublishOptions(
-            final Account account,
-            final String node,
-            final Element element,
-            final String id,
-            final Bundle options) {
-        pushNodeAndEnforcePublishOptions(account, node, element, id, options, true);
-    }
-
-    private void pushNodeAndEnforcePublishOptions(
-            final Account account,
-            final String node,
-            final Element element,
-            final String id,
-            final Bundle options,
-            final boolean retry) {
-        final Iq packet = mIqGenerator.publishElement(node, element, id, options);
-        sendIqPacket(
-                account,
-                packet,
-                (response) -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        return;
-                    }
-                    if (retry && PublishOptions.preconditionNotMet(response)) {
-                        pushNodeConfiguration(
-                                account,
-                                node,
-                                options,
-                                new OnConfigurationPushed() {
-                                    @Override
-                                    public void onPushSucceeded() {
-                                        pushNodeAndEnforcePublishOptions(
-                                                account, node, element, id, options, false);
-                                    }
-
-                                    @Override
-                                    public void onPushFailed() {
-                                        Log.d(
-                                                Config.LOGTAG,
-                                                account.getJid().asBareJid()
-                                                        + ": unable to push node configuration ("
-                                                        + node
-                                                        + ")");
-                                    }
-                                });
-                    } else {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid()
-                                        + ": error publishing "
-                                        + node
-                                        + " (retry="
-                                        + retry
-                                        + ") "
-                                        + response);
-                    }
-                });
+        account.getXmppConnection().getManager(BookmarkManager.class).delete(bookmark);
     }
 
     private void restoreFromDatabase() {
@@ -3004,47 +2381,64 @@ public class XmppConnectionService extends Service {
                     conversations.remove(conversation);
                 }
             }
-            long diffConversationsRestore = SystemClock.elapsedRealtime() - startTimeConversationsRestore;
-            Log.d(Config.LOGTAG, "finished restoring conversations in " + diffConversationsRestore + "ms");
-            Runnable runnable = () -> {
-                if (DatabaseBackend.requiresMessageIndexRebuild()) {
-                    DatabaseBackend.getInstance(this).rebuildMessagesIndex();
-                }
-                mutedMucUsers = databaseBackend.loadMutedMucUsers();
-                final long deletionDate = getAutomaticMessageDeletionDate();
-                mLastExpiryRun.set(SystemClock.elapsedRealtime());
-                if (deletionDate > 0) {
-                    Log.d(Config.LOGTAG, "deleting messages that are older than " + AbstractGenerator.getTimestamp(deletionDate));
-                    databaseBackend.expireOldMessages(deletionDate);
-                }
-                Log.d(Config.LOGTAG, "restoring roster...");
-                for (final Account account : accounts) {
-                    databaseBackend.readRoster(account.getRoster());
-                    account.initAccountServices(XmppConnectionService.this); //roster needs to be loaded at this stage
-                }
-                getDrawableCache().evictAll();
-                loadPhoneContacts();
-                Log.d(Config.LOGTAG, "restoring messages...");
-                final long startMessageRestore = SystemClock.elapsedRealtime();
-                final Conversation quickLoad = QuickLoader.get(this.conversations);
-                if (quickLoad != null) {
-                    restoreMessages(quickLoad);
-                    updateConversationUi();
-                    final long diffMessageRestore = SystemClock.elapsedRealtime() - startMessageRestore;
-                    Log.d(Config.LOGTAG, "quickly restored " + quickLoad.getName() + " after " + diffMessageRestore + "ms");
-                }
-                for (Conversation conversation : this.conversations) {
-                    if (quickLoad != conversation) {
-                        restoreMessages(conversation);
-                    }
-                }
-                mNotificationService.finishBacklog();
-                restoredFromDatabaseLatch.countDown();
-                final long diffMessageRestore = SystemClock.elapsedRealtime() - startMessageRestore;
-                Log.d(Config.LOGTAG, "finished restoring messages in " + diffMessageRestore + "ms");
-                updateConversationUi();
-            };
-            mDatabaseReaderExecutor.execute(runnable); //will contain one write command (expiry) but that's fine
+            long diffConversationsRestore =
+                    SystemClock.elapsedRealtime() - startTimeConversationsRestore;
+            Log.d(
+                    Config.LOGTAG,
+                    "finished restoring conversations in " + diffConversationsRestore + "ms");
+            Runnable runnable =
+                    () -> {
+                        if (DatabaseBackend.requiresMessageIndexRebuild()) {
+                            DatabaseBackend.getInstance(this).rebuildMessagesIndex();
+                        }
+                        mutedMucUsers = databaseBackend.loadMutedMucUsers();
+                        final long deletionDate = getAutomaticMessageDeletionDate();
+                        mLastExpiryRun.set(SystemClock.elapsedRealtime());
+                        if (deletionDate > 0) {
+                            Log.d(
+                                    Config.LOGTAG,
+                                    "deleting messages that are older than "
+                                            + AbstractGenerator.getTimestamp(deletionDate));
+                            databaseBackend.expireOldMessages(deletionDate);
+                        }
+                        Log.d(Config.LOGTAG, "restoring roster...");
+                        for (final Account account : accounts) {
+                            account.getXmppConnection().getManager(RosterManager.class).restore();
+                        }
+                        getDrawableCache().evictAll();
+                        loadPhoneContacts();
+                        Log.d(Config.LOGTAG, "restoring messages...");
+                        final long startMessageRestore = SystemClock.elapsedRealtime();
+                        final Conversation quickLoad = QuickLoader.get(this.conversations);
+                        if (quickLoad != null) {
+                            restoreMessages(quickLoad);
+                            updateConversationUi();
+                            final long diffMessageRestore =
+                                    SystemClock.elapsedRealtime() - startMessageRestore;
+                            Log.d(
+                                    Config.LOGTAG,
+                                    "quickly restored "
+                                            + quickLoad.getName()
+                                            + " after "
+                                            + diffMessageRestore
+                                            + "ms");
+                        }
+                        for (Conversation conversation : this.conversations) {
+                            if (quickLoad != conversation) {
+                                restoreMessages(conversation);
+                            }
+                        }
+                        mNotificationService.finishBacklog();
+                        restoredFromDatabaseLatch.countDown();
+                        final long diffMessageRestore =
+                                SystemClock.elapsedRealtime() - startMessageRestore;
+                        Log.d(
+                                Config.LOGTAG,
+                                "finished restoring messages in " + diffMessageRestore + "ms");
+                        updateConversationUi();
+                    };
+            mDatabaseReaderExecutor.execute(
+                    runnable); // will contain one write command (expiry) but that's fine
         }
     }
 
@@ -3059,9 +2453,13 @@ public class XmppConnectionService extends Service {
                 () -> {
                     final Map<Jid, JabberIdContact> contacts = JabberIdContact.load(this);
                     Log.d(Config.LOGTAG, "start merging phone contacts with roster");
+                    // TODO if we do this merge this only on enabled accounts we need to trigger
+                    // this upon enable
                     for (final Account account : accounts) {
-                        final List<Contact> withSystemAccounts =
-                                account.getRoster().getWithSystemAccounts(JabberIdContact.class);
+                        final var remaining =
+                                new ArrayList<>(
+                                        account.getRoster()
+                                                .getWithSystemAccounts(JabberIdContact.class));
                         for (final JabberIdContact jidContact : contacts.values()) {
                             final Contact contact =
                                     account.getRoster().getContact(jidContact.getJid());
@@ -3069,9 +2467,9 @@ public class XmppConnectionService extends Service {
                             if (needsCacheClean) {
                                 getAvatarService().clear(contact);
                             }
-                            withSystemAccounts.remove(contact);
+                            remaining.remove(contact);
                         }
-                        for (final Contact contact : withSystemAccounts) {
+                        for (final Contact contact : remaining) {
                             boolean needsCacheClean =
                                     contact.unsetPhoneContact(JabberIdContact.class);
                             if (needsCacheClean) {
@@ -3085,14 +2483,6 @@ public class XmppConnectionService extends Service {
                     updateRosterUi(UpdateRosterReason.PUSH);
                     mQuickConversationsService.considerSync();
                 });
-    }
-
-    public void syncRoster(final Account account) {
-        mRosterSyncTaskManager.execute(account, () -> {
-            unregisterPhoneAccounts(account);
-            databaseBackend.writeRoster(account.getRoster());
-            try { Thread.sleep(500); } catch (InterruptedException e) { }
-        });
     }
 
     public List<Conversation> getConversations() {
@@ -3317,11 +2707,13 @@ public class XmppConnectionService extends Service {
     public void maybeRegisterWithMuc(Conversation c, String nickArg) {
         final var nick = nickArg == null ? c.getMucOptions().getSelf().getFullJid().getResource() : nickArg;
         final var register = new Iq(Iq.Type.GET);
-        register.query(Namespace.REGISTER);
+        final var query0 = register.addChild("query");
+        query0.setAttribute("xmlns", Namespace.REGISTER);
         register.setTo(c.getJid().asBareJid());
         sendIqPacket(c.getAccount(), register, (response) -> {
             if (response.getType() == Iq.Type.RESULT) {
-                final Element query = response.query(Namespace.REGISTER);
+                final Element query = response.addChild("query");
+                query.setAttribute("xmlns", Namespace.REGISTER);
                 String username = query.findChildContent("username", Namespace.REGISTER);
                 if (username == null) username = query.findChildContent("nick", Namespace.REGISTER);
                 if (username != null && username.equals(nick)) {
@@ -3346,7 +2738,9 @@ public class XmppConnectionService extends Service {
                     form.put("muc#register_roomnick", nick);
                     form.submit();
                     final var finish = new Iq(Iq.Type.SET);
-                    finish.query(Namespace.REGISTER).addChild(form);
+                    final var query2 = finish.addChild("query");
+                    query2.setAttribute("xmlns", Namespace.REGISTER);
+                    query2.addChild(form);
                     finish.setTo(c.getJid().asBareJid());
                     sendIqPacket(c.getAccount(), finish, (response2) -> {
                         if (response.getType() == Iq.Type.RESULT) {
@@ -3368,7 +2762,9 @@ public class XmppConnectionService extends Service {
 
     public void deregisterWithMuc(Conversation c) {
         final Iq register = new Iq(Iq.Type.GET);
-        register.query(Namespace.REGISTER).addChild("remove");
+        final var query = register.addChild("query");
+        query.setAttribute("xmlns", Namespace.REGISTER);
+        query.addChild("remove");
         register.setTo(c.getJid().asBareJid());
         sendIqPacket(c.getAccount(), register, (response) -> {
             if (response.getType() == Iq.Type.RESULT) {
@@ -3483,7 +2879,9 @@ public class XmppConnectionService extends Service {
                                 null));
         this.conversations.add(existing);
         if (existing.getMode() == Conversational.MODE_MULTI) {
-            ensureBookmarkIsAutoJoin(existing);
+            account.getXmppConnection()
+                    .getManager(BookmarkManager.class)
+                    .ensureBookmarkIsAutoJoin(existing);
         }
         updateConversationUi();
         return existing;
@@ -3540,21 +2938,24 @@ public class XmppConnectionService extends Service {
         archiveConversation(conversation, true);
     }
 
-    private void archiveConversation(
+    public void archiveConversation(
             Conversation conversation, final boolean maySynchronizeWithBookmarks) {
         if (isOnboarding()) return;
 
+        final var account = conversation.getAccount();
+        final var connection = account.getXmppConnection();
         getNotificationService().clear(conversation);
         conversation.setStatus(Conversation.STATUS_ARCHIVED);
         conversation.setNextMessage(null);
         synchronized (this.conversations) {
             getMessageArchiveService().kill(conversation);
             if (conversation.getMode() == Conversation.MODE_MULTI) {
+                // TODO always clean up bookmarks no matter if we are currently connected
+                // TODO always delete reference to conversation in bookmark
                 if (conversation.getAccount().getStatus() == Account.State.ONLINE) {
                     final Bookmark bookmark = conversation.getBookmark();
                     if (maySynchronizeWithBookmarks && bookmark != null) {
                         if (conversation.getMucOptions().getError() == MucOptions.Error.DESTROYED) {
-                            Account account = bookmark.getAccount();
                             bookmark.setConversation(null);
                             deleteBookmark(account, bookmark);
                         } else if (bookmark.autojoin()) {
@@ -3564,7 +2965,7 @@ public class XmppConnectionService extends Service {
                     }
                 }
                 deregisterWithMuc(conversation);
-                leaveMuc(conversation);
+                connection.getManager(MultiUserChatManager.class).leave(conversation);
             } else {
                 if (conversation
                         .getContact()
@@ -3578,14 +2979,17 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    public void stopPresenceUpdatesTo(Contact contact) {
+    public void stopPresenceUpdatesTo(final Contact contact) {
         Log.d(Config.LOGTAG, "Canceling presence request from " + contact.getJid().toString());
-        sendPresencePacket(contact.getAccount(), mPresenceGenerator.stopPresenceUpdatesTo(contact));
         contact.resetOption(Contact.Options.PENDING_SUBSCRIPTION_REQUEST);
+        contact.getAccount()
+                .getXmppConnection()
+                .getManager(PresenceManager.class)
+                .unsubscribed(contact.getJid().asBareJid());
     }
 
     public void createAccount(final Account account) {
-        account.initAccountServices(this);
+        account.setXmppConnection(createConnection(account));
         databaseBackend.createAccount(account);
         if (CallIntegration.hasSystemFeature(this)) {
             CallIntegrationConnectionService.togglePhoneAccountAsync(this, account);
@@ -3733,7 +3137,8 @@ public class XmppConnectionService extends Service {
                 getPreferences().edit().putInt("account_color:" + account.getUuid(), color.intValue()).commit();
             }
             account.setShowErrorNotification(true);
-            this.statusListener.onStatusChanged(account);
+            // TODO what was the purpose of that? will likely be triggered by reconnect anyway?
+            // this.statusListener.onStatusChanged(account);
             databaseBackend.updateAccount(account);
             reconnectAccountInBackground(account);
             updateAccountUi();
@@ -3750,41 +3155,10 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    public void updateAccountPasswordOnServer(
-            final Account account,
-            final String newPassword,
-            final OnAccountPasswordChanged callback) {
-        final Iq iq = getIqGenerator().generateSetPassword(account, newPassword);
-        sendIqPacket(
-                account,
-                iq,
-                (packet) -> {
-                    if (packet.getType() == Iq.Type.RESULT) {
-                        account.setPassword(newPassword);
-                        account.setOption(Account.OPTION_MAGIC_CREATE, false);
-                        databaseBackend.updateAccount(account);
-                        callback.onPasswordChangeSucceeded();
-                    } else {
-                        callback.onPasswordChangeFailed();
-                    }
-                });
-    }
-
-    public void unregisterAccount(final Account account, final Consumer<Boolean> callback) {
-        final Iq iqPacket = new Iq(Iq.Type.SET);
-        final Element query = iqPacket.addChild("query", Namespace.REGISTER);
-        query.addChild("remove");
-        sendIqPacket(
-                account,
-                iqPacket,
-                (response) -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        deleteAccount(account);
-                        callback.accept(true);
-                    } else {
-                        callback.accept(false);
-                    }
-                });
+    public ListenableFuture<Void> updateAccountPasswordOnServer(
+            final Account account, final String newPassword) {
+        final var connection = account.getXmppConnection();
+        return connection.getManager(RegistrationManager.class).setPassword(newPassword);
     }
 
     public void deleteAccount(final Account account) {
@@ -3798,7 +3172,9 @@ public class XmppConnectionService extends Service {
                 if (conversation.getAccount() == account) {
                     if (conversation.getMode() == Conversation.MODE_MULTI) {
                         if (connected) {
-                            leaveMuc(conversation);
+                            account.getXmppConnection()
+                                    .getManager(MultiUserChatManager.class)
+                                    .unavailable(conversation);
                         }
                     }
                     conversations.remove(conversation);
@@ -3826,7 +3202,6 @@ public class XmppConnectionService extends Service {
             if (CallIntegration.hasSystemFeature(this)) {
                 CallIntegrationConnectionService.unregisterPhoneAccount(this, account);
             }
-            this.mRosterSyncTaskManager.clear(account);
             updateAccountUi();
             mNotificationService.updateErrorNotification();
             syncEnabledAccountSetting();
@@ -4093,7 +3468,7 @@ public class XmppConnectionService extends Service {
 
     private void switchToForeground() {
         toggleSoftDisabled(false);
-        final boolean broadcastLastActivity = broadcastLastActivity();
+        final boolean broadcastLastActivity = appSettings.isBroadcastLastActivity();
         for (Conversation conversation : getConversations()) {
             if (conversation.getMode() == Conversation.MODE_MULTI) {
                 conversation.getMucOptions().resetChatState();
@@ -4101,45 +3476,41 @@ public class XmppConnectionService extends Service {
                 conversation.setIncomingChatState(Config.DEFAULT_CHAT_STATE);
             }
         }
-        for (Account account : getAccounts()) {
-            if (account.getStatus() == Account.State.ONLINE) {
-                account.deactivateGracePeriod();
-                final XmppConnection connection = account.getXmppConnection();
-                if (connection != null) {
-                    if (connection.getFeatures().csi()) {
-                        connection.sendActive();
-                    }
-                    if (broadcastLastActivity) {
-                        sendPresence(
-                                account,
-                                false); // send new presence but don't include idle because we are
-                        // not
-                    }
-                }
+        for (final var account : getAccounts()) {
+            if (account.getStatus() != Account.State.ONLINE) {
+                continue;
+            }
+            account.deactivateGracePeriod();
+            final XmppConnection connection = account.getXmppConnection();
+            if (connection.getFeatures().csi()) {
+                connection.sendActive();
+            }
+            if (broadcastLastActivity) {
+                // send new presence but don't include idle because we are not
+                connection.getManager(PresenceManager.class).available(false);
             }
         }
         Log.d(Config.LOGTAG, "app switched into foreground");
     }
 
     private void switchToBackground() {
-        final boolean broadcastLastActivity = broadcastLastActivity();
+        final boolean broadcastLastActivity = appSettings.isBroadcastLastActivity();
         if (broadcastLastActivity) {
             mLastActivity = System.currentTimeMillis();
             final SharedPreferences.Editor editor = getPreferences().edit();
             editor.putLong(SETTING_LAST_ACTIVITY_TS, mLastActivity);
             editor.apply();
         }
-        for (Account account : getAccounts()) {
-            if (account.getStatus() == Account.State.ONLINE) {
-                XmppConnection connection = account.getXmppConnection();
-                if (connection != null) {
-                    if (broadcastLastActivity) {
-                        sendPresence(account, true);
-                    }
-                    if (connection.getFeatures().csi()) {
-                        connection.sendInactive();
-                    }
-                }
+        for (final var account : getAccounts()) {
+            if (account.getStatus() != Account.State.ONLINE) {
+                continue;
+            }
+            final var connection = account.getXmppConnection();
+            if (broadcastLastActivity) {
+                connection.getManager(PresenceManager.class).available(true);
+            }
+            if (connection.getFeatures().csi()) {
+                connection.sendInactive();
             }
         }
         this.mNotificationService.setIsInForeground(false);
@@ -4156,439 +3527,75 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    public void mucSelfPingAndRejoin(final Conversation conversation) {
-        final Account account = conversation.getAccount();
-        synchronized (account.inProgressConferenceJoins) {
-            if (account.inProgressConferenceJoins.contains(conversation)) {
-                Log.d(
-                        Config.LOGTAG,
-                        account.getJid().asBareJid()
-                                + ": canceling muc self ping because join is already under way");
-                return;
-            }
-        }
-        synchronized (account.inProgressConferencePings) {
-            if (!account.inProgressConferencePings.add(conversation)) {
-                Log.d(
-                        Config.LOGTAG,
-                        account.getJid().asBareJid()
-                                + ": canceling muc self ping because ping is already under way");
-                return;
-            }
-        }
-        // TODO use PingManager
-        final Jid self = conversation.getMucOptions().getSelf().getFullJid();
-        final Iq ping = new Iq(Iq.Type.GET);
-        ping.setTo(self);
-        ping.addChild("ping", Namespace.PING);
-        sendIqPacket(
-                conversation.getAccount(),
-                ping,
-                (response) -> {
-                    if (response.getType() == Iq.Type.ERROR) {
-                        final var error = response.getError();
-                        if (error == null
-                                || error.hasChild("service-unavailable")
-                                || error.hasChild("feature-not-implemented")
-                                || error.hasChild("item-not-found")) {
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid()
-                                            + ": ping to "
-                                            + self
-                                            + " came back as ignorable error");
-                        } else {
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid()
-                                            + ": ping to "
-                                            + self
-                                            + " failed. attempting rejoin");
-                            joinMuc(conversation);
-                        }
-                    } else if (response.getType() == Iq.Type.RESULT) {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid()
-                                        + ": ping to "
-                                        + self
-                                        + " came back fine");
-                    }
-                    synchronized (account.inProgressConferencePings) {
-                        account.inProgressConferencePings.remove(conversation);
-                    }
-                });
-    }
-
-    public void joinMuc(Conversation conversation) {
-        joinMuc(conversation, null, false);
-    }
-
-    public void joinMuc(Conversation conversation, boolean followedInvite) {
-        joinMuc(conversation, null, followedInvite);
-    }
-
-    private void joinMuc(Conversation conversation, final OnConferenceJoined onConferenceJoined) {
-        joinMuc(conversation, onConferenceJoined, false);
-    }
-
-    private void joinMuc(
-            final Conversation conversation,
-            final OnConferenceJoined onConferenceJoined,
-            final boolean followedInvite) {
-        final Account account = conversation.getAccount();
-        synchronized (account.pendingConferenceJoins) {
-            account.pendingConferenceJoins.remove(conversation);
-        }
-        synchronized (account.pendingConferenceLeaves) {
-            account.pendingConferenceLeaves.remove(conversation);
-        }
-        if (account.getStatus() == Account.State.ONLINE) {
-            synchronized (account.inProgressConferenceJoins) {
-                account.inProgressConferenceJoins.add(conversation);
-            }
-            if (Config.MUC_LEAVE_BEFORE_JOIN) {
-                sendPresencePacket(account, mPresenceGenerator.leave(conversation.getMucOptions()));
-            }
-            conversation.resetMucOptions();
-            if (onConferenceJoined != null) {
-                conversation.getMucOptions().flagNoAutoPushConfiguration();
-            }
-            conversation.setHasMessagesLeftOnServer(false);
-            fetchConferenceConfiguration(
-                    conversation,
-                    new OnConferenceConfigurationFetched() {
-
-                        private void join(Conversation conversation) {
-                            Account account = conversation.getAccount();
-                            final MucOptions mucOptions = conversation.getMucOptions();
-
-                            if (mucOptions.nonanonymous()
-                                    && !mucOptions.membersOnly()
-                                    && !conversation.getBooleanAttribute(
-                                            "accept_non_anonymous", false)) {
-                                synchronized (account.inProgressConferenceJoins) {
-                                    account.inProgressConferenceJoins.remove(conversation);
-                                }
-                                mucOptions.setError(MucOptions.Error.NON_ANONYMOUS);
-                                updateConversationUi();
-                                if (onConferenceJoined != null) {
-                                    onConferenceJoined.onConferenceJoined(conversation);
-                                }
-                                return;
-                            }
-
-                            final Jid joinJid = mucOptions.getSelf().getFullJid();
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid().toString()
-                                            + ": joining conversation "
-                                            + joinJid.toString());
-                            final var packet =
-                                    mPresenceGenerator.selfPresence(
-                                            account,
-                                            im.conversations.android.xmpp.model.stanza.Presence
-                                                    .Availability.ONLINE,
-                                            mucOptions.nonanonymous()
-                                                    || onConferenceJoined != null,
-                                            mucOptions.getSelf().getNick());
-                            packet.setTo(joinJid);
-                            Element x = packet.addChild("x", "http://jabber.org/protocol/muc");
-                            if (conversation.getMucOptions().getPassword() != null) {
-                                x.addChild("password").setContent(mucOptions.getPassword());
-                            }
-
-                            if (mucOptions.mamSupport()) {
-                                // Use MAM instead of the limited muc history to get history
-                                x.addChild("history").setAttribute("maxchars", "0");
-                            } else {
-                                // Fallback to muc history
-                                x.addChild("history")
-                                        .setAttribute(
-                                                "since",
-                                                PresenceGenerator.getTimestamp(
-                                                        conversation
-                                                                .getLastMessageTransmitted()
-                                                                .getTimestamp()));
-                            }
-                            sendPresencePacket(account, packet);
-                            if (onConferenceJoined != null) {
-                                onConferenceJoined.onConferenceJoined(conversation);
-                            }
-                            if (!joinJid.equals(conversation.getJid())) {
-                                conversation.setContactJid(joinJid);
-                                databaseBackend.updateConversation(conversation);
-                            }
-
-                            maybeRegisterWithMuc(conversation, null);
-
-                            if (mucOptions.mamSupport()) {
-                                getMessageArchiveService().catchupMUC(conversation);
-                            }
-                            fetchConferenceMembers(conversation);
-                            if (mucOptions.isPrivateAndNonAnonymous()) {
-                                if (followedInvite) {
-                                    final Bookmark bookmark = conversation.getBookmark();
-                                    if (bookmark != null) {
-                                        if (!bookmark.autojoin()) {
-                                            bookmark.setAutojoin(true);
-                                            createBookmark(account, bookmark);
-                                        }
-                                    } else {
-                                        saveConversationAsBookmark(conversation, null);
-                                    }
-                                }
-                            }
-                            synchronized (account.inProgressConferenceJoins) {
-                                account.inProgressConferenceJoins.remove(conversation);
-                                sendUnsentMessages(conversation);
-                            }
-                        }
-
-                        @Override
-                        public void onConferenceConfigurationFetched(Conversation conversation) {
-                            if (conversation.getStatus() == Conversation.STATUS_ARCHIVED) {
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid()
-                                                + ": conversation ("
-                                                + conversation.getJid()
-                                                + ") got archived before IQ result");
-                                return;
-                            }
-                            join(conversation);
-                        }
-
-                        @Override
-                        public void onFetchFailed(
-                                final Conversation conversation, final String errorCondition) {
-                            if (conversation.getStatus() == Conversation.STATUS_ARCHIVED) {
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid()
-                                                + ": conversation ("
-                                                + conversation.getJid()
-                                                + ") got archived before IQ result");
-                                return;
-                            }
-                            if ("remote-server-not-found".equals(errorCondition)) {
-                                synchronized (account.inProgressConferenceJoins) {
-                                    account.inProgressConferenceJoins.remove(conversation);
-                                }
-                                conversation
-                                        .getMucOptions()
-                                        .setError(MucOptions.Error.SERVER_NOT_FOUND);
-                                updateConversationUi();
-                            } else {
-                                join(conversation);
-                                fetchConferenceConfiguration(conversation);
-                            }
-                        }
-                    });
-            updateConversationUi();
-        } else {
-            synchronized (account.pendingConferenceJoins) {
-                account.pendingConferenceJoins.add(conversation);
-            }
-            conversation.resetMucOptions();
-            conversation.setHasMessagesLeftOnServer(false);
-            updateConversationUi();
-        }
-    }
-
-    private void fetchConferenceMembers(final Conversation conversation) {
-        final Account account = conversation.getAccount();
-        final AxolotlService axolotlService = account.getAxolotlService();
-        final var affiliations = new ArrayList<String>();
-        affiliations.add("outcast");
-        if (conversation.getMucOptions().isPrivateAndNonAnonymous()) affiliations.addAll(List.of("member", "admin", "owner"));
-        final Consumer<Iq> callback =
-                new Consumer<Iq>() {
-
-                    private int i = 0;
-                    private boolean success = true;
-
-                    @Override
-                    public void accept(Iq response) {
-                        final boolean omemoEnabled =
-                                conversation.getNextEncryption() == Message.ENCRYPTION_AXOLOTL;
-                        Element query = response.query("http://jabber.org/protocol/muc#admin");
-                        if (response.getType() == Iq.Type.RESULT && query != null) {
-                            for (Element child : query.getChildren()) {
-                                if ("item".equals(child.getName())) {
-                                    MucOptions.User user =
-                                            AbstractParser.parseItem(conversation, child);
-                                    user.setOnline(false);
-                                    if (!user.realJidMatchesAccount()) {
-                                        boolean isNew =
-                                                conversation.getMucOptions().updateUser(user);
-                                        Contact contact = user.getContact();
-                                        if (omemoEnabled
-                                                && isNew
-                                                && user.getRealJid() != null
-                                                && (contact == null
-                                                        || !contact.mutualPresenceSubscription())
-                                                && axolotlService.hasEmptyDeviceList(
-                                                        user.getRealJid())) {
-                                            axolotlService.fetchDeviceIds(user.getRealJid());
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            success = false;
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid()
-                                            + ": could not request affiliation "
-                                            + affiliations.get(i)
-                                            + " in "
-                                            + conversation.getJid().asBareJid());
-                        }
-                        ++i;
-                        if (i >= affiliations.size()) {
-                            final var mucOptions = conversation.getMucOptions();
-                            List<Jid> members = mucOptions.getMembers(true);
-                            if (success) {
-                                List<Jid> cryptoTargets = conversation.getAcceptedCryptoTargets();
-                                boolean changed = false;
-                                for (ListIterator<Jid> iterator = cryptoTargets.listIterator();
-                                        iterator.hasNext(); ) {
-                                    Jid jid = iterator.next();
-                                    if (!members.contains(jid)
-                                            && !members.contains(jid.getDomain())) {
-                                        iterator.remove();
-                                        Log.d(
-                                                Config.LOGTAG,
-                                                account.getJid().asBareJid()
-                                                        + ": removed "
-                                                        + jid
-                                                        + " from crypto targets of "
-                                                        + conversation.getName());
-                                        changed = true;
-                                    }
-                                }
-                                if (changed) {
-                                    conversation.setAcceptedCryptoTargets(cryptoTargets);
-                                    updateConversation(conversation);
-                                }
-                            }
-                            getAvatarService().clear(mucOptions);
-                            updateMucRosterUi();
-                            updateConversationUi();
-                        }
-                    }
-                };
-        for (String affiliation : affiliations) {
-            sendIqPacket(
-                    account, mIqGenerator.queryAffiliation(conversation, affiliation), callback);
-        }
-        Log.d(
-                Config.LOGTAG,
-                account.getJid().asBareJid() + ": fetching members for " + conversation.getName());
+    public void joinMuc(final Conversation conversation) {
+        final var account = conversation.getAccount();
+        account.getXmppConnection().getManager(MultiUserChatManager.class).join(conversation);
     }
 
     public void providePasswordForMuc(final Conversation conversation, final String password) {
-        if (conversation.getMode() == Conversation.MODE_MULTI) {
-            conversation.getMucOptions().setPassword(password);
-            if (conversation.getBookmark() != null) {
-                final Bookmark bookmark = conversation.getBookmark();
-                bookmark.setAutojoin(true);
-                createBookmark(conversation.getAccount(), bookmark);
-            }
-            updateConversation(conversation);
-            joinMuc(conversation);
-        }
+        final var account = conversation.getAccount();
+        account.getXmppConnection()
+                .getManager(MultiUserChatManager.class)
+                .setPassword(conversation, password);
     }
 
     public void deleteAvatar(final Account account) {
-        final AtomicBoolean executed = new AtomicBoolean(false);
-        final Runnable onDeleted =
-                () -> {
-                    if (executed.compareAndSet(false, true)) {
+        final var connection = account.getXmppConnection();
+
+        final var vCardPhotoDeletionFuture =
+                connection.getManager(VCardManager.class).deletePhoto();
+        final var pepDeletionFuture = connection.getManager(AvatarManager.class).delete();
+
+        final var deletionFuture = Futures.allAsList(vCardPhotoDeletionFuture, pepDeletionFuture);
+
+        Futures.addCallback(
+                deletionFuture,
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(List<Void> result) {
+                        Log.d(
+                                Config.LOGTAG,
+                                account.getJid().asBareJid() + ": deleted avatar from server");
                         account.setAvatar(null);
                         databaseBackend.updateAccount(account);
                         getAvatarService().clear(account);
                         updateAccountUi();
                     }
-                };
-        deleteVcardAvatar(account, onDeleted);
-        deletePepNode(account, Namespace.AVATAR_DATA);
-        deletePepNode(account, Namespace.AVATAR_METADATA, onDeleted);
+
+                    @Override
+                    public void onFailure(Throwable t) {
+                        Log.d(
+                                Config.LOGTAG,
+                                account.getJid().asBareJid() + ": could not delete avatar",
+                                t);
+                    }
+                },
+                MoreExecutors.directExecutor());
     }
 
     public void deletePepNode(final Account account, final String node) {
-        deletePepNode(account, node, null);
-    }
-
-    private void deletePepNode(final Account account, final String node, final Runnable runnable) {
-        final Iq request = mIqGenerator.deleteNode(node);
-        sendIqPacket(
-                account,
-                request,
-                (packet) -> {
-                    if (packet.getType() == Iq.Type.RESULT) {
+        final var future = account.getXmppConnection().getManager(PepManager.class).delete(node);
+        Futures.addCallback(
+                future,
+                new FutureCallback<Void>() {
+                    @Override
+                    public void onSuccess(Void result) {
                         Log.d(
                                 Config.LOGTAG,
                                 account.getJid().asBareJid()
                                         + ": successfully deleted pep node "
                                         + node);
-                        if (runnable != null) {
-                            runnable.run();
-                        }
-                    } else {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid() + ": failed to delete " + packet);
                     }
-                });
-    }
 
-    private void deleteVcardAvatar(final Account account, @NonNull final Runnable runnable) {
-        final Iq retrieveVcard = mIqGenerator.retrieveVcardAvatar(account.getJid().asBareJid());
-        sendIqPacket(
-                account,
-                retrieveVcard,
-                (response) -> {
-                    if (response.getType() != Iq.Type.RESULT) {
+                    @Override
+                    public void onFailure(@NonNull Throwable t) {
                         Log.d(
                                 Config.LOGTAG,
-                                account.getJid().asBareJid() + ": no vCard set. nothing to do");
-                        return;
+                                account.getJid().asBareJid() + ": failed to delete node " + node,
+                                t);
                     }
-                    final Element vcard = response.findChild("vCard", "vcard-temp");
-                    if (vcard == null) {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid() + ": no vCard set. nothing to do");
-                        return;
-                    }
-                    Element photo = vcard.findChild("PHOTO");
-                    if (photo == null) {
-                        photo = vcard.addChild("PHOTO");
-                    }
-                    photo.clearChildren();
-                    final Iq publication = new Iq(Iq.Type.SET);
-                    publication.setTo(account.getJid().asBareJid());
-                    publication.addChild(vcard);
-                    sendIqPacket(
-                            account,
-                            publication,
-                            (publicationResponse) -> {
-                                if (publicationResponse.getType() == Iq.Type.RESULT) {
-                                    Log.d(
-                                            Config.LOGTAG,
-                                            account.getJid().asBareJid()
-                                                    + ": successfully deleted vcard avatar");
-                                    runnable.run();
-                                } else {
-                                    Log.d(
-                                            Config.LOGTAG,
-                                            "failed to publish vcard "
-                                                    + publicationResponse.getErrorCondition());
-                                }
-                            });
-                });
+                },
+                MoreExecutors.directExecutor());
     }
 
     private boolean hasEnabledAccounts() {
@@ -4661,169 +3668,17 @@ public class XmppConnectionService extends Service {
         createBookmark(bookmark.getAccount(), bookmark);
     }
 
-    public void presenceToMuc(final Conversation conversation) {
-        final MucOptions options = conversation.getMucOptions();
-        if (options.online()) {
-            Account account = conversation.getAccount();
-            final Jid joinJid = options.getSelf().getFullJid();
-            final var packet = mPresenceGenerator.selfPresence(account, Presence.Availability.ONLINE, options.nonanonymous(), options.getSelf().getNick());
-            packet.setTo(joinJid);
-            sendPresencePacket(account, packet);
-        }
-    }
-
-    public boolean renameInMuc(
-            final Conversation conversation,
-            final String nick,
-            final UiCallback<Conversation> callback) {
-        final Account account = conversation.getAccount();
-        final Bookmark bookmark = conversation.getBookmark();
-        final MucOptions options = conversation.getMucOptions();
-        final Jid joinJid = options.createJoinJid(nick);
-        if (joinJid == null) {
-            return false;
-        }
-        if (options.online()) {
-            maybeRegisterWithMuc(conversation, nick);
-            options.setOnRenameListener(
-                    new OnRenameListener() {
-
-                        @Override
-                        public void onSuccess() {
-                            final var packet = mPresenceGenerator.selfPresence(account, Presence.Availability.ONLINE, options.nonanonymous(), nick);
-                            packet.setTo(joinJid);
-                            sendPresencePacket(account, packet);
-                            callback.success(conversation);
-                        }
-
-                        @Override
-                        public void onFailure() {
-                            callback.error(R.string.nick_in_use, conversation);
-                        }
-                    });
-
-            final var packet =
-                    mPresenceGenerator.selfPresence(
-                            account,
-                            im.conversations.android.xmpp.model.stanza.Presence.Availability.ONLINE,
-                            options.nonanonymous(), nick);
-            packet.setTo(joinJid);
-            sendPresencePacket(account, packet);
-            if (nick.equals(MucOptions.defaultNick(account))
-                    && bookmark != null
-                    && bookmark.getNick() != null) {
-                Log.d(
-                        Config.LOGTAG,
-                        account.getJid().asBareJid()
-                                + ": removing nick from bookmark for "
-                                + bookmark.getJid());
-                bookmark.setNick(null);
-                createBookmark(account, bookmark);
-            }
-        } else {
-            conversation.setContactJid(joinJid);
-            databaseBackend.updateConversation(conversation);
-            if (account.getStatus() == Account.State.ONLINE) {
-                if (bookmark != null) {
-                    bookmark.setNick(nick);
-                    createBookmark(account, bookmark);
-                }
-                joinMuc(conversation);
-            }
-        }
-        return true;
-    }
-
     public void checkMucRequiresRename() {
         synchronized (this.conversations) {
             for (final Conversation conversation : this.conversations) {
                 if (conversation.getMode() == Conversational.MODE_MULTI) {
-                    checkMucRequiresRename(conversation);
+                    final var account = conversation.getAccount();
+                    account.getXmppConnection()
+                            .getManager(MultiUserChatManager.class)
+                            .checkMucRequiresRename(conversation);
                 }
             }
         }
-    }
-
-    private void checkMucRequiresRename(final Conversation conversation) {
-        final var options = conversation.getMucOptions();
-        if (!options.online()) {
-            return;
-        }
-        final var account = conversation.getAccount();
-        final String current = options.getActualNick();
-        final String proposed = options.getProposedNickPure();
-        if (current == null || current.equals(proposed)) {
-            return;
-        }
-        final Jid joinJid = options.createJoinJid(proposed);
-        Log.d(
-                Config.LOGTAG,
-                String.format(
-                        "%s: muc rename required %s (was: %s)",
-                        account.getJid().asBareJid(), joinJid, current));
-        final var packet =
-                mPresenceGenerator.selfPresence(
-                        account,
-                        im.conversations.android.xmpp.model.stanza.Presence.Availability.ONLINE,
-                        options.nonanonymous(), proposed);
-        packet.setTo(joinJid);
-        sendPresencePacket(account, packet);
-    }
-
-    public void leaveMuc(Conversation conversation) {
-        leaveMuc(conversation, false);
-    }
-
-    private void leaveMuc(Conversation conversation, boolean now) {
-        final Account account = conversation.getAccount();
-        synchronized (account.pendingConferenceJoins) {
-            account.pendingConferenceJoins.remove(conversation);
-        }
-        synchronized (account.pendingConferenceLeaves) {
-            account.pendingConferenceLeaves.remove(conversation);
-        }
-        if (account.getStatus() == Account.State.ONLINE || now) {
-            sendPresencePacket(
-                    conversation.getAccount(),
-                    mPresenceGenerator.leave(conversation.getMucOptions()));
-            conversation.getMucOptions().setOffline();
-            Bookmark bookmark = conversation.getBookmark();
-            if (bookmark != null) {
-                bookmark.setConversation(null);
-            }
-            Log.d(
-                    Config.LOGTAG,
-                    conversation.getAccount().getJid().asBareJid()
-                            + ": leaving muc "
-                            + conversation.getJid());
-            final var connection = account.getXmppConnection();
-            if (connection != null) {
-                connection.getManager(DiscoManager.class).clear(conversation.getJid().asBareJid());
-            }
-        } else {
-            synchronized (account.pendingConferenceLeaves) {
-                account.pendingConferenceLeaves.add(conversation);
-            }
-        }
-    }
-
-    public String findConferenceServer(final Account account) {
-        String server;
-        if (account.getXmppConnection() != null) {
-            server = account.getXmppConnection().getMucServer();
-            if (server != null) {
-                return server;
-            }
-        }
-        for (Account other : getAccounts()) {
-            if (other != account && other.getXmppConnection() != null) {
-                server = other.getXmppConnection().getMucServer();
-                if (server != null) {
-                    return server;
-                }
-            }
-        }
-        return null;
     }
 
     public void createPublicChannel(
@@ -4831,127 +3686,27 @@ public class XmppConnectionService extends Service {
             final String name,
             final Jid address,
             final UiCallback<Conversation> callback) {
-        joinMuc(
-                findOrCreateConversation(account, address, true, false, true),
-                conversation -> {
-                    final Bundle configuration = IqGenerator.defaultChannelConfiguration();
-                    if (!TextUtils.isEmpty(name)) {
-                        configuration.putString("muc#roomconfig_roomname", name);
+        final var future =
+                account.getXmppConnection()
+                        .getManager(MultiUserChatManager.class)
+                        .createPublicChannel(address, name);
+
+        Futures.addCallback(
+                future,
+                new FutureCallback<Conversation>() {
+                    @Override
+                    public void onSuccess(Conversation result) {
+                        callback.success(result);
                     }
-                    pushConferenceConfiguration(
-                            conversation,
-                            configuration,
-                            new OnConfigurationPushed() {
-                                @Override
-                                public void onPushSucceeded() {
-                                    saveConversationAsBookmark(conversation, name);
-                                    callback.success(conversation);
-                                }
 
-                                @Override
-                                public void onPushFailed() {
-                                    if (conversation
-                                            .getMucOptions()
-                                            .getSelf()
-                                            .getAffiliation()
-                                            .ranks(MucOptions.Affiliation.OWNER)) {
-                                        callback.error(
-                                                R.string.unable_to_set_channel_configuration,
-                                                conversation);
-                                    } else {
-                                        callback.error(
-                                                R.string.joined_an_existing_channel, conversation);
-                                    }
-                                }
-                            });
-                });
-    }
-
-    public boolean createAdhocConference(
-            final Account account,
-            final String name,
-            final Iterable<Jid> jids,
-            final UiCallback<Conversation> callback) {
-        Log.d(
-                Config.LOGTAG,
-                account.getJid().asBareJid().toString()
-                        + ": creating adhoc conference with "
-                        + jids.toString());
-        if (account.getStatus() == Account.State.ONLINE) {
-            try {
-                String server = findConferenceServer(account);
-                if (server == null) {
-                    if (callback != null) {
-                        callback.error(R.string.no_conference_server_found, null);
+                    @Override
+                    public void onFailure(Throwable t) {
+                        Log.d(Config.LOGTAG, "could not create public channel", t);
+                        // TODO I guess it’s better to just not use callbacks here
+                        callback.error(R.string.unable_to_set_channel_configuration, null);
                     }
-                    return false;
-                }
-                final Jid jid = Jid.of(CryptoHelper.pronounceable(), server, null);
-                final Conversation conversation =
-                        findOrCreateConversation(account, jid, true, false, true);
-                joinMuc(
-                        conversation,
-                        new OnConferenceJoined() {
-                            @Override
-                            public void onConferenceJoined(final Conversation conversation) {
-                                final Bundle configuration =
-                                        IqGenerator.defaultGroupChatConfiguration();
-                                if (!TextUtils.isEmpty(name)) {
-                                    configuration.putString("muc#roomconfig_roomname", name);
-                                }
-                                pushConferenceConfiguration(
-                                        conversation,
-                                        configuration,
-                                        new OnConfigurationPushed() {
-                                            @Override
-                                            public void onPushSucceeded() {
-                                                for (Jid invite : jids) {
-                                                    invite(conversation, invite);
-                                                }
-                                                for (String resource :
-                                                        account.getSelfContact()
-                                                                .getPresences()
-                                                                .toResourceArray()) {
-                                                    Jid other =
-                                                            account.getJid().withResource(resource);
-                                                    Log.d(
-                                                            Config.LOGTAG,
-                                                            account.getJid().asBareJid()
-                                                                    + ": sending direct invite to "
-                                                                    + other);
-                                                    directInvite(conversation, other);
-                                                }
-                                                saveConversationAsBookmark(conversation, name);
-                                                if (callback != null) {
-                                                    callback.success(conversation);
-                                                }
-                                            }
-
-                                            @Override
-                                            public void onPushFailed() {
-                                                archiveConversation(conversation);
-                                                if (callback != null) {
-                                                    callback.error(
-                                                            R.string.conference_creation_failed,
-                                                            conversation);
-                                                }
-                                            }
-                                        });
-                            }
-                        });
-                return true;
-            } catch (IllegalArgumentException e) {
-                if (callback != null) {
-                    callback.error(R.string.conference_creation_failed, null);
-                }
-                return false;
-            }
-        } else {
-            if (callback != null) {
-                callback.error(R.string.not_connected_try_again, null);
-            }
-            return false;
-        }
+                },
+                MoreExecutors.directExecutor());
     }
 
     public void checkIfMuc(final Account account, final Jid jid, Consumer<Boolean> cb) {
@@ -4992,97 +3747,34 @@ public class XmppConnectionService extends Service {
         );
     }
 
-    public void fetchConferenceConfiguration(final Conversation conversation) {
-        fetchConferenceConfiguration(conversation, null);
-    }
-
-    public void fetchConferenceConfiguration(
-            final Conversation conversation, final OnConferenceConfigurationFetched callback) {
-        final var account = conversation.getAccount();
-        final var connection = account.getXmppConnection();
-        if (connection == null) {
-            return;
+    public boolean createAdhocConference(
+            final Account account,
+            final String name,
+            final Collection<Jid> addresses,
+            final UiCallback<Conversation> callback) {
+        final var manager = account.getXmppConnection().getManager(MultiUserChatManager.class);
+        if (manager.getServices().isEmpty()) {
+            return false;
         }
-        final var future =
-                connection
-                        .getManager(DiscoManager.class)
-                        .info(Entity.discoItem(conversation.getJid().asBareJid()), null);
+
+        final var future = manager.createPrivateGroupChat(name, addresses);
+
         Futures.addCallback(
                 future,
                 new FutureCallback<>() {
                     @Override
-                    public void onSuccess(InfoQuery result) {
-                        final MucOptions mucOptions = conversation.getMucOptions();
-                        final Bookmark bookmark = conversation.getBookmark();
-                        final boolean sameBefore =
-                                StringUtils.equals(
-                                        bookmark == null ? null : bookmark.getBookmarkName(),
-                                        mucOptions.getName());
-
-                        final var hadOccupantId = mucOptions.occupantId();
-                        if (mucOptions.updateConfiguration(result)) {
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid()
-                                            + ": muc configuration changed for "
-                                            + conversation.getJid().asBareJid());
-                            updateConversation(conversation);
-                        }
-
-                        final var hasOccupantId = mucOptions.occupantId();
-
-                        if (!hadOccupantId && hasOccupantId && mucOptions.online()) {
-                            final var me = mucOptions.getSelf().getFullJid();
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid()
-                                            + ": gained support for occupant-id in "
-                                            + me
-                                            + ". resending presence");
-                            final var packet =
-                                    mPresenceGenerator.selfPresence(
-                                            account,
-                                            im.conversations.android.xmpp.model.stanza.Presence
-                                                    .Availability.ONLINE,
-                                            mucOptions.nonanonymous(), mucOptions.getSelf().getNick());
-                            packet.setTo(me);
-                            sendPresencePacket(account, packet);
-                        }
-
-                        if (bookmark != null
-                                && (sameBefore || bookmark.getBookmarkName() == null)) {
-                            if (bookmark.setBookmarkName(
-                                    StringUtils.nullOnEmpty(mucOptions.getName()))) {
-                                createBookmark(account, bookmark);
-                            }
-                        }
-
-                        if (callback != null) {
-                            callback.onConferenceConfigurationFetched(conversation);
-                        }
-
-                        updateConversationUi();
+                    public void onSuccess(Conversation result) {
+                        callback.success(result);
                     }
 
                     @Override
-                    public void onFailure(@NonNull Throwable throwable) {
-                        if (throwable instanceof TimeoutException) {
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid()
-                                            + ": received timeout waiting for conference"
-                                            + " configuration fetch");
-                        } else if (throwable
-                                instanceof IqErrorResponseException errorResponseException) {
-                            if (callback != null) {
-                                callback.onFetchFailed(
-                                        conversation,
-                                        errorResponseException.getResponse().getErrorCondition());
-                            }
-                        }
+                    public void onFailure(@NonNull Throwable t) {
+                        Log.d(Config.LOGTAG, "could not create private group chat", t);
+                        callback.error(R.string.conference_creation_failed, null);
                     }
                 },
                 MoreExecutors.directExecutor());
+        return true;
     }
 
     public void pushNodeConfiguration(
@@ -5144,65 +3836,11 @@ public class XmppConnectionService extends Service {
                 });
     }
 
-    public void pushConferenceConfiguration(
-            final Conversation conversation,
-            final Bundle options,
-            final OnConfigurationPushed callback) {
-        if (options.getString("muc#roomconfig_whois", "moderators").equals("anyone")) {
-            conversation.setAttribute("accept_non_anonymous", true);
-            updateConversation(conversation);
-        }
-        if (options.containsKey("muc#roomconfig_moderatedroom")) {
-            final boolean moderated = "1".equals(options.getString("muc#roomconfig_moderatedroom"));
-            options.putString("members_by_default", moderated ? "0" : "1");
-        }
-        if (options.containsKey("muc#roomconfig_allowpm")) {
-            // ejabberd :-/
-            final boolean allow = "anyone".equals(options.getString("muc#roomconfig_allowpm"));
-            options.putString("allow_private_messages", allow ? "1" : "0");
-            options.putString("allow_private_messages_from_visitors", allow ? "anyone" : "nobody");
-        }
-        final var account = conversation.getAccount();
-        final Iq request = new Iq(Iq.Type.GET);
-        request.setTo(conversation.getJid().asBareJid());
-        request.query("http://jabber.org/protocol/muc#owner");
-        sendIqPacket(
-                account,
-                request,
-                response -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        final Data data =
-                                Data.parse(response.query().findChild("x", Namespace.DATA));
-                        data.submit(options);
-                        final Iq set = new Iq(Iq.Type.SET);
-                        set.setTo(conversation.getJid().asBareJid());
-                        set.query("http://jabber.org/protocol/muc#owner").addChild(data);
-                        sendIqPacket(
-                                account,
-                                set,
-                                packet -> {
-                                    if (callback != null) {
-                                        if (packet.getType() == Iq.Type.RESULT) {
-                                            callback.onPushSucceeded();
-                                        } else {
-                                            Log.d(Config.LOGTAG, "failed: " + packet);
-                                            callback.onPushFailed();
-                                        }
-                                    }
-                                });
-                    } else {
-                        if (callback != null) {
-                            callback.onPushFailed();
-                        }
-                    }
-                });
-    }
-
     public void pushSubjectToConference(final Conversation conference, final String subject) {
-        final var packet =
-                this.getMessageGenerator()
-                        .conferenceSubject(conference, StringUtils.nullOnEmpty(subject));
-        this.sendMessagePacket(conference.getAccount(), packet);
+        final var account = conference.getAccount();
+        account.getXmppConnection()
+                .getManager(MultiUserChatManager.class)
+                .setSubject(conference, subject);
     }
 
     public void requestVoice(final Account account, final Jid jid) {
@@ -5213,49 +3851,46 @@ public class XmppConnectionService extends Service {
     public void changeAffiliationInConference(
             final Conversation conference,
             Jid user,
-            final MucOptions.Affiliation affiliation,
+            final Affiliation affiliation,
             final OnAffiliationChanged callback) {
-        final Jid jid = user.asBareJid();
-        final Iq request =
-                this.mIqGenerator.changeAffiliation(conference, jid, affiliation.toString());
-        sendIqPacket(
-                conference.getAccount(),
-                request,
-                (response) -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        final var mucOptions = conference.getMucOptions();
-                        mucOptions.changeAffiliation(jid, affiliation);
-                        getAvatarService().clear(mucOptions);
+        final var account = conference.getAccount();
+        final var future =
+                account.getXmppConnection()
+                        .getManager(MultiUserChatManager.class)
+                        .setAffiliation(conference, affiliation, user);
+        Futures.addCallback(
+                future,
+                new FutureCallback<Void>() {
+                    @Override
+                    public void onSuccess(Void result) {
                         if (callback != null) {
-                            callback.onAffiliationChangedSuccessful(jid);
+                            callback.onAffiliationChangedSuccessful(user);
                         } else {
                             Log.d(
                                     Config.LOGTAG,
                                     "changed affiliation of " + user + " to " + affiliation);
                         }
-                    } else if (callback != null) {
-                        callback.onAffiliationChangeFailed(
-                                jid, R.string.could_not_change_affiliation);
-                    } else {
-                        Log.d(Config.LOGTAG, "unable to change affiliation");
                     }
-                });
+
+                    @Override
+                    public void onFailure(Throwable t) {
+                        if (callback != null) {
+                            callback.onAffiliationChangeFailed(
+                                    user, R.string.could_not_change_affiliation);
+                        } else {
+                            Log.d(Config.LOGTAG, "could not change affiliation", t);
+                        }
+                    }
+                },
+                MoreExecutors.directExecutor());
     }
 
     public void changeRoleInConference(
-            final Conversation conference, final String nick, MucOptions.Role role) {
+            final Conversation conference, final String nick, Role role) {
         final var account = conference.getAccount();
-        final Iq request = this.mIqGenerator.changeRole(conference, nick, role.toString());
-        sendIqPacket(
-                account,
-                request,
-                (packet) -> {
-                    if (packet.getType() != Iq.Type.RESULT) {
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid() + " unable to change role of " + nick);
-                    }
-                });
+        account.getXmppConnection()
+                .getManager(MultiUserChatManager.class)
+                .setRole(conference.getJid().asBareJid(), role, nick);
     }
 
     public void moderateMessage(final Account account, final Message m, final String reason) {
@@ -5268,24 +3903,11 @@ public class XmppConnectionService extends Service {
         });
     }
 
-    public void destroyRoom(final Conversation conversation, final OnRoomDestroy callback) {
-        final Iq request = new Iq(Iq.Type.SET);
-        request.setTo(conversation.getJid().asBareJid());
-        request.query("http://jabber.org/protocol/muc#owner").addChild("destroy");
-        sendIqPacket(
-                conversation.getAccount(),
-                request,
-                response -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        if (callback != null) {
-                            callback.onRoomDestroySucceeded();
-                        }
-                    } else if (response.getType() == Iq.Type.ERROR) {
-                        if (callback != null) {
-                            callback.onRoomDestroyFailed();
-                        }
-                    }
-                });
+    public ListenableFuture<Void> destroyRoom(final Conversation conversation) {
+        final var account = conversation.getAccount();
+        return account.getXmppConnection()
+                .getManager(MultiUserChatManager.class)
+                .destroy(conversation.getJid().asBareJid());
     }
 
     private void disconnect(final Account account, boolean force) {
@@ -5298,11 +3920,13 @@ public class XmppConnectionService extends Service {
             for (Conversation conversation : conversations) {
                 if (conversation.getAccount() == account) {
                     if (conversation.getMode() == Conversation.MODE_MULTI) {
-                        leaveMuc(conversation, true);
+                        account.getXmppConnection()
+                                .getManager(MultiUserChatManager.class)
+                                .unavailable(conversation);
                     }
                 }
             }
-            sendOfflinePresence(account);
+            connection.getManager(PresenceManager.class).unavailable();
         }
         connection.disconnect(force);
     }
@@ -5339,18 +3963,11 @@ public class XmppConnectionService extends Service {
         updateConversationUi();
     }
 
-    public void syncDirtyContacts(Account account) {
-        for (Contact contact : account.getRoster().getContacts()) {
-            if (contact.getOption(Contact.Options.DIRTY_PUSH)) {
-                pushContactToServer(contact);
-            }
-            if (contact.getOption(Contact.Options.DIRTY_DELETE)) {
-                deleteContactOnServer(contact);
-            }
-        }
+    public void createContact(final Contact contact) {
+        createContact(contact, null);
     }
 
-    protected void unregisterPhoneAccounts(final Account account) {
+    public void unregisterPhoneAccounts(final Account account) {
         for (final Contact contact : account.getRoster().getContacts()) {
             if (!contact.showInRoster()) {
                 contact.unregisterAsPhoneAccount(this);
@@ -5358,599 +3975,92 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    public void createContact(final Contact contact, final boolean autoGrant) {
-        createContact(contact, autoGrant, null);
+    public void createContact(final Contact contact, final String preAuth) {
+        contact.setOption(Contact.Options.PREEMPTIVE_GRANT);
+        contact.setOption(Contact.Options.ASKING);
+        final var connection = contact.getAccount().getXmppConnection();
+        connection.getManager(RosterManager.class).addRosterItem(contact, preAuth);
     }
 
-    public void createContact(
-            final Contact contact, final boolean autoGrant, final String preAuth) {
-        if (autoGrant) {
-            contact.setOption(Contact.Options.PREEMPTIVE_GRANT);
-            contact.setOption(Contact.Options.ASKING);
-        }
-        pushContactToServer(contact, preAuth);
-    }
-
-    public void pushContactToServer(final Contact contact) {
-        pushContactToServer(contact, null);
-    }
-
-    private void pushContactToServer(final Contact contact, final String preAuth) {
-        contact.resetOption(Contact.Options.DIRTY_DELETE);
-        contact.setOption(Contact.Options.DIRTY_PUSH);
-        final Account account = contact.getAccount();
-        if (account.getStatus() == Account.State.ONLINE) {
-            final boolean ask = contact.getOption(Contact.Options.ASKING);
-            final boolean sendUpdates =
-                    contact.getOption(Contact.Options.PENDING_SUBSCRIPTION_REQUEST)
-                            && contact.getOption(Contact.Options.PREEMPTIVE_GRANT);
-            final Iq iq = new Iq(Iq.Type.SET);
-            iq.query(Namespace.ROSTER).addChild(contact.asElement());
-            account.getXmppConnection().sendIqPacket(iq, mDefaultIqHandler);
-            if (sendUpdates) {
-                sendPresencePacket(account, mPresenceGenerator.sendPresenceUpdatesTo(contact));
-            }
-            if (ask) {
-                sendPresencePacket(
-                        account, mPresenceGenerator.requestPresenceUpdatesFrom(contact, preAuth));
-            }
-        } else {
-            syncRoster(contact.getAccount());
-        }
+    public void deleteContactOnServer(final Contact contact) {
+        final var connection = contact.getAccount().getXmppConnection();
+        connection.getManager(RosterManager.class).deleteRosterItem(contact);
     }
 
     public void publishMucAvatar(
             final Conversation conversation, final Uri image, final OnAvatarPublication callback) {
-        new Thread(
-                        () -> {
-                            final Bitmap.CompressFormat format = Config.AVATAR_FORMAT;
-                            final int size = Config.AVATAR_SIZE;
-                            final Avatar avatar =
-                                    getFileBackend().getPepAvatar(image, size, format);
-                            if (avatar != null) {
-                                if (!getFileBackend().save(avatar)) {
-                                    callback.onAvatarPublicationFailed(
-                                            R.string.error_saving_avatar);
-                                    return;
-                                }
-                                avatar.owner = conversation.getJid().asBareJid();
-                                publishMucAvatar(conversation, avatar, callback);
-                            } else {
-                                callback.onAvatarPublicationFailed(
-                                        R.string.error_publish_avatar_converting);
-                            }
-                        })
-                .start();
-    }
-
-    public void publishAvatarAsync(
-            final Account account,
-            final Uri image,
-            final boolean open,
-            final OnAvatarPublication callback) {
-        new Thread(() -> publishAvatar(account, image, open, callback)).start();
-    }
-
-    private void publishAvatar(
-            final Account account,
-            final Uri image,
-            final boolean open,
-            final OnAvatarPublication callback) {
-        final Bitmap.CompressFormat format = Config.AVATAR_FORMAT;
-        final int size = Config.AVATAR_SIZE;
-        final Avatar avatar = getFileBackend().getPepAvatar(image, size, format);
-        if (avatar != null) {
-            if (!getFileBackend().save(avatar)) {
-                Log.d(Config.LOGTAG, "unable to save vcard");
-                callback.onAvatarPublicationFailed(R.string.error_saving_avatar);
-                return;
-            }
-            publishAvatar(account, avatar, open, callback);
-        } else {
-            callback.onAvatarPublicationFailed(R.string.error_publish_avatar_converting);
-        }
-    }
-
-    private void publishMucAvatar(
-            Conversation conversation, Avatar avatar, OnAvatarPublication callback) {
-        final var account = conversation.getAccount();
-        final Iq retrieve = mIqGenerator.retrieveVcardAvatar(avatar);
-        sendIqPacket(
-                account,
-                retrieve,
-                (response) -> {
-                    boolean itemNotFound =
-                            response.getType() == Iq.Type.ERROR
-                                    && response.hasChild("error")
-                                    && response.findChild("error").hasChild("item-not-found");
-                    if (response.getType() == Iq.Type.RESULT || itemNotFound) {
-                        Element vcard = response.findChild("vCard", "vcard-temp");
-                        if (vcard == null) {
-                            vcard = new Element("vCard", "vcard-temp");
-                        }
-                        Element photo = vcard.findChild("PHOTO");
-                        if (photo == null) {
-                            photo = vcard.addChild("PHOTO");
-                        }
-                        photo.clearChildren();
-                        photo.addChild("TYPE").setContent(avatar.type);
-                        photo.addChild("BINVAL").setContent(avatar.image);
-                        final Iq publication = new Iq(Iq.Type.SET);
-                        publication.setTo(conversation.getJid().asBareJid());
-                        publication.addChild(vcard);
-                        sendIqPacket(
-                                account,
-                                publication,
-                                (publicationResponse) -> {
-                                    if (publicationResponse.getType() == Iq.Type.RESULT) {
-                                        callback.onAvatarPublicationSucceeded();
-                                    } else {
-                                        Log.d(
-                                                Config.LOGTAG,
-                                                "failed to publish vcard "
-                                                        + publicationResponse.getErrorCondition());
-                                        callback.onAvatarPublicationFailed(
-                                                R.string.error_publish_avatar_server_reject);
-                                    }
-                                });
-                    } else {
-                        Log.d(Config.LOGTAG, "failed to request vcard " + response);
-                        callback.onAvatarPublicationFailed(
-                                R.string.error_publish_avatar_no_server_support);
-                    }
-                });
-    }
-
-    public void publishAvatar(
-            final Account account,
-            final Avatar avatar,
-            final boolean open,
-            final OnAvatarPublication callback) {
-        final Bundle options;
-        if (account.getXmppConnection().getFeatures().pepPublishOptions()) {
-            options = open ? PublishOptions.openAccess() : PublishOptions.presenceAccess();
-        } else {
-            options = null;
-        }
-        publishAvatar(account, avatar, options, true, callback);
-    }
-
-    public void publishAvatar(
-            Account account,
-            final Avatar avatar,
-            final Bundle options,
-            final boolean retry,
-            final OnAvatarPublication callback) {
-        Log.d(
-                Config.LOGTAG,
-                account.getJid().asBareJid() + ": publishing avatar. options=" + options);
-        final Iq packet = this.mIqGenerator.publishAvatar(avatar, options);
-        this.sendIqPacket(
-                account,
-                packet,
-                result -> {
-                    if (result.getType() == Iq.Type.RESULT) {
-                        publishAvatarMetadata(account, avatar, options, true, callback);
-                    } else if (retry && PublishOptions.preconditionNotMet(result)) {
-                        pushNodeConfiguration(
-                                account,
-                                Namespace.AVATAR_DATA,
-                                options,
-                                new OnConfigurationPushed() {
-                                    @Override
-                                    public void onPushSucceeded() {
-                                        Log.d(
-                                                Config.LOGTAG,
-                                                account.getJid().asBareJid()
-                                                        + ": changed node configuration for avatar"
-                                                        + " node");
-                                        publishAvatar(account, avatar, options, false, callback);
-                                    }
-
-                                    @Override
-                                    public void onPushFailed() {
-                                        Log.d(
-                                                Config.LOGTAG,
-                                                account.getJid().asBareJid()
-                                                        + ": unable to change node configuration"
-                                                        + " for avatar node");
-                                        publishAvatar(account, avatar, null, false, callback);
-                                    }
-                                });
-                    } else {
-                        Element error = result.findChild("error");
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid()
-                                        + ": server rejected avatar "
-                                        + (avatar.size / 1024)
-                                        + "KiB "
-                                        + (error != null ? error.toString() : ""));
-                        if (callback != null) {
-                            callback.onAvatarPublicationFailed(
-                                    R.string.error_publish_avatar_server_reject);
-                        }
-                    }
-                });
-    }
-
-    public void publishAvatarMetadata(
-            Account account,
-            final Avatar avatar,
-            final Bundle options,
-            final boolean retry,
-            final OnAvatarPublication callback) {
-        final Iq packet =
-                XmppConnectionService.this.mIqGenerator.publishAvatarMetadata(avatar, options);
-        sendIqPacket(
-                account,
-                packet,
-                result -> {
-                    if (result.getType() == Iq.Type.RESULT) {
-                        if (account.setAvatar(avatar.getFilename())) {
-                            getAvatarService().clear(account);
-                            databaseBackend.updateAccount(account);
-                            notifyAccountAvatarHasChanged(account);
-                        }
-                        Log.d(
-                                Config.LOGTAG,
-                                account.getJid().asBareJid()
-                                        + ": published avatar "
-                                        + (avatar.size / 1024)
-                                        + "KiB");
-                        if (callback != null) {
-                            callback.onAvatarPublicationSucceeded();
-                        }
-                    } else if (retry && PublishOptions.preconditionNotMet(result)) {
-                        pushNodeConfiguration(
-                                account,
-                                Namespace.AVATAR_METADATA,
-                                options,
-                                new OnConfigurationPushed() {
-                                    @Override
-                                    public void onPushSucceeded() {
-                                        Log.d(
-                                                Config.LOGTAG,
-                                                account.getJid().asBareJid()
-                                                        + ": changed node configuration for avatar"
-                                                        + " meta data node");
-                                        publishAvatarMetadata(
-                                                account, avatar, options, false, callback);
-                                    }
-
-                                    @Override
-                                    public void onPushFailed() {
-                                        Log.d(
-                                                Config.LOGTAG,
-                                                account.getJid().asBareJid()
-                                                        + ": unable to change node configuration"
-                                                        + " for avatar meta data node");
-                                        publishAvatarMetadata(
-                                                account, avatar, null, false, callback);
-                                    }
-                                });
-                    } else {
-                        if (callback != null) {
-                            callback.onAvatarPublicationFailed(
-                                    R.string.error_publish_avatar_server_reject);
-                        }
-                    }
-                });
-    }
-
-    public void republishAvatarIfNeeded(final Account account) {
-        if (account.getAxolotlService().isPepBroken()) {
-            Log.d(
-                    Config.LOGTAG,
-                    account.getJid().asBareJid()
-                            + ": skipping republication of avatar because pep is broken");
-            return;
-        }
-        final Iq packet = this.mIqGenerator.retrieveAvatarMetaData(null);
-        this.sendIqPacket(
-                account,
-                packet,
-                new Consumer<Iq>() {
-
-                    private Avatar parseAvatar(final Iq packet) {
-                        final var pubsub = packet.getExtension(PubSub.class);
-                        if (pubsub == null) {
-                            return null;
-                        }
-                        final var items = pubsub.getItems();
-                        if (items == null) {
-                            return null;
-                        }
-                        final var item = items.getFirstItemWithId(Metadata.class);
-                        if (item == null) {
-                            return null;
-                        }
-                        return Avatar.parseMetadata(item.getKey(), item.getValue());
-                    }
-
-                    private boolean errorIsItemNotFound(Iq packet) {
-                        Element error = packet.findChild("error");
-                        return packet.getType() == Iq.Type.ERROR
-                                && error != null
-                                && error.hasChild("item-not-found");
+        final var connection = conversation.getAccount().getXmppConnection();
+        final var future =
+                connection
+                        .getManager(AvatarManager.class)
+                        .publishVCard(conversation.getJid().asBareJid(), image);
+        Futures.addCallback(
+                future,
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(Void result) {
+                        callback.onAvatarPublicationSucceeded();
                     }
 
                     @Override
-                    public void accept(final Iq packet) {
-                        if (packet.getType() == Iq.Type.RESULT || errorIsItemNotFound(packet)) {
-                            final Avatar serverAvatar = parseAvatar(packet);
-                            if (serverAvatar == null && account.getAvatar() != null) {
-                                final Avatar avatar =
-                                        fileBackend.getStoredPepAvatar(account.getAvatar());
-                                if (avatar != null) {
-                                    Log.d(
-                                            Config.LOGTAG,
-                                            account.getJid().asBareJid()
-                                                    + ": avatar on server was null. republishing");
-                                    // publishing as 'open' - old server (that requires
-                                    // republication) likely doesn't support access models anyway
-                                    publishAvatar(
-                                            account,
-                                            fileBackend.getStoredPepAvatar(account.getAvatar()),
-                                            true,
-                                            null);
-                                } else {
-                                    Log.e(
-                                            Config.LOGTAG,
-                                            account.getJid().asBareJid()
-                                                    + ": error rereading avatar");
-                                }
-                            }
-                        }
+                    public void onFailure(@NonNull Throwable t) {
+                        Log.d(Config.LOGTAG, "could not publish MUC avatar", t);
+                        callback.onAvatarPublicationFailed(
+                                R.string.error_publish_avatar_server_reject);
                     }
-                });
+                },
+                MoreExecutors.directExecutor());
     }
 
-    public void cancelAvatarFetches(final Account account) {
-        synchronized (mInProgressAvatarFetches) {
-            for (final Iterator<String> iterator = mInProgressAvatarFetches.iterator();
-                    iterator.hasNext(); ) {
-                final String KEY = iterator.next();
-                if (KEY.startsWith(account.getJid().asBareJid() + "_")) {
-                    iterator.remove();
-                }
-            }
-        }
+    public void publishAvatar(
+            final Account account,
+            final Uri image,
+            final boolean open,
+            final OnAvatarPublication callback) {
+
+        final var connection = account.getXmppConnection();
+        final var publicationFuture =
+                connection.getManager(AvatarManager.class).uploadAndPublish(image, open);
+
+        Futures.addCallback(
+                publicationFuture,
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(final Void result) {
+                        Log.d(Config.LOGTAG, "published avatar");
+                        callback.onAvatarPublicationSucceeded();
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull final Throwable t) {
+                        Log.d(Config.LOGTAG, "avatar upload failed", t);
+                        // TODO actually figure out what went wrong
+                        callback.onAvatarPublicationFailed(
+                                R.string.error_publish_avatar_server_reject);
+                    }
+                },
+                MoreExecutors.directExecutor());
     }
 
-    public void fetchAvatar(Account account, Avatar avatar) {
-        fetchAvatar(account, avatar, null);
-    }
-
-    public void fetchAvatar(
-            Account account, final Avatar avatar, final UiCallback<Avatar> callback) {
-        if (databaseBackend.isBlockedMedia(avatar.cid())) {
-            if (callback != null) callback.error(0, null);
-            return;
-        }
-
-        final String KEY = generateFetchKey(account, avatar);
-        synchronized (this.mInProgressAvatarFetches) {
-            if (mInProgressAvatarFetches.add(KEY)) {
-                switch (avatar.origin) {
-                    case PEP:
-                        this.mInProgressAvatarFetches.add(KEY);
-                        fetchAvatarPep(account, avatar, callback);
-                        break;
-                    case VCARD:
-                        this.mInProgressAvatarFetches.add(KEY);
-                        fetchAvatarVcard(account, avatar, callback);
-                        break;
-                }
-            } else if (avatar.origin == Avatar.Origin.PEP) {
-                mOmittedPepAvatarFetches.add(KEY);
-            } else {
-                Log.d(
-                        Config.LOGTAG,
-                        account.getJid().asBareJid()
-                                + ": already fetching "
-                                + avatar.origin
-                                + " avatar for "
-                                + avatar.owner);
-            }
-        }
-    }
-
-    private void fetchAvatarPep(
-            final Account account, final Avatar avatar, final UiCallback<Avatar> callback) {
-        final Iq packet = this.mIqGenerator.retrievePepAvatar(avatar);
-        sendIqPacket(
-                account,
-                packet,
-                (result) -> {
-                    synchronized (mInProgressAvatarFetches) {
-                        mInProgressAvatarFetches.remove(generateFetchKey(account, avatar));
-                    }
-                    final String ERROR =
-                            account.getJid().asBareJid()
-                                    + ": fetching avatar for "
-                                    + avatar.owner
-                                    + " failed ";
-                    if (result.getType() == Iq.Type.RESULT) {
-                        avatar.image = IqParser.avatarData(result);
-                        if (avatar.image != null) {
-                            if (getFileBackend().save(avatar)) {
-                                if (account.getJid().asBareJid().equals(avatar.owner)) {
-                                    if (account.setAvatar(avatar.getFilename())) {
-                                        databaseBackend.updateAccount(account);
-                                    }
-                                    getAvatarService().clear(account);
-                                    updateConversationUi();
-                                    updateAccountUi();
-                                } else {
-                                    final Contact contact =
-                                            account.getRoster().getContact(avatar.owner);
-                                    contact.setAvatar(avatar);
-                                    syncRoster(account);
-                                    getAvatarService().clear(contact);
-                                    updateConversationUi();
-                                    updateRosterUi(UpdateRosterReason.AVATAR);
-                                }
-                                if (callback != null) {
-                                    callback.success(avatar);
-                                }
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid()
-                                                + ": successfully fetched pep avatar for "
-                                                + avatar.owner);
-                                return;
-                            }
-                        } else {
-
-                            Log.d(Config.LOGTAG, ERROR + "(parsing error)");
-                        }
-                    } else {
-                        Element error = result.findChild("error");
-                        if (error == null) {
-                            Log.d(Config.LOGTAG, ERROR + "(server error)");
-                        } else {
-                            Log.d(Config.LOGTAG, ERROR + error);
-                        }
-                    }
-                    if (callback != null) {
-                        callback.error(0, null);
-                    }
-                });
-    }
-
-    private void fetchAvatarVcard(
-            final Account account, final Avatar avatar, final UiCallback<Avatar> callback) {
-        final Iq packet = this.mIqGenerator.retrieveVcardAvatar(avatar);
-        this.sendIqPacket(
-                account,
-                packet,
-                response -> {
-                    final boolean previouslyOmittedPepFetch;
-                    synchronized (mInProgressAvatarFetches) {
-                        final String KEY = generateFetchKey(account, avatar);
-                        mInProgressAvatarFetches.remove(KEY);
-                        previouslyOmittedPepFetch = mOmittedPepAvatarFetches.remove(KEY);
-                    }
-                    if (response.getType() == Iq.Type.RESULT) {
-                        Element vCard = response.findChild("vCard", "vcard-temp");
-                        Element photo = vCard != null ? vCard.findChild("PHOTO") : null;
-                        String image = photo != null ? photo.findChildContent("BINVAL") : null;
-                        if (image != null) {
-                            avatar.image = image;
-                            if (getFileBackend().save(avatar)) {
-                                Log.d(
-                                        Config.LOGTAG,
-                                        account.getJid().asBareJid()
-                                                + ": successfully fetched vCard avatar for "
-                                                + avatar.owner
-                                                + " omittedPep="
-                                                + previouslyOmittedPepFetch);
-                                if (avatar.owner.isBareJid()) {
-                                    if (account.getJid().asBareJid().equals(avatar.owner)
-                                            && account.getAvatar() == null) {
-                                        Log.d(
-                                                Config.LOGTAG,
-                                                account.getJid().asBareJid()
-                                                        + ": had no avatar. replacing with vcard");
-                                        account.setAvatar(avatar.getFilename());
-                                        databaseBackend.updateAccount(account);
-                                        getAvatarService().clear(account);
-                                        updateAccountUi();
-                                    } else {
-                                        final Contact contact =
-                                                account.getRoster().getContact(avatar.owner);
-                                        contact.setAvatar(avatar, previouslyOmittedPepFetch);
-                                        syncRoster(account);
-                                        getAvatarService().clear(contact);
-                                        updateRosterUi(UpdateRosterReason.AVATAR);
-                                    }
-                                    updateConversationUi();
-                                } else {
-                                    Conversation conversation =
-                                            find(account, avatar.owner.asBareJid());
-                                    if (conversation != null
-                                            && conversation.getMode() == Conversation.MODE_MULTI) {
-                                        MucOptions.User user =
-                                                conversation
-                                                        .getMucOptions()
-                                                        .findUserByFullJid(avatar.owner);
-                                        if (user != null) {
-                                            if (user.setAvatar(avatar)) {
-                                                getAvatarService().clear(user);
-                                                updateConversationUi();
-                                                updateMucRosterUi();
-                                            }
-                                            if (user.getRealJid() != null) {
-                                                Contact contact =
-                                                        account.getRoster()
-                                                                .getContact(user.getRealJid());
-                                                contact.setAvatar(avatar);
-                                                syncRoster(account);
-                                                getAvatarService().clear(contact);
-                                                updateRosterUi(UpdateRosterReason.AVATAR);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-    }
-
-    public void checkForAvatar(final Account account, final UiCallback<Avatar> callback) {
-        final Iq packet = this.mIqGenerator.retrieveAvatarMetaData(null);
-        this.sendIqPacket(
-                account,
-                packet,
-                response -> {
-                    if (response.getType() != Iq.Type.RESULT) {
-                        callback.error(0, null);
-                    }
-                    final var pubsub = packet.getExtension(PubSub.class);
-                    if (pubsub == null) {
-                        callback.error(0, null);
-                        return;
-                    }
-                    final var items = pubsub.getItems();
-                    if (items == null) {
-                        callback.error(0, null);
-                        return;
-                    }
-                    final var item = items.getFirstItemWithId(Metadata.class);
-                    if (item == null) {
-                        callback.error(0, null);
-                        return;
-                    }
-                    final var avatar = Avatar.parseMetadata(item.getKey(), item.getValue());
-                    if (avatar == null) {
-                        callback.error(0, null);
-                        return;
-                    }
-                    avatar.owner = account.getJid().asBareJid();
-                    if (fileBackend.isAvatarCached(avatar)) {
-                        if (account.setAvatar(avatar.getFilename())) {
-                            databaseBackend.updateAccount(account);
-                        }
-                        getAvatarService().clear(account);
-                        callback.success(avatar);
-                    } else {
-                        fetchAvatarPep(account, avatar, callback);
-                    }
-                });
+    public ListenableFuture<Void> checkForAvatar(final Account account) {
+        final var connection = account.getXmppConnection();
+        return connection
+                .getManager(AvatarManager.class)
+                .fetchAndStore(account.getJid().asBareJid());
     }
 
     public void notifyAccountAvatarHasChanged(final Account account) {
         final XmppConnection connection = account.getXmppConnection();
-        if (connection != null && connection.getFeatures().bookmarksConversion()) {
+        // this was bookmark conversion for a bit which doesn't make sense
+        if (connection.getManager(AvatarManager.class).hasPepToVCardConversion()) {
             Log.d(
                     Config.LOGTAG,
                     account.getJid().asBareJid()
                             + ": avatar changed. resending presence to online group chats");
             for (Conversation conversation : conversations) {
-                if (conversation.getAccount() == account && conversation.getMode() == Conversational.MODE_MULTI) {
-                    presenceToMuc(conversation);
+                if (conversation.getAccount() == account
+                        && conversation.getMode() == Conversational.MODE_MULTI) {
+                    connection.getManager(MultiUserChatManager.class).resendPresence(conversation);
                 }
             }
         }
@@ -5985,37 +4095,14 @@ public class XmppConnectionService extends Service {
         });
     }
 
-    public void deleteContactOnServer(Contact contact) {
-        contact.resetOption(Contact.Options.PREEMPTIVE_GRANT);
-        contact.resetOption(Contact.Options.DIRTY_PUSH);
-        contact.setOption(Contact.Options.DIRTY_DELETE);
-        Account account = contact.getAccount();
-        if (account.getStatus() == Account.State.ONLINE) {
-            final Iq iq = new Iq(Iq.Type.SET);
-            Element item = iq.query(Namespace.ROSTER).addChild("item");
-            item.setAttribute("jid", contact.getJid());
-            item.setAttribute("subscription", "remove");
-            account.getXmppConnection().sendIqPacket(iq, mDefaultIqHandler);
-        }
-    }
-
     public void updateConversation(final Conversation conversation) {
         mDatabaseWriterExecutor.execute(() -> databaseBackend.updateConversation(conversation));
     }
 
-    private void reconnectAccount(
+    public void reconnectAccount(
             final Account account, final boolean force, final boolean interactive) {
         synchronized (account) {
-            final XmppConnection existingConnection = account.getXmppConnection();
-            final XmppConnection connection;
-            if (existingConnection != null) {
-                connection = existingConnection;
-            } else if (account.isConnectionEnabled()) {
-                connection = createConnection(account);
-                account.setXmppConnection(connection);
-            } else {
-                return;
-            }
+            final XmppConnection connection = account.getXmppConnection();
             final boolean hasInternet = hasInternetConnection();
             if (account.isConnectionEnabled() && hasInternet) {
                 if (!force) {
@@ -6029,13 +4116,14 @@ public class XmppConnectionService extends Service {
                 scheduleWakeUpCall(Config.CONNECT_DISCO_TIMEOUT, account.getUuid().hashCode());
             } else {
                 disconnect(account, force || account.getTrueStatus().isError() || !hasInternet);
-                account.getRoster().clearPresences();
+                connection.getManager(RosterManager.class).clearPresences();
                 connection.resetEverything();
                 final AxolotlService axolotlService = account.getAxolotlService();
                 if (axolotlService != null) {
                     axolotlService.resetBrokenness();
                 }
                 if (!hasInternet) {
+                    // TODO should this go via XmppConnection.setStatusAndTriggerProcessor()?
                     account.setStatus(Account.State.NO_INTERNET);
                 }
             }
@@ -6047,25 +4135,17 @@ public class XmppConnectionService extends Service {
     }
 
     public void invite(final Conversation conversation, final Jid contact) {
-        Log.d(
-                Config.LOGTAG,
-                conversation.getAccount().getJid().asBareJid()
-                        + ": inviting "
-                        + contact
-                        + " to "
-                        + conversation.getJid().asBareJid());
-        final MucOptions.User user =
-                conversation.getMucOptions().findUserByRealJid(contact.asBareJid());
-        if (user == null || user.getAffiliation() == MucOptions.Affiliation.OUTCAST) {
-            changeAffiliationInConference(conversation, contact, MucOptions.Affiliation.NONE, null);
-        }
-        final var packet = mMessageGenerator.invite(conversation, contact);
-        sendMessagePacket(conversation.getAccount(), packet);
+        final var account = conversation.getAccount();
+        account.getXmppConnection()
+                .getManager(MultiUserChatManager.class)
+                .invite(conversation, contact);
     }
 
     public void directInvite(Conversation conversation, Jid jid) {
-        final var packet = mMessageGenerator.directInvite(conversation, jid);
-        sendMessagePacket(conversation.getAccount(), packet);
+        final var account = conversation.getAccount();
+        account.getXmppConnection()
+                .getManager(MultiUserChatManager.class)
+                .directInvite(conversation, jid);
     }
 
     public void resetSendingToWaiting(Account account) {
@@ -6196,11 +4276,11 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    public boolean getBooleanPreference(String name, @BoolRes int res) {
+    public boolean getBooleanPreference(String name, int res) {
         return getPreferences().getBoolean(name, getResources().getBoolean(res));
     }
 
-    public String getStringPreference(String name, @BoolRes int res) {
+    public String getStringPreference(String name, int res) {
         return getPreferences().getString(name, getResources().getString(res));
     }
 
@@ -6212,16 +4292,8 @@ public class XmppConnectionService extends Service {
         return appSettings.isAllowMessageCorrection();
     }
 
-    public boolean sendChatStates() {
-        return getBooleanPreference("chat_states", R.bool.chat_states);
-    }
-
     public boolean useTorToConnect() {
         return appSettings.isUseTor();
-    }
-
-    public boolean broadcastLastActivity() {
-        return appSettings.isBroadcastLastActivity();
     }
 
     public int unreadCount() {
@@ -6291,21 +4363,24 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    public boolean displayCaptchaRequest(Account account, String id, Data data, Bitmap captcha) {
-        if (mOnCaptchaRequested.size() > 0) {
-            DisplayMetrics metrics = getApplicationContext().getResources().getDisplayMetrics();
-            Bitmap scaled =
-                    Bitmap.createScaledBitmap(
-                            captcha,
-                            (int) (captcha.getWidth() * metrics.scaledDensity),
-                            (int) (captcha.getHeight() * metrics.scaledDensity),
-                            false);
-            for (OnCaptchaRequested listener : threadSafeList(this.mOnCaptchaRequested)) {
-                listener.onCaptchaRequested(account, id, data, scaled);
-            }
-            return true;
+    public boolean displayCaptchaRequest(
+            final Account account,
+            final im.conversations.android.xmpp.model.data.Data data,
+            final Bitmap captcha) {
+        if (mOnCaptchaRequested.isEmpty()) {
+            return false;
         }
-        return false;
+        final var metrics = getApplicationContext().getResources().getDisplayMetrics();
+        Bitmap scaled =
+                Bitmap.createScaledBitmap(
+                        captcha,
+                        (int) (captcha.getWidth() * metrics.scaledDensity),
+                        (int) (captcha.getHeight() * metrics.scaledDensity),
+                        false);
+        for (final OnCaptchaRequested listener : threadSafeList(this.mOnCaptchaRequested)) {
+            listener.onCaptchaRequested(account, data, scaled);
+        }
+        return true;
     }
 
     public void updateBlocklistUi(final OnUpdateBlocklist.Status status) {
@@ -6453,7 +4528,8 @@ public class XmppConnectionService extends Service {
         final String stanzaId = last.getServerMsgId();
 
         if (sendDisplayedMarker && serverAssist) {
-            final var mdsDisplayed = mIqGenerator.mdsDisplayed(stanzaId, conversation);
+            final var mdsDisplayed =
+                    MessageDisplayedSynchronizationManager.displayed(stanzaId, conversation);
             final var packet = mMessageGenerator.confirm(last);
             packet.addChild(mdsDisplayed);
             if (!last.isPrivateMessage()) {
@@ -6500,21 +4576,11 @@ public class XmppConnectionService extends Service {
             itemId = conversation.getJid().asBareJid();
         }
         Log.d(Config.LOGTAG, "publishing mds for " + itemId + "/" + stanzaId);
-        publishMds(account, itemId, stanzaId, conversation);
-    }
-
-    private void publishMds(
-            final Account account,
-            final Jid itemId,
-            final String stanzaId,
-            final Conversation conversation) {
-        final var item = mIqGenerator.mdsDisplayed(stanzaId, conversation);
-        pushNodeAndEnforcePublishOptions(
-                account,
-                Namespace.MDS_DISPLAYED,
-                item,
-                itemId.toString(),
-                PublishOptions.persistentWhitelistAccessMaxItems());
+        final var displayed =
+                MessageDisplayedSynchronizationManager.displayed(stanzaId, conversation);
+        connection
+                .getManager(MessageDisplayedSynchronizationManager.class)
+                .publish(itemId, displayed);
     }
 
     public boolean sendReactions(final Message message, final Collection<String> reactions) {
@@ -6678,20 +4744,20 @@ public class XmppConnectionService extends Service {
     }
 
     public Collection<String> getKnownConferenceHosts() {
-        final Set<String> mucServers = new HashSet<>();
+        final var builder = new ImmutableSet.Builder<Jid>();
         for (final Account account : accounts) {
-            if (account.getXmppConnection() != null) {
-                mucServers.addAll(account.getXmppConnection().getMucServers());
-                for (final Bookmark bookmark : account.getBookmarks()) {
-                    final Jid jid = bookmark.getJid();
-                    final String s = jid == null ? null : jid.getDomain().toString();
-                    if (s != null) {
-                        mucServers.add(s);
-                    }
+            final var connection = account.getXmppConnection();
+            builder.addAll(connection.getManager(MultiUserChatManager.class).getServices());
+            for (final var bookmark : account.getBookmarks()) {
+                final Jid jid = bookmark.getJid();
+                final Jid domain = jid == null ? null : jid.getDomain();
+                if (domain == null) {
+                    continue;
                 }
+                builder.add(domain);
             }
         }
-        return mucServers;
+        return Collections2.transform(builder.build(), Jid::toString);
     }
 
     public void sendMessagePacket(
@@ -6701,23 +4767,6 @@ public class XmppConnectionService extends Service {
         if (connection != null) {
             connection.sendMessagePacket(packet);
         }
-    }
-
-    public void sendPresencePacket(
-            final Account account,
-            final im.conversations.android.xmpp.model.stanza.Presence packet) {
-        final XmppConnection connection = account.getXmppConnection();
-        if (connection != null) {
-            connection.sendPresencePacket(packet);
-        }
-    }
-
-    public void sendCreateAccountWithCaptchaPacket(Account account, String id, Data data) {
-        final XmppConnection connection = account.getXmppConnection();
-        if (connection == null) {
-            return;
-        }
-        connection.sendCreateAccountWithCaptchaPacket(id, data);
     }
 
     public ListenableFuture<Iq> sendIqPacket(final Account account, final Iq request) {
@@ -6741,27 +4790,6 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    public void sendPresence(final Account account) {
-        sendPresence(account, checkListeners() && broadcastLastActivity());
-    }
-
-    private void sendPresence(final Account account, final boolean includeIdleTimestamp) {
-        final im.conversations.android.xmpp.model.stanza.Presence.Availability status;
-        if (manuallyChangePresence()) {
-            status = account.getPresenceStatus();
-        } else {
-            status = getTargetPresence();
-        }
-        final var packet = mPresenceGenerator.selfPresence(account, status);
-        if (mLastActivity > 0 && includeIdleTimestamp) {
-            long since =
-                    Math.min(mLastActivity, System.currentTimeMillis()); // don't send future dates
-            packet.addChild("idle", Namespace.IDLE)
-                    .setAttribute("since", AbstractGenerator.getTimestamp(since));
-        }
-        sendPresencePacket(account, packet);
-    }
-
     private void deactivateGracePeriod() {
         for (Account account : getAccounts()) {
             account.deactivateGracePeriod();
@@ -6769,10 +4797,13 @@ public class XmppConnectionService extends Service {
     }
 
     public void refreshAllPresences() {
-        boolean includeIdleTimestamp = checkListeners() && broadcastLastActivity();
-        for (Account account : getAccounts()) {
+        final boolean includeIdleTimestamp =
+                checkListeners() && appSettings.isBroadcastLastActivity();
+        for (final var account : getAccounts()) {
             if (account.isConnectionEnabled()) {
-                sendPresence(account, includeIdleTimestamp);
+                account.getXmppConnection()
+                        .getManager(PresenceManager.class)
+                        .available(includeIdleTimestamp);
             }
         }
     }
@@ -6783,11 +4814,6 @@ public class XmppConnectionService extends Service {
                 mPushManagementService.registerPushTokenOnServer(account);
             }
         }
-    }
-
-    private void sendOfflinePresence(final Account account) {
-        Log.d(Config.LOGTAG, account.getJid().asBareJid() + ": sending offline presence");
-        sendPresencePacket(account, mPresenceGenerator.sendOfflinePresence(account));
     }
 
     public MessageGenerator getMessageGenerator() {
@@ -6806,7 +4832,7 @@ public class XmppConnectionService extends Service {
         return this.mJingleConnectionManager;
     }
 
-    private boolean hasJingleRtpConnection(final Account account) {
+    public boolean hasJingleRtpConnection(final Account account) {
         return this.mJingleConnectionManager.hasJingleRtpConnection(account);
     }
 
@@ -6890,29 +4916,11 @@ public class XmppConnectionService extends Service {
 
     public boolean sendBlockRequest(
             final Blockable blockable, final boolean reportSpam, final String serverMsgId) {
-        if (blockable != null && blockable.getBlockedJid() != null) {
-            final var account = blockable.getAccount();
-            final Jid jid = blockable.getBlockedJid();
-            this.sendIqPacket(
-                    account,
-                    getIqGenerator().generateSetBlockRequest(jid, reportSpam, serverMsgId),
-                    (response) -> {
-                        if (response.getType() == Iq.Type.RESULT) {
-                            account.getBlocklist().add(jid);
-                            updateBlocklistUi(OnUpdateBlocklist.Status.BLOCKED);
-                        }
-                    });
-            if (blockable.getBlockedJid().isFullJid()) {
-                return false;
-            } else if (removeBlockedConversations(blockable.getAccount(), jid)) {
-                updateConversationUi();
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            return false;
-        }
+        final var account = blockable.getAccount();
+        final var connection = account.getXmppConnection();
+        return connection
+                .getManager(BlockingManager.class)
+                .block(blockable, reportSpam, serverMsgId);
     }
 
     public boolean removeBlockedConversations(final Account account, final Jid blockedJid) {
@@ -6947,55 +4955,46 @@ public class XmppConnectionService extends Service {
     }
 
     public void sendUnblockRequest(final Blockable blockable) {
-        if (blockable != null && blockable.getJid() != null) {
-            final var account = blockable.getAccount();
-            final Jid jid = blockable.getBlockedJid();
-            this.sendIqPacket(
-                    account,
-                    getIqGenerator().generateSetUnblockRequest(jid),
-                    response -> {
-                        if (response.getType() == Iq.Type.RESULT) {
-                            account.getBlocklist().remove(jid);
-                            updateBlocklistUi(OnUpdateBlocklist.Status.UNBLOCKED);
-                        }
-                    });
-        }
+        final var account = blockable.getAccount();
+        final var connection = account.getXmppConnection();
+        connection.getManager(BlockingManager.class).unblock(blockable);
     }
 
     public void publishDisplayName(final Account account) {
-        String displayName = account.getDisplayName();
-        final Iq request;
-        if (TextUtils.isEmpty(displayName)) {
-            request = mIqGenerator.deleteNode(Namespace.NICK);
-        } else {
-            request = mIqGenerator.publishNick(displayName);
-        }
+        final var connection = account.getXmppConnection();
+        final String displayName = account.getDisplayName();
         mAvatarService.clear(account);
-        sendIqPacket(
-                account,
-                request,
-                (packet) -> {
-                    if (packet.getType() == Iq.Type.ERROR) {
+        final var future = connection.getManager(NickManager.class).publish(displayName);
+        Futures.addCallback(
+                future,
+                new FutureCallback<Void>() {
+                    @Override
+                    public void onSuccess(Void result) {
                         Log.d(
                                 Config.LOGTAG,
-                                account.getJid().asBareJid()
-                                        + ": unable to modify nick name "
-                                        + packet);
+                                account.getJid().asBareJid() + ": published User Nick");
                     }
-                });
+
+                    @Override
+                    public void onFailure(@NonNull Throwable t) {
+                        Log.d(Config.LOGTAG, "could not publish User Nick", t);
+                    }
+                },
+                MoreExecutors.directExecutor());
     }
 
     public void fetchFromGateway(Account account, final Jid jid, final String input, final OnGatewayResult callback) {
         final var request = new Iq(input == null ? Iq.Type.GET : Iq.Type.SET);
         request.setTo(jid);
-        Element query = request.query("jabber:iq:gateway");
+        Element query = request.addChild("query");
+        query.setAttribute("xmlns", "jabber:iq:gateway");
         if (input != null) {
             Element prompt = query.addChild("prompt");
             prompt.setContent(input);
         }
         sendIqPacket(account, request, packet -> {
             if (packet.getType() == Iq.Type.RESULT) {
-                callback.onGatewayResult(packet.query().findChildContent(input == null ? "prompt" : "jid"), null);
+                callback.onGatewayResult(packet.findChild("query").findChildContent(input == null ? "prompt" : "jid"), null);
             } else {
                 Element error = packet.findChild("error");
                 callback.onGatewayResult(null, error == null ? null : error.findChildContent("text"));
@@ -7013,6 +5012,7 @@ public class XmppConnectionService extends Service {
                 (packet) -> {
                     final Element prefs = packet.findChild("prefs", version.namespace);
                     if (packet.getType() == Iq.Type.RESULT && prefs != null) {
+                        account.setMamPrefs(prefs);
                         callback.onPreferencesFetched(prefs);
                     } else {
                         callback.onPreferencesFetchFailed();
@@ -7024,7 +5024,8 @@ public class XmppConnectionService extends Service {
         return mPushManagementService;
     }
 
-    public void changeStatus(Account account, PresenceTemplate template, String signature) {
+    public void changeStatus(
+            final Account account, final PresenceTemplate template, final String signature) {
         if (!template.getStatusMessage().isEmpty()) {
             databaseBackend.insertPresenceTemplate(template);
         }
@@ -7032,7 +5033,7 @@ public class XmppConnectionService extends Service {
         account.setPresenceStatus(template.getStatus());
         account.setPresenceStatusMessage(template.getStatusMessage());
         databaseBackend.updateAccount(account);
-        sendPresence(account);
+        account.getXmppConnection().getManager(PresenceManager.class).available();
     }
 
     public List<PresenceTemplate> getPresenceTemplates(Account account) {
@@ -7043,22 +5044,6 @@ public class XmppConnectionService extends Service {
             }
         }
         return templates;
-    }
-
-    public void saveConversationAsBookmark(final Conversation conversation, final String name) {
-        final Account account = conversation.getAccount();
-        final Bookmark bookmark = new Bookmark(account, conversation.getJid().asBareJid());
-        String nick = conversation.getMucOptions().getActualNick();
-        if (nick == null) nick = conversation.getJid().getResource();
-        if (nick != null && !nick.isEmpty() && !nick.equals(MucOptions.defaultNick(account))) {
-            bookmark.setNick(nick);
-        }
-        if (!TextUtils.isEmpty(name)) {
-            bookmark.setBookmarkName(name);
-        }
-        bookmark.setAutojoin(true);
-        createBookmark(account, bookmark);
-        bookmark.setConversation(conversation);
     }
 
     public boolean verifyFingerprints(Contact contact, List<XmppUri.Fingerprint> fingerprints) {
@@ -7132,6 +5117,10 @@ public class XmppConnectionService extends Service {
         }
     }
 
+    public long getLastActivity() {
+        return this.mLastActivity;
+    }
+
     public interface OnMamPreferencesFetched {
         void onPreferencesFetched(Element prefs);
 
@@ -7148,18 +5137,6 @@ public class XmppConnectionService extends Service {
         void onMoreMessagesLoaded(int count, Conversation conversation);
 
         void informUser(int r);
-    }
-
-    public interface OnAccountPasswordChanged {
-        void onPasswordChangeSucceeded();
-
-        void onPasswordChangeFailed();
-    }
-
-    public interface OnRoomDestroy {
-        void onRoomDestroySucceeded();
-
-        void onRoomDestroyFailed();
     }
 
     public interface OnAffiliationChanged {
@@ -7190,7 +5167,10 @@ public class XmppConnectionService extends Service {
     }
 
     public interface OnCaptchaRequested {
-        void onCaptchaRequested(Account account, String id, Data data, Bitmap captcha);
+        void onCaptchaRequested(
+                Account account,
+                im.conversations.android.xmpp.model.data.Data data,
+                Bitmap captcha);
     }
 
     public interface OnRosterUpdate {

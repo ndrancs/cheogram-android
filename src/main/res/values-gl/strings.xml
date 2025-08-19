@@ -8,7 +8,6 @@
     <string name="channel_details">Detalles da canle</string>
     <string name="action_add_account">Engadir conta</string>
     <string name="action_edit_contact">Editar contacto</string>
-    <string name="action_add_phone_book">Engadir a libreta de enderezos</string>
     <string name="action_delete_contact">Eliminar contacto da lista</string>
     <string name="action_block_contact">Bloquear contacto</string>
     <string name="action_unblock_contact">Desbloquear contacto</string>
@@ -1124,4 +1123,7 @@
     <string name="account_status_service_outage_scheduled">Desconexión programada</string>
     <string name="sos_scheduled_return">Está previsto reactivar o servizo ás %s</string>
     <string name="account_status_service_outage_known">Sen servizo (incidencia coñecida)</string>
+    <string name="no_contacts_permission">%1$s precisa acceso aos teus contactos</string>
+    <string name="save_to_contact">Gardar nos contactos</string>
+    <string name="show_in_contacts">Mostrar nos contactos</string>
 </resources>

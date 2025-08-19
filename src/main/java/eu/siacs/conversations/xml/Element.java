@@ -1,6 +1,7 @@
 package eu.siacs.conversations.xml;
 
 import androidx.annotation.NonNull;
+import com.google.common.base.CaseFormat;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -130,6 +131,16 @@ public class Element implements Node {
 
 	public boolean hasChild(final String name) {
 		return findChild(name) != null;
+	}
+
+	public Element setAttribute(final String name, final Enum<?> e) {
+		if (e == null) {
+			this.attributes.remove(name);
+		} else {
+			this.attributes.put(
+					name, CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.LOWER_HYPHEN, e.toString()));
+		}
+		return this;
 	}
 
 	public boolean hasChild(final String name, final String xmlns) {

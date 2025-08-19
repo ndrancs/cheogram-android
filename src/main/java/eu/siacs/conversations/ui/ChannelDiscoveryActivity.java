@@ -42,6 +42,10 @@ import eu.siacs.conversations.ui.util.SoftKeyboardUtils;
 import eu.siacs.conversations.utils.AccountUtils;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ChannelDiscoveryActivity extends XmppActivity
         implements MenuItem.OnActionExpandListener,
@@ -317,7 +321,9 @@ public class ChannelDiscoveryActivity extends XmppActivity
         final Conversation conversation =
                 xmppConnectionService.findOrCreateConversation(
                         account, result.getRoom(), true, true, true);
-        xmppConnectionService.ensureBookmarkIsAutoJoin(conversation);
+        account.getXmppConnection()
+                .getManager(BookmarkManager.class)
+                .ensureBookmarkIsAutoJoin(conversation);
         switchToConversation(conversation);
     }
 }

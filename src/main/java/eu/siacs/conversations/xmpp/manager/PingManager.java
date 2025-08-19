@@ -4,7 +4,9 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
+import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.services.XmppConnectionService;
 import im.conversations.android.xmpp.model.ping.Ping;
@@ -23,6 +25,12 @@ public class PingManager extends AbstractManager {
         } else {
             this.connection.sendIqPacket(new Iq(Iq.Type.GET, new Ping()));
         }
+    }
+
+    public ListenableFuture<Iq> ping(final Jid address) {
+        final var iq = new Iq(Iq.Type.GET, new Ping());
+        iq.setTo(address);
+        return this.connection.sendIqPacket(iq);
     }
 
     public void ping(final Runnable runnable) {
@@ -44,5 +52,9 @@ public class PingManager extends AbstractManager {
                     }
                 },
                 MoreExecutors.directExecutor());
+    }
+
+    public void pong(final Iq packet) {
+        this.connection.sendResultFor(packet);
     }
 }

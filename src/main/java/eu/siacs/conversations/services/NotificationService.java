@@ -57,6 +57,7 @@ import com.google.common.primitives.Ints;
 import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
+import eu.siacs.conversations.android.Device;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
@@ -79,6 +80,7 @@ import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.jingle.AbstractJingleConnection;
 import eu.siacs.conversations.xmpp.jingle.Media;
+import im.conversations.android.xmpp.model.muc.Affiliation;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -405,6 +407,7 @@ public class NotificationService {
     }
 
     private boolean notifyMessage(final Message message) {
+        final var appSettings = new AppSettings(mXmppConnectionService.getApplicationContext());
         final Conversation conversation = (Conversation) message.getConversation();
         final var chatRequestsPref = mXmppConnectionService.getStringPreference("chat_requests", R.string.default_chat_requests);
         return message.getStatus() == Message.STATUS_RECEIVED
@@ -578,9 +581,8 @@ public class NotificationService {
 
     public void pushFailedDelivery(final Message message) {
         final Conversation conversation = (Conversation) message.getConversation();
-        final boolean isScreenLocked = !mXmppConnectionService.isScreenLocked();
         if (this.mIsInForeground
-                && isScreenLocked
+                && !new Device(mXmppConnectionService).isScreenLocked()
                 && this.mOpenConversation == message.getConversation()) {
             Log.d(
                     Config.LOGTAG,
@@ -850,7 +852,7 @@ public class NotificationService {
                             + ": suppressing notification because turned off");
             return;
         }
-        final boolean isScreenLocked = mXmppConnectionService.isScreenLocked();
+        final boolean isScreenLocked = new Device(mXmppConnectionService).isScreenLocked();
         if (this.mIsInForeground
                 && !isScreenLocked
                 && this.mOpenConversation == message.getConversation()) {
@@ -1924,7 +1926,7 @@ public class NotificationService {
             final MucOptions.User sender = conversation.getMucOptions().findUserByFullJid(message.getCounterpart());
             final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && mXmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getJid(), message.getOccupantId(), null, null));
             if (muted) return false;
-            if (sender != null && sender.getAffiliation().ranks(MucOptions.Affiliation.MEMBER) && message.isAttention()) {
+            if (sender != null && sender.ranks(Affiliation.MEMBER) && message.isAttention()) {
                 return true;
             }
             final String nick = conversation.getMucOptions().getActualNick();
@@ -2045,7 +2047,7 @@ public class NotificationService {
         }
     }
 
-    void updateErrorNotification() {
+    public void updateErrorNotification() {
         if (Config.SUPPRESS_ERROR_NOTIFICATION) {
             cancel(ERROR_NOTIFICATION_ID);
             return;

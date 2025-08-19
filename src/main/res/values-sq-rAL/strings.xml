@@ -7,7 +7,6 @@
     <string name="channel_details">Hollësi kanali</string>
     <string name="action_add_account">Shtoni llogari</string>
     <string name="action_edit_contact">Përpunoni emër</string>
-    <string name="action_add_phone_book">Shtoje te libër adresash</string>
     <string name="action_block_contact">Bllokojeni kontaktin</string>
     <string name="action_unblock_contact">Zhbllokoje kontaktin</string>
     <string name="action_block_domain">Blloko përkatësin</string>
@@ -1134,4 +1133,7 @@
     <string name="sos_scheduled_return">Shërbimi është vënë në plan të rikthehet në funksionim më %s</string>
     <string name="account_status_service_outage_known">Shërbim Jashtë Funksionimi (Problem i Ditur)</string>
     <string name="account_status_service_outage_scheduled">Kohë Mosfunksionimi e Planifikuar</string>
+    <string name="save_to_contact">Ruaje te Kontaktet</string>
+    <string name="show_in_contacts">Shfaqe te Kontakte</string>
+    <string name="no_contacts_permission">%1$s ka nevojë për hyrje te kontaktet tuaja</string>
 </resources>

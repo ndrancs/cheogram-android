@@ -1,13 +1,23 @@
 package im.conversations.android.xmpp.processor;
 
-import android.text.TextUtils;
 import android.util.Log;
+import androidx.annotation.NonNull;
+import com.google.common.base.Strings;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.entities.Account;
-import eu.siacs.conversations.generator.IqGenerator;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.xmpp.XmppConnection;
-import im.conversations.android.xmpp.model.stanza.Iq;
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
+import eu.siacs.conversations.xmpp.manager.HttpUploadManager;
+import eu.siacs.conversations.xmpp.manager.MessageDisplayedSynchronizationManager;
+import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
+import eu.siacs.conversations.xmpp.manager.NickManager;
+import eu.siacs.conversations.xmpp.manager.OfflineMessagesManager;
+import eu.siacs.conversations.xmpp.manager.PresenceManager;
+import eu.siacs.conversations.xmpp.manager.RosterManager;
 
 public class BindProcessor extends XmppConnection.Delegate implements Runnable {
 
@@ -22,7 +32,6 @@ public class BindProcessor extends XmppConnection.Delegate implements Runnable {
     public void run() {
         final var account = connection.getAccount();
         final var features = connection.getFeatures();
-        service.cancelAvatarFetches(account);
         final boolean loggedInSuccessfully =
                 account.setOption(Account.OPTION_LOGGED_IN_SUCCESSFULLY, true);
         final boolean sosModified;
@@ -34,70 +43,71 @@ public class BindProcessor extends XmppConnection.Delegate implements Runnable {
             sosModified = false;
         }
         final boolean gainedFeature =
-                account.setOption(Account.OPTION_HTTP_UPLOAD_AVAILABLE, features.httpUpload(0));
+                account.setOption(
+                        Account.OPTION_HTTP_UPLOAD_AVAILABLE,
+                        getManager(HttpUploadManager.class).isAvailableForSize(0));
         if (loggedInSuccessfully || gainedFeature || sosModified) {
             service.databaseBackend.updateAccount(account);
         }
 
         if (loggedInSuccessfully) {
-            if (!TextUtils.isEmpty(account.getDisplayName())) {
+            final String displayName = account.getDisplayName();
+            if (!Strings.isNullOrEmpty(displayName)) {
                 Log.d(
                         Config.LOGTAG,
                         account.getJid().asBareJid()
                                 + ": display name wasn't empty on first log in. publishing");
-                service.publishDisplayName(account);
+                getManager(NickManager.class).publish(displayName);
             }
         }
 
-        account.getRoster().clearPresences();
-        synchronized (account.inProgressConferenceJoins) {
-            account.inProgressConferenceJoins.clear();
-        }
-        synchronized (account.inProgressConferencePings) {
-            account.inProgressConferencePings.clear();
-        }
+        getManager(RosterManager.class).clearPresences();
+        getManager(MultiUserChatManager.class).clearInProgress();
         service.getJingleConnectionManager().notifyRebound(account);
         service.getQuickConversationsService().considerSyncBackground(false);
 
-        connection.fetchRoster();
-
-        if (features.bookmarks2()) {
-            service.fetchBookmarks2(account);
-        } else if (!features.bookmarksConversion()) {
-            service.fetchBookmarks(account);
-        }
+        getManager(RosterManager.class).request();
+        getManager(BookmarkManager.class).request();
 
         if (features.mds()) {
-            service.fetchMessageDisplayedSynchronization(account);
+            getManager(MessageDisplayedSynchronizationManager.class).fetch();
         } else {
             Log.d(Config.LOGTAG, account.getJid() + ": server has no support for mds");
         }
+        final var offlineManager = getManager(OfflineMessagesManager.class);
         final boolean bind2 = features.bind2();
-        final boolean flexible = features.flexibleOfflineMessageRetrieval();
+        final boolean flexible = offlineManager.hasFeature();
         final boolean catchup = service.getMessageArchiveService().inCatchup(account);
         final boolean trackOfflineMessageRetrieval;
         if (!bind2 && flexible && catchup && connection.isMamPreferenceAlways()) {
             trackOfflineMessageRetrieval = false;
-            connection.sendIqPacket(
-                    IqGenerator.purgeOfflineMessages(),
-                    (packet) -> {
-                        if (packet.getType() == Iq.Type.RESULT) {
+            Futures.addCallback(
+                    offlineManager.purge(),
+                    new FutureCallback<Void>() {
+                        @Override
+                        public void onSuccess(Void result) {
                             Log.d(
                                     Config.LOGTAG,
                                     account.getJid().asBareJid()
                                             + ": successfully purged offline messages");
                         }
-                    });
+
+                        @Override
+                        public void onFailure(@NonNull Throwable t) {
+                            Log.d(Config.LOGTAG, "could not purge offline messages", t);
+                        }
+                    },
+                    MoreExecutors.directExecutor());
         } else {
             trackOfflineMessageRetrieval = true;
         }
-        service.sendPresence(account);
+        getManager(PresenceManager.class).available();
         connection.trackOfflineMessageRetrieval(trackOfflineMessageRetrieval);
         if (service.getPushManagementService().available(account)) {
             service.getPushManagementService().registerPushTokenOnServer(account);
         }
         service.connectMultiModeConversations(account);
-        service.syncDirtyContacts(account);
+        getManager(RosterManager.class).syncDirtyContacts();
 
         service.getUnifiedPushBroker().renewUnifiedPushEndpointsOnBind(account);
     }

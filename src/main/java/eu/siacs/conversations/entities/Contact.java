@@ -31,7 +31,6 @@ import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.jingle.RtpCapability;
-import eu.siacs.conversations.xmpp.pep.Avatar;
 import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -86,7 +85,7 @@ public class Contact implements ListItem, Blockable {
     private JSONArray systemTags = new JSONArray();
     private final Presences presences = new Presences(this);
     protected Account account;
-    protected Avatar avatar;
+    protected String avatar;
 
     private boolean mActive = false;
     private long mLastseen = 0;
@@ -94,7 +93,7 @@ public class Contact implements ListItem, Blockable {
     private RtpCapability.Capability rtpCapability;
 
     public Contact(Contact other) {
-        this(null, other.systemName, other.serverName, other.presenceName, other.jid, other.subscription, other.photoUri, other.systemAccount, other.keys == null ? null : other.keys.toString(), other.getAvatar() == null ? null : other.getAvatar().sha1sum, other.mLastseen, other.mLastPresence, other.groups == null ? null : other.groups.toString(), other.rtpCapability);
+        this(null, other.systemName, other.serverName, other.presenceName, other.jid, other.subscription, other.photoUri, other.systemAccount, other.keys == null ? null : other.keys.toString(), other.getAvatar(), other.mLastseen, other.mLastPresence, other.groups == null ? null : other.groups.toString(), other.rtpCapability);
         setAccount(other.getAccount());
     }
 
@@ -128,11 +127,7 @@ public class Contact implements ListItem, Blockable {
             tmpJsonObject = new JSONObject();
         }
         this.keys = tmpJsonObject;
-        if (avatar != null) {
-            this.avatar = new Avatar();
-            this.avatar.sha1sum = avatar;
-            this.avatar.origin = Avatar.Origin.VCARD; // always assume worst
-        }
+        this.avatar = avatar;
         try {
             this.groups = (groups == null ? new JSONArray() : new JSONArray(groups));
         } catch (JSONException e) {
@@ -295,7 +290,7 @@ public class Contact implements ListItem, Blockable {
             values.put(SYSTEMACCOUNT, systemAccount != null ? systemAccount.toString() : null);
             values.put(PHOTOURI, photoUri);
             values.put(KEYS, keys.toString());
-            values.put(AVATAR, avatar == null ? null : avatar.getFilename());
+            values.put(AVATAR, avatar);
             values.put(LAST_PRESENCE, mLastPresence);
             values.put(LAST_TIME, mLastseen);
             values.put(GROUPS, groups.toString());
@@ -393,7 +388,7 @@ public class Contact implements ListItem, Blockable {
         this.groups = new JSONArray(groups);
     }
 
-    private Collection<String> getGroups(final boolean unique) {
+    public Collection<String> getGroups(final boolean unique) {
         final Collection<String> groups = unique ? new HashSet<>() : new ArrayList<>();
         for (int i = 0; i < this.groups.length(); ++i) {
             try {
@@ -560,30 +555,16 @@ public class Contact implements ListItem, Blockable {
         return getJid().getDomain().toString();
     }
 
-    public boolean setAvatar(final Avatar avatar) {
-        return setAvatar(avatar, false);
-    }
-
-    public boolean setAvatar(final Avatar avatar, final boolean previouslyOmittedPepFetch) {
+    public boolean setAvatar(final String avatar) {
         if (this.avatar != null && this.avatar.equals(avatar)) {
-            return false;
-        }
-        if (!previouslyOmittedPepFetch
-                && this.avatar != null
-                && this.avatar.origin == Avatar.Origin.PEP
-                && avatar.origin == Avatar.Origin.VCARD) {
             return false;
         }
         this.avatar = avatar;
         return true;
     }
 
-    public String getAvatarFilename() {
-        return avatar == null ? null : avatar.getFilename();
-    }
-
-    public Avatar getAvatar() {
-        return avatar;
+    public String getAvatar() {
+        return this.avatar;
     }
 
     public boolean mutualPresenceSubscription() {
@@ -601,6 +582,7 @@ public class Contact implements ListItem, Blockable {
     }
 
     @Override
+    @NonNull
     public Jid getBlockedJid() {
         if (isDomainBlocked()) {
             return getJid().getDomain();
@@ -761,7 +743,7 @@ public class Contact implements ListItem, Blockable {
     }
 
     public boolean hasAvatarOrPresenceName() {
-        return (avatar != null && avatar.getFilename() != null) || presenceName != null;
+        return avatar != null || presenceName != null;
     }
 
     public boolean refreshRtpCapability() {

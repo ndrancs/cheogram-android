@@ -49,6 +49,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import io.ipfs.cid.Cid;
 
+import com.google.common.collect.ImmutableMap;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
@@ -60,7 +61,6 @@ import eu.siacs.conversations.entities.DownloadableFile;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.MucOptions;
 import eu.siacs.conversations.entities.PresenceTemplate;
-import eu.siacs.conversations.entities.Roster;
 import eu.siacs.conversations.services.QuickConversationsService;
 import eu.siacs.conversations.services.ShortcutService;
 import eu.siacs.conversations.utils.CryptoHelper;
@@ -2232,23 +2232,29 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                db.delete("cheogram." + Message.TABLENAME, Message.UUID + "=?", args) == 1;
     }
 
-    public void readRoster(Roster roster) {
+    public Map<Jid, Contact> readRoster(final Account account) {
+        final var builder = new ImmutableMap.Builder<Jid, Contact>();
         final SQLiteDatabase db = this.getReadableDatabase();
-        final String[] args = {roster.getAccount().getUuid()};
+        final String[] args = {account.getUuid()};
         try (final Cursor cursor =
                 db.query(Contact.TABLENAME, null, Contact.ACCOUNT + "=?", args, null, null, null)) {
             while (cursor.moveToNext()) {
-                roster.initContact(Contact.fromCursor(cursor));
+                final var contact = Contact.fromCursor(cursor);
+                if (contact != null) {
+                    contact.setAccount(account);
+                    builder.put(contact.getJid(), contact);
+                }
             }
         }
+        return builder.buildKeepingLast();
     }
 
-    public void writeRoster(final Roster roster) {
-        long start = SystemClock.elapsedRealtime();
-        final Account account = roster.getAccount();
+    public void writeRoster(
+            final Account account, final String version, final List<Contact> contacts) {
+        final long start = SystemClock.elapsedRealtime();
         final SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
-        for (Contact contact : roster.getContacts()) {
+        for (final Contact contact : contacts) {
             if (contact.getOption(Contact.Options.IN_ROSTER)
                     || contact.hasAvatarOrPresenceName()
                     || contact.getOption(Contact.Options.SYNCED_VIA_OTHER)) {
@@ -2261,7 +2267,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         }
         db.setTransactionSuccessful();
         db.endTransaction();
-        account.setRosterVersion(roster.getVersion());
+        account.setRosterVersion(version);
         updateAccount(account);
         long duration = SystemClock.elapsedRealtime() - start;
         Log.d(

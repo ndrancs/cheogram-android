@@ -28,7 +28,6 @@ import android.provider.OpenableColumns;
 import android.system.Os;
 import android.system.StructStat;
 import android.util.Base64;
-import android.util.Base64OutputStream;
 import android.util.DisplayMetrics;
 import android.util.Pair;
 import android.util.Log;
@@ -149,11 +148,11 @@ public class FileBackend {
     }
 
     public static boolean allFilesUnderSize(
-            Context context, List<Attachment> attachments, long max) {
+            Context context, List<Attachment> attachments, final Long max) {
         final boolean compressVideo =
                 !AttachFileToConversationRunnable.getVideoCompression(context)
                         .equals("uncompressed");
-        if (max <= 0) {
+        if (max == null || max <= 0) {
             Log.d(Config.LOGTAG, "server did not report max file size for http upload");
             return true; // exception to be compatible with HTTP Upload < v0.2
         }
@@ -262,7 +261,7 @@ public class FileBackend {
         return context.getPackageName() + FILE_PROVIDER;
     }
 
-    private static boolean hasAlpha(final Bitmap bitmap) {
+    public static boolean hasAlpha(final Bitmap bitmap) {
         final int w = bitmap.getWidth();
         final int h = bitmap.getHeight();
         final int yStep = Math.max(1, w / 100);
@@ -927,7 +926,7 @@ public class FileBackend {
                 throw new ImageCompressionException("Source file had alpha channel");
             }
             Bitmap scaledBitmap = resize(originalBitmap, Config.IMAGE_SIZE);
-            final int rotation = getRotation(image);
+            final int rotation = getRotation(mXmppConnectionService, image);
             scaledBitmap = rotate(scaledBitmap, rotation);
             boolean targetSizeReached = false;
             int quality = Config.IMAGE_QUALITY;
@@ -1166,9 +1165,8 @@ public class FileBackend {
         }
     }
 
-    private int getRotation(final Uri image) {
-        try (final InputStream is =
-                mXmppConnectionService.getContentResolver().openInputStream(image)) {
+    private static int getRotation(final Context context, final Uri image) {
+        try (final InputStream is = context.getContentResolver().openInputStream(image)) {
             return is == null ? 0 : getRotation(is);
         } catch (final Exception e) {
             return 0;
@@ -1559,7 +1557,6 @@ public class FileBackend {
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private Bitmap cropCenterSquarePdf(final Uri uri, final int size) {
         try {
             ParcelFileDescriptor fileDescriptor =
@@ -1573,7 +1570,6 @@ public class FileBackend {
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private Bitmap renderPdfDocument(
             ParcelFileDescriptor fileDescriptor, int targetSize, boolean fit) throws IOException {
         final PdfRenderer pdfRenderer = new PdfRenderer(fileDescriptor);
@@ -1609,240 +1605,6 @@ public class FileBackend {
         return getUriForFile(mXmppConnectionService, file, filename);
     }
 
-    public Avatar getPepAvatar(Uri image, int size, Bitmap.CompressFormat format) {
-
-        final Pair<Avatar,Boolean> uncompressAvatar = getUncompressedAvatar(image);
-        if (uncompressAvatar != null && uncompressAvatar.first != null &&
-                (uncompressAvatar.first.image.length() <= Config.AVATAR_CHAR_LIMIT || uncompressAvatar.second)) {
-            return uncompressAvatar.first;
-        }
-        if (uncompressAvatar != null && uncompressAvatar.first != null) {
-            Log.d(
-                    Config.LOGTAG,
-                    "uncompressed avatar exceeded char limit by "
-                            + (uncompressAvatar.first.image.length() - Config.AVATAR_CHAR_LIMIT));
-        }
-
-        Bitmap bm = cropCenterSquare(image, size);
-        if (bm == null) {
-            return null;
-        }
-        if (hasAlpha(bm)) {
-            Log.d(Config.LOGTAG, "alpha in avatar detected; uploading as PNG");
-            bm.recycle();
-            bm = cropCenterSquare(image, 96);
-            return getPepAvatar(bm, Bitmap.CompressFormat.PNG, 100);
-        }
-        return getPepAvatar(bm, format, 100);
-    }
-
-    private Pair<Avatar,Boolean> getUncompressedAvatar(Uri uri) {
-        try {
-            if (android.os.Build.VERSION.SDK_INT >= 28) {
-                ImageDecoder.Source source = ImageDecoder.createSource(mXmppConnectionService.getContentResolver(), uri);
-                int[] size = new int[] { 0, 0 };
-                boolean[] animated = new boolean[] { false };
-                String[] mimeType = new String[] { null };
-                Drawable drawable = ImageDecoder.decodeDrawable(source, (decoder, info, src) -> {
-                    mimeType[0] = info.getMimeType();
-                    animated[0] = info.isAnimated();
-                    size[0] = info.getSize().getWidth();
-                    size[1] = info.getSize().getHeight();
-                });
-
-                if (animated[0]) {
-                    Avatar avatar = getPepAvatar(uri, size[0], size[1], mimeType[0]);
-                    if (avatar != null) return new Pair(avatar, true);
-                }
-
-                return new Pair(getPepAvatar(drawDrawable(drawable), Bitmap.CompressFormat.PNG, 100), false);
-            } else {
-                Bitmap bitmap =
-                    BitmapFactory.decodeStream(
-                            mXmppConnectionService.getContentResolver().openInputStream(uri));
-                return new Pair(getPepAvatar(bitmap, Bitmap.CompressFormat.PNG, 100), false);
-            }
-        } catch (Exception e) {
-            try {
-                final SVG svg = SVG.getFromInputStream(mXmppConnectionService.getContentResolver().openInputStream(uri));
-                return new Pair(getPepAvatar(uri, (int) svg.getDocumentWidth(), (int) svg.getDocumentHeight(), "image/svg+xml"), true);
-            } catch (Exception e2) {
-                return null;
-            }
-        }
-    }
-
-    private Avatar getPepAvatar(Uri uri, int width, int height, final String mimeType) throws IOException, NoSuchAlgorithmException {
-        AssetFileDescriptor fd = mXmppConnectionService.getContentResolver().openAssetFileDescriptor(uri, "r");
-        if (fd.getLength() > 100000) return null; // Too big to use raw file
-
-        ByteArrayOutputStream mByteArrayOutputStream = new ByteArrayOutputStream();
-        Base64OutputStream mBase64OutputStream =
-                new Base64OutputStream(mByteArrayOutputStream, Base64.DEFAULT);
-        MessageDigest digest = MessageDigest.getInstance("SHA-1");
-        DigestOutputStream mDigestOutputStream =
-                new DigestOutputStream(mBase64OutputStream, digest);
-
-        ByteStreams.copy(fd.createInputStream(), mDigestOutputStream);
-        mDigestOutputStream.flush();
-        mDigestOutputStream.close();
-
-        final Avatar avatar = new Avatar();
-        avatar.sha1sum = CryptoHelper.bytesToHex(digest.digest());
-        avatar.image = new String(mByteArrayOutputStream.toByteArray());
-        avatar.type = mimeType;
-        avatar.width = width;
-        avatar.height = height;
-        return avatar;
-    }
-
-    private Avatar getPepAvatar(Bitmap bitmap, Bitmap.CompressFormat format, int quality) {
-        try {
-            ByteArrayOutputStream mByteArrayOutputStream = new ByteArrayOutputStream();
-            Base64OutputStream mBase64OutputStream =
-                    new Base64OutputStream(mByteArrayOutputStream, Base64.DEFAULT);
-            MessageDigest digest = MessageDigest.getInstance("SHA-1");
-            DigestOutputStream mDigestOutputStream =
-                    new DigestOutputStream(mBase64OutputStream, digest);
-            if (!bitmap.compress(format, quality, mDigestOutputStream)) {
-                return null;
-            }
-            mDigestOutputStream.flush();
-            mDigestOutputStream.close();
-            long chars = mByteArrayOutputStream.size();
-            if (format != Bitmap.CompressFormat.PNG
-                    && quality >= 50
-                    && chars >= Config.AVATAR_CHAR_LIMIT) {
-                int q = quality - 2;
-                Log.d(
-                        Config.LOGTAG,
-                        "avatar char length was " + chars + " reducing quality to " + q);
-                return getPepAvatar(bitmap, format, q);
-            }
-            Log.d(Config.LOGTAG, "settled on char length " + chars + " with quality=" + quality);
-            final Avatar avatar = new Avatar();
-            avatar.sha1sum = CryptoHelper.bytesToHex(digest.digest());
-            avatar.image = mByteArrayOutputStream.toString();
-            if (format.equals(Bitmap.CompressFormat.WEBP)) {
-                avatar.type = "image/webp";
-            } else if (format.equals(Bitmap.CompressFormat.JPEG)) {
-                avatar.type = "image/jpeg";
-            } else if (format.equals(Bitmap.CompressFormat.PNG)) {
-                avatar.type = "image/png";
-            }
-            avatar.width = bitmap.getWidth();
-            avatar.height = bitmap.getHeight();
-            return avatar;
-        } catch (OutOfMemoryError e) {
-            Log.d(Config.LOGTAG, "unable to convert avatar to base64 due to low memory");
-            return null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public Avatar getStoredPepAvatar(String hash) {
-        if (hash == null) {
-            return null;
-        }
-        Avatar avatar = new Avatar();
-        final File file = getAvatarFile(hash);
-        FileInputStream is = null;
-        try {
-            avatar.size = file.length();
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inJustDecodeBounds = true;
-            BitmapFactory.decodeFile(file.getAbsolutePath(), options);
-            is = new FileInputStream(file);
-            ByteArrayOutputStream mByteArrayOutputStream = new ByteArrayOutputStream();
-            Base64OutputStream mBase64OutputStream =
-                    new Base64OutputStream(mByteArrayOutputStream, Base64.DEFAULT);
-            MessageDigest digest = MessageDigest.getInstance("SHA-1");
-            DigestOutputStream os = new DigestOutputStream(mBase64OutputStream, digest);
-            byte[] buffer = new byte[4096];
-            int length;
-            while ((length = is.read(buffer)) > 0) {
-                os.write(buffer, 0, length);
-            }
-            os.flush();
-            os.close();
-            avatar.sha1sum = CryptoHelper.bytesToHex(digest.digest());
-            avatar.image = mByteArrayOutputStream.toString();
-            avatar.height = options.outHeight;
-            avatar.width = options.outWidth;
-            avatar.type = options.outMimeType;
-            return avatar;
-        } catch (NoSuchAlgorithmException | IOException e) {
-            return null;
-        } finally {
-            close(is);
-        }
-    }
-
-    public boolean isAvatarCached(Avatar avatar) {
-        final File file = getAvatarFile(avatar.getFilename());
-        return file.exists();
-    }
-
-    public boolean save(final Avatar avatar) {
-        File file;
-        if (isAvatarCached(avatar)) {
-            file = getAvatarFile(avatar.getFilename());
-            avatar.size = file.length();
-        } else {
-            file =
-                    new File(
-                            mXmppConnectionService.getCacheDir().getAbsolutePath()
-                                    + "/"
-                                    + UUID.randomUUID().toString());
-            if (file.getParentFile().mkdirs()) {
-                Log.d(Config.LOGTAG, "created cache directory");
-            }
-            OutputStream os = null;
-            try {
-                if (!file.createNewFile()) {
-                    Log.d(
-                            Config.LOGTAG,
-                            "unable to create temporary file " + file.getAbsolutePath());
-                }
-                os = new FileOutputStream(file);
-                MessageDigest digest = MessageDigest.getInstance("SHA-1");
-                digest.reset();
-                DigestOutputStream mDigestOutputStream = new DigestOutputStream(os, digest);
-                final byte[] bytes = avatar.getImageAsBytes();
-                mDigestOutputStream.write(bytes);
-                mDigestOutputStream.flush();
-                mDigestOutputStream.close();
-                String sha1sum = CryptoHelper.bytesToHex(digest.digest());
-                if (sha1sum.equals(avatar.sha1sum)) {
-                    final File outputFile = getAvatarFile(avatar.getFilename());
-                    if (outputFile.getParentFile().mkdirs()) {
-                        Log.d(Config.LOGTAG, "created avatar directory");
-                    }
-                    final File avatarFile = getAvatarFile(avatar.getFilename());
-                    if (!file.renameTo(avatarFile)) {
-                        Log.d(
-                                Config.LOGTAG,
-                                "unable to rename " + file.getAbsolutePath() + " to " + outputFile);
-                        return false;
-                    }
-                } else {
-                    Log.d(Config.LOGTAG, "sha1sum mismatch for " + avatar.owner);
-                    if (!file.delete()) {
-                        Log.d(Config.LOGTAG, "unable to delete temporary file");
-                    }
-                    return false;
-                }
-                avatar.size = bytes.length;
-            } catch (IllegalArgumentException | IOException | NoSuchAlgorithmException e) {
-                return false;
-            } finally {
-                close(os);
-            }
-        }
-        return true;
-    }
-
     public void deleteHistoricAvatarPath() {
         delete(getHistoricAvatarPath());
     }
@@ -1865,8 +1627,8 @@ public class FileBackend {
         return new File(mXmppConnectionService.getFilesDir(), "/avatars/");
     }
 
-    public File getAvatarFile(String avatar) {
-        final var f = new File(mXmppConnectionService.getCacheDir(), "/avatars/" + avatar);
+    public static File getAvatarFile(Context context, String avatar) {
+        final var f = new File(context.getCacheDir(), "/avatars/" + avatar);
         if (Build.VERSION.SDK_INT < 26) return f; // Doesn't support file.toPath
         try {
             if (f.exists()) java.nio.file.Files.setAttribute(f.toPath(), "lastAccessTime", java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis()));
@@ -1874,6 +1636,10 @@ public class FileBackend {
             Log.w(Config.LOGTAG, "unable to set lastAccessTime for " + f);
         }
         return f;
+    }
+
+    public File getAvatarFile(final String avatar) {
+        return getAvatarFile(mXmppConnectionService, avatar);
     }
 
     public Uri getAvatarUri(String avatar) {
@@ -1905,12 +1671,16 @@ public class FileBackend {
     }
 
     public Bitmap cropCenterSquare(final Uri image, final int size) {
+        return cropCenterSquare(mXmppConnectionService, image, size);
+    }
+
+    public Bitmap cropCenterSquare(final Context context, final Uri image, final int size) {
         if (image == null) {
             return null;
         }
         final BitmapFactory.Options options = new BitmapFactory.Options();
         try {
-            options.inSampleSize = calcSampleSize(image, size);
+            options.inSampleSize = calcSampleSize(context, image, size);
         } catch (final IOException | SecurityException e) {
             Log.d(Config.LOGTAG, "unable to calculate sample size for " + image, e);
             return null;
@@ -1924,7 +1694,7 @@ public class FileBackend {
             if (originalBitmap == null) {
                 return null;
             } else {
-                final var bitmap = rotate(originalBitmap, getRotation(image));
+                final var bitmap = rotate(originalBitmap, getRotation(context, image));
                 return cropCenterSquare(bitmap, size);
             }
         } catch (final SecurityException | IOException e) {
@@ -1976,20 +1746,28 @@ public class FileBackend {
         }
     }
 
-    public Bitmap cropCenterSquare(Bitmap input, int size) {
-        int w = input.getWidth();
-        int h = input.getHeight();
-
-        float scale = Math.max((float) size / h, (float) size / w);
-
-        float outWidth = scale * w;
-        float outHeight = scale * h;
+    public static Bitmap cropCenterSquare(final Bitmap input, final int sizeIn) {
+        final int w = input.getWidth();
+        final int h = input.getHeight();
+        final int size;
+        final float outWidth;
+        final float outHeight;
+        if (w < sizeIn || h < sizeIn) {
+            size = Math.min(w, h);
+            outWidth = w;
+            outHeight = h;
+        } else {
+            size = sizeIn;
+            final float scale = Math.max((float) sizeIn / h, (float) sizeIn / w);
+            outWidth = scale * w;
+            outHeight = scale * h;
+        }
         float left = (size - outWidth) / 2;
         float top = (size - outHeight) / 2;
-        RectF target = new RectF(left, top, left + outWidth, top + outHeight);
+        final var target = new RectF(left, top, left + outWidth, top + outHeight);
 
-        Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(output);
+        final var output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        final var canvas = new Canvas(output);
         canvas.drawBitmap(input, null, target, createAntiAliasingPaint());
         if (!input.isRecycled()) {
             input.recycle();
@@ -1998,6 +1776,11 @@ public class FileBackend {
     }
 
     private int calcSampleSize(final Uri image, int size) throws IOException, SecurityException {
+        return calcSampleSize(mXmppConnectionService, image, size);
+    }
+
+    private int calcSampleSize(final Context context, final Uri image, int size)
+            throws IOException, SecurityException {
         final BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         try (final InputStream inputStream =
