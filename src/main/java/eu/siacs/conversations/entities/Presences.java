@@ -187,7 +187,7 @@ public class Presences {
         }
         for (final var jid : jids) {
             final var disco = connection.getManager(DiscoManager.class).get(jid);
-            if (disco != null && disco.getFeatures().contains(namespace)) {
+            if (disco != null && disco.hasFeature(namespace)) {
                 return true;
             }
         }
@@ -201,7 +201,7 @@ public class Presences {
         }
         for (final var jid : getFullJids()) {
             final var disco = connection.getManager(DiscoManager.class).get(jid);
-            if (disco != null && disco.getFeatures().contains(namespace)) {
+            if (disco != null && disco.hasFeature(namespace)) {
                 return jid.getResource();
             }
         }
