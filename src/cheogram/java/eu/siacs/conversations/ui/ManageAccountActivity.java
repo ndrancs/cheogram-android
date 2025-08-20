@@ -12,11 +12,13 @@ import android.security.KeyChainAliasCallback;
 import android.util.Pair;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.ListView;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -31,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
+import eu.siacs.conversations.databinding.ActivityManageAccountsBinding;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.services.XmppConnectionService;
@@ -60,6 +63,9 @@ public class ManageAccountActivity extends XmppActivity implements OnAccountUpda
     protected AtomicBoolean mInvokedAddAccount = new AtomicBoolean(false);
     protected Intent mMicIntent = null;
 
+    private ActivityManageAccountsBinding binding;
+    private RelativeLayout phoneAccountsFooter;
+
     protected Pair<Integer, Intent> mPostponedActivityResult = null;
 
     @Override
@@ -81,14 +87,14 @@ public class ManageAccountActivity extends XmppActivity implements OnAccountUpda
         invalidateOptionsMenu();
         mAccountAdapter.notifyDataSetChanged();
 
-        findViewById(R.id.phone_accounts).setVisibility(View.GONE);
-        findViewById(R.id.phone_accounts).setOnClickListener((View v) -> {
+        phoneAccountsFooter.setVisibility(View.GONE);
+        phoneAccountsFooter.setOnClickListener((View v) -> {
             mMicIntent = new Intent();
             mMicIntent.setComponent(new ComponentName("com.android.server.telecom",
                 "com.android.server.telecom.settings.EnableAccountPreferenceActivity"));
             requestMicPermission();
         });
-        findViewById(R.id.phone_accounts_settings).setOnClickListener((View v) -> {
+        phoneAccountsFooter.findViewById(R.id.phone_accounts_settings).setOnClickListener((View v) -> {
             mMicIntent = new Intent(android.telecom.TelecomManager.ACTION_CHANGE_PHONE_ACCOUNTS);
             requestMicPermission();
         });
@@ -102,7 +108,7 @@ public class ManageAccountActivity extends XmppActivity implements OnAccountUpda
 
         final var hasPhoneAccounts = xmppConnectionService.getAccounts().stream().anyMatch(a -> a.getGateways("pstn").size() > 0);
         if (hasPhoneAccounts) {
-            findViewById(R.id.phone_accounts).setVisibility(View.VISIBLE);
+            phoneAccountsFooter.setVisibility(View.VISIBLE);
         }
     }
 
@@ -110,8 +116,9 @@ public class ManageAccountActivity extends XmppActivity implements OnAccountUpda
     protected void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
+        binding = ActivityManageAccountsBinding.inflate(getLayoutInflater());
 
-        setContentView(R.layout.activity_manage_accounts);
+        setContentView(binding.getRoot());
         Activities.setStatusAndNavigationBarColors(this, findViewById(android.R.id.content));
         setSupportActionBar(findViewById(R.id.toolbar));
         configureActionBar(getSupportActionBar());
@@ -126,10 +133,20 @@ public class ManageAccountActivity extends XmppActivity implements OnAccountUpda
             }
         }
 
-        accountListView = findViewById(R.id.account_list);
+        accountListView = binding.accountList;
         this.mAccountAdapter = new AccountAdapter(this, accountList);
         accountListView.setAdapter(this.mAccountAdapter);
         accountListView.setOnItemClickListener((arg0, view, position, arg3) -> switchToAccount(accountList.get(position)));
+
+
+        LayoutInflater inflater = getLayoutInflater();
+        phoneAccountsFooter = (RelativeLayout) inflater.inflate(
+                R.layout.footer_manage_phone_accounts,
+                accountListView,
+                false
+        );
+        accountListView.addFooterView(phoneAccountsFooter);
+
         registerForContextMenu(accountListView);
     }
 
