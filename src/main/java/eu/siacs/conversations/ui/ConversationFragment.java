@@ -3615,6 +3615,21 @@ public class ConversationFragment extends XmppFragment
                         @Override
                         public void onFailure(@NonNull Throwable throwable) {
                             Log.d(Config.LOGTAG, "Failed to get commands: " + throwable);
+
+                            if (activity == null) return;
+
+                            activity.runOnUiThread(() -> {
+                                binding.commandsViewProgressbar.setVisibility(View.GONE);
+                                commandAdapter.clear();
+
+                                if (mucConfig != null) commandAdapter.add(mucConfig);
+
+                                if (commandAdapter.getCount() < 1) {
+                                    conversation.hideViewPager();
+                                } else if (delayShow) {
+                                    conversation.showViewPager();
+                                }
+                            });
                         }
                     },
                     MoreExecutors.directExecutor()
