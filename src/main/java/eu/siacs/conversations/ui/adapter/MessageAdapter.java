@@ -1776,6 +1776,11 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                 return false;
             }
         }
+        final var trueCounterA = a.getTrueCounterpart();
+        final var trueCounterB = b.getTrueCounterpart();
+        if ((trueCounterA != null || trueCounterB != null) && (trueCounterA == null || !trueCounterA.equals(trueCounterB))) {
+            return false;
+        }
         return b.getTimeSent() - a.getTimeSent() <= Config.MESSAGE_MERGE_WINDOW;
     }
 
