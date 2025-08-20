@@ -255,10 +255,10 @@ public class DiscoManager extends AbstractManager {
                     if (itemsQuery == null) {
                         throw new IllegalStateException();
                     }
-                    if (!Objects.equals(requestNode, itemsQuery.getNode())) {
+                    /*if (!Objects.equals(requestNode, itemsQuery.getNode())) {
                         throw new IllegalStateException(
-                                "Node in response did not match node in request");
-                    }
+                                "Node in response did not match node in request: " + requestNode + " vs " + itemsQuery.getNode());
+                    }*/
                     final var items = itemsQuery.getExtensions(Item.class);
 
                     final var validItems =
