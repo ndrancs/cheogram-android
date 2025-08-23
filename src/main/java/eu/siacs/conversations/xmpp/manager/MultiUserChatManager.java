@@ -911,9 +911,11 @@ public class MultiUserChatManager extends AbstractManager {
             }
         } catch (final Exception e) { }
         Set<MucOptions.Hat> hats = new TreeSet<>();
-        for (final var hat : hatsEl.getChildren()) {
-            if ("hat".equals(hat.getName()) && ("urn:xmpp:hats:0".equals(hat.getNamespace()) || "xmpp:prosody.im/protocol/hats:1".equals(hat.getNamespace()))) {
-                hats.add(new MucOptions.Hat(hat));
+        if (hatsEl != null) {
+            for (final var hat : hatsEl.getChildren()) {
+                if ("hat".equals(hat.getName()) && ("urn:xmpp:hats:0".equals(hat.getNamespace()) || "xmpp:prosody.im/protocol/hats:1".equals(hat.getNamespace()))) {
+                    hats.add(new MucOptions.Hat(hat));
+                }
             }
         }
         final Jid fullAddress;
