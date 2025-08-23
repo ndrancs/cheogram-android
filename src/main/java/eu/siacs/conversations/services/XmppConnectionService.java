@@ -79,6 +79,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.security.NoSuchAlgorithmException;
 import java.security.Security;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -504,6 +505,18 @@ public class XmppConnectionService extends Service {
 
     public void blockMedia(Cid cid) {
         this.databaseBackend.blockMedia(cid);
+    }
+
+    public boolean isBlockedMedia(Cid cid) {
+        return databaseBackend.isBlockedMedia(cid);
+    }
+
+    public boolean isBlockedMediaSha1(final String sha1sum) {
+        try {
+            return isBlockedMedia(CryptoHelper.cid(CryptoHelper.hexToBytes(sha1sum), "sha-1"));
+        } catch (final NoSuchAlgorithmException e) {
+            return false;
+        }
     }
 
     public void clearBlockedMedia() {

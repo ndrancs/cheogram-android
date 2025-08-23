@@ -128,6 +128,11 @@ public class AvatarManager extends AbstractManager {
     }
 
     private ListenableFuture<byte[]> fetch(final Jid address, final String itemId) {
+        if (context.isBlockedMediaSha1(itemId)) {
+            final SettableFuture<byte[]> future = SettableFuture.create();
+            future.setException(new XmppConnectionService.BlockedMediaException());
+            return future;
+        }
         final var future = getManager(PubSubManager.class).fetchItem(address, itemId, Data.class);
         return Futures.transform(future, ByteContent::asBytes, MoreExecutors.directExecutor());
     }
@@ -261,6 +266,9 @@ public class AvatarManager extends AbstractManager {
     }
 
     private void setAvatar(final Jid from, @Nullable final String id) {
+        if (context.isBlockedMediaSha1(id)) {
+            return;
+        }
         Log.d(Config.LOGTAG, "setting avatar for " + from + " to " + id);
         if (from.isBareJid()) {
             setAvatarContact(from, id);
@@ -412,7 +420,7 @@ public class AvatarManager extends AbstractManager {
                     Collections2.filter(
                             infos,
                             i ->
-                                    Objects.nonNull(i.getId())
+                                    Objects.nonNull(i.getId()) && !context.isBlockedMediaSha1(i.getId())
                                             && i.getBytes() > 0
                                             && i.getHeight() > 0
                                             && i.getWidth() > 0
@@ -843,6 +851,11 @@ public class AvatarManager extends AbstractManager {
     }
 
     public ListenableFuture<Void> fetchAndStoreVCard(final Jid address, final String expectedHash) {
+        if (context.isBlockedMediaSha1(expectedHash)) {
+            final SettableFuture<Void> future = SettableFuture.create();
+            future.setException(new XmppConnectionService.BlockedMediaException());
+            return future;
+        }
         final var future =
                 connection.getManager(VCardManager.class).retrievePhotoCacheException(address);
         return Futures.transformAsync(
