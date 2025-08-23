@@ -1339,7 +1339,7 @@ public class MessageParser extends AbstractParser
                                     } else {
                                         c.add(message);
                                     }
-                                    query.incrementActualMessageCount();
+                                    if (query != null) query.incrementActualMessageCount();
                                     mXmppConnectionService.databaseBackend.createMessage(message);
                                 }
                             }
