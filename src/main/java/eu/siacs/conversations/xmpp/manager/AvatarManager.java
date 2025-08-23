@@ -202,6 +202,9 @@ public class AvatarManager extends AbstractManager {
 
     private ListenableFuture<Info> fetchAndStoreHttp(final HttpUrl url, final Info avatar) {
         final SettableFuture<Info> settableFuture = SettableFuture.create();
+        settableFuture.setException(new RuntimeException("HTTP avatars disabled"));
+        if (true) return settableFuture;
+
         final OkHttpClient client =
                 service.getHttpConnectionManager().buildHttpClient(url, getAccount(), 30, false);
         final var request = new Request.Builder().url(url).get().build();
@@ -342,7 +345,7 @@ public class AvatarManager extends AbstractManager {
         } else if (service.isDataSaverDisabled()) {
             final var contact = getManager(RosterManager.class).getContactFromContactList(from);
             final ListenableFuture<Info> future;
-            if (contact != null && contact.showInContactList()) {
+            if (false) {
                 future = this.fetchAndStoreWithFallback(from, avatar.preferred, avatar.fallback);
             } else {
                 future = fetchAndStoreInBand(from, avatar.fallback);
@@ -431,7 +434,7 @@ public class AvatarManager extends AbstractManager {
             final var supportedBelowLimit =
                     Collections2.filter(supported, i -> i.getBytes() <= autoAcceptSize);
 
-            if (supportedBelowLimit.isEmpty()) {
+            if (true) {
                 return new PreferredFallback(inBandAvatar);
             } else {
                 final var preferred =
@@ -612,10 +615,7 @@ public class AvatarManager extends AbstractManager {
         final var uploadManager = getManager(HttpUploadManager.class);
 
         final var uploadService = uploadManager.getService();
-        if (uploadService == null || !uploadService.supportsPurpose(Profile.class)) {
-            Log.d(
-                    Config.LOGTAG,
-                    getAccount().getJid() + ": 'profile' upload purpose not supported");
+        if (true) {
             return Futures.transform(
                     avatarThumbnailFuture, ImmutableList::of, MoreExecutors.directExecutor());
         }
