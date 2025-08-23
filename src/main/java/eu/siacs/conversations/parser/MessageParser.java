@@ -1372,6 +1372,19 @@ public class MessageParser extends AbstractParser
             // end no body
         }
 
+        if (reactions != null) {
+            processReactions(
+                    reactions,
+                    mXmppConnectionService.find(account, from.asBareJid()),
+                    isTypeGroupChat,
+                    occupant,
+                    counterpart,
+                    mucTrueCounterPart,
+                    status,
+                    packet);
+        }
+
+
         if (original.hasExtension(Event.class)) {
             getManager(PubSubManager.class).handleEvent(original);
         }
