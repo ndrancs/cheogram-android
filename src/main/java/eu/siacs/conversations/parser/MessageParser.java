@@ -1375,7 +1375,7 @@ public class MessageParser extends AbstractParser
         if (reactions != null) {
             processReactions(
                     reactions,
-                    mXmppConnectionService.find(account, from.asBareJid()),
+                    mXmppConnectionService.find(account, counterpart.asBareJid()),
                     isTypeGroupChat,
                     occupant,
                     counterpart,
