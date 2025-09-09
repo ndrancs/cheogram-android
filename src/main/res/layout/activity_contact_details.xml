@@ -68,18 +68,17 @@
 
                         <LinearLayout
                             android:id="@+id/button_box"
-                            android:layout_width="wrap_content"
+                            android:layout_width="fill_parent"
                             android:layout_height="wrap_content"
                             android:layout_below="@+id/details_contact_xmpp_address"
-                            android:layout_centerHorizontal="true"
                             android:layout_marginTop="16dp"
-                            android:orientation="horizontal">
+                            android:gravity="center_horizontal"
+                            android:orientation="vertical">
 
                             <Button
                                 android:id="@+id/add_contact_button"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginHorizontal="8dp"
                                 android:text="@string/add_contact" />
 
                             <Button
@@ -87,7 +86,6 @@
                                 style="@style/Widget.Material3.Button.TonalButton"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginHorizontal="8dp"
                                 android:text="@string/save_to_contact"
                                 app:icon="@drawable/ic_contacts_24dp" />
                         </LinearLayout>
