@@ -201,12 +201,12 @@ public final class MucDetailsContextMenuHelper {
             .setTitle(R.string.moderate_recent)
             .setMessage("Do you want to moderate all recent messages from this user?")
             .setView(binding.getRoot())
-            .setPositiveButton(R.string.yes, (dialog, whichButton) -> {
+            .setPositiveButton("Moderate", (dialog, whichButton) -> {
                 for (Message m : conversation.findMessagesBy(user)) {
                     activity.xmppConnectionService.moderateMessage(conversation.getAccount(), m, binding.inputEditText.getText().toString());
                 }
             })
-            .setNegativeButton(R.string.no, null).show();
+            .setNegativeButton("Just ban", null).show();
     }
 
     public static boolean onContextItemSelected(
