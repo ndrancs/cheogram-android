@@ -385,7 +385,7 @@ public class PresenceParser extends AbstractParser
             if (contact.setLastseen(AbstractParser.parseTimestamp(packet, 0L, true))) {
                 contact.flagInactive();
             }
-            getManager(DiscoManager.class).clear(from);
+            if (!from.equals(getAccount().getJid().getDomain())) getManager(DiscoManager.class).clear(from);
             if (from.isBareJid()) {
                 contact.clearPresences();
             } else {
