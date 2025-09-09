@@ -802,6 +802,7 @@ public class ConferenceDetailsActivity extends XmppActivity
                     R.drawable.ic_notifications_none_24dp);
         }
         final List<User> users = mucOptions.getUsers();
+        users.add(mucOptions.getSelf());
         Collections.sort(
                 users,
                 (a, b) -> {

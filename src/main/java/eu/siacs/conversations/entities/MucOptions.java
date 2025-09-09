@@ -568,6 +568,8 @@ public class MucOptions {
     }
 
     public static List<User> sub(final List<User> users, final int max) {
+        if (users.size() < max) return users;
+
         final var subset = new ArrayList<User>();
         final var addresses = new HashSet<Jid>();
         for (final var user : users) {
