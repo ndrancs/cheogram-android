@@ -65,16 +65,22 @@ public class ListItemAdapter extends ArrayAdapter<ListItem> {
         LayoutInflater inflater = activity.getLayoutInflater();
         final ListItem item = getItem(position);
         ViewHolder viewHolder;
+        View innerView;
         if (view == null) {
             final ItemContactBinding binding =
                     DataBindingUtil.inflate(inflater, R.layout.item_contact, parent, false);
             viewHolder = ViewHolder.get(binding);
             view = binding.getRoot();
+            innerView = binding.inner;
         } else {
             viewHolder = (ViewHolder) view.getTag();
+            innerView = viewHolder.inner;
         }
         if (view.isActivated()) {
             Log.d(Config.LOGTAG, "item " + item.getDisplayName() + " is activated");
+        }
+        if (activity.colorCodeAccounts()) {
+            innerView.setBackgroundColor(item.getAccount().getColor(activity.isDark()));
         }
         // view.setBackground(StyledAttributes.getDrawable(view.getContext(),R.attr.list_item_background));
         final List<ListItem.Tag> tags = item.getTags(activity);
@@ -162,6 +168,7 @@ public class ListItemAdapter extends ArrayAdapter<ListItem> {
         private TextView name;
         private TextView jid;
         private ImageView avatar;
+        private View inner;
         private ConstraintLayout tags;
         private Flow flowWidget;
 
@@ -173,6 +180,7 @@ public class ListItemAdapter extends ArrayAdapter<ListItem> {
             viewHolder.jid = binding.contactJid;
             viewHolder.avatar = binding.contactPhoto;
             viewHolder.tags = binding.tags;
+            viewHolder.inner = binding.inner;
             viewHolder.flowWidget = binding.flowWidget;
             binding.getRoot().setTag(viewHolder);
             return viewHolder;
