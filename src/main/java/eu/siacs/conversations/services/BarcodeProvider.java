@@ -17,6 +17,7 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import com.google.common.base.CharMatcher;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.common.BitMatrix;
@@ -57,7 +58,7 @@ public class BarcodeProvider extends ContentProvider implements ServiceConnectio
 			final QRCodeWriter barcodeWriter = new QRCodeWriter();
 			final Hashtable<EncodeHintType, Object> hints = new Hashtable<>();
 			hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
-			hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+			if (!CharMatcher.ascii().matchesAllOf(input)) hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
 			final BitMatrix result = barcodeWriter.encode(input, BarcodeFormat.QR_CODE, size, size, hints);
 			final int width = result.getWidth();
 			final int height = result.getHeight();
