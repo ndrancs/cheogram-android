@@ -52,8 +52,10 @@ public class ChangePasswordActivity extends XmppActivity {
                     }
                     final String currentPassword = binding.currentPassword.getText().toString();
                     final String newPassword = binding.newPassword.getText().toString();
-                    if (!account.isOptionSet(Account.OPTION_MAGIC_CREATE)
-                            && !currentPassword.equals(account.getPassword())) {
+                    if (!(didUnlock
+                          || account.isOptionSet(Account.OPTION_MAGIC_CREATE)
+                          || currentPassword.equals(account.getPassword())
+                        )) {
                         binding.currentPassword.requestFocus();
                         binding.currentPasswordLayout.setError(
                                 getString(R.string.account_status_unauthorized));
