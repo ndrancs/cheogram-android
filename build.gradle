@@ -90,7 +90,7 @@ dependencies {
     implementation 'me.drakeet.support:toastcompat:1.1.0'
     implementation 'me.leolin:ShortcutBadger:1.1.22@aar'
     implementation 'org.bouncycastle:bcmail-jdk18on:1.80'
-    implementation 'org.conscrypt:conscrypt-android:2.5.2'
+    implementation 'org.conscrypt:conscrypt-android:2.5.3'
     implementation 'org.hsluv:hsluv:0.2'
     implementation 'org.jxmpp:jxmpp-jid:1.0.3'
     implementation 'org.jxmpp:jxmpp-stringprep-libidn:1.0.3'
