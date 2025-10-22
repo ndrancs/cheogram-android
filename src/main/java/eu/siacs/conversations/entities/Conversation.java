@@ -3241,6 +3241,9 @@ public class Conversation extends AbstractEntity
                             String url = el.findChildContent("url", "jabber:x:oob");
                             if (url != null) {
                                 String scheme = Uri.parse(url).getScheme();
+                                if (scheme == null) {
+                                    break;
+                                }
                                 if (scheme.equals("http") || scheme.equals("https")) {
                                     this.responseElement = el;
                                     break;
