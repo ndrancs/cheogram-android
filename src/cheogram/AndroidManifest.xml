@@ -21,6 +21,9 @@
         </service>
 
         <service android:name="com.cheogram.android.ExportBackupService" />
+        <service
+            android:name=".services.ImportBackupService"
+            android:foregroundServiceType="dataSync" />
 
         <activity
             android:name=".ui.ManageAccountActivity"
