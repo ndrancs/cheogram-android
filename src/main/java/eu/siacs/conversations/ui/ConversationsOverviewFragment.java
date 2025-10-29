@@ -335,7 +335,8 @@ public class ConversationsOverviewFragment extends XmppFragment {
                 DataBindingUtil.inflate(
                         inflater, R.layout.fragment_conversations_overview, container, false);
         this.binding.fab.setOnClickListener(
-                (view) -> StartConversationActivity.launch(getActivity()));
+                (view) -> activity.launchStartConversation()
+        );
 
         this.conversationsAdapter = new ConversationAdapter(this.activity, this.conversations);
         this.conversationsAdapter.setConversationClickListener(
