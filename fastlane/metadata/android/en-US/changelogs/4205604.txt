@@ -1,0 +1,13 @@
+* Fix direct shares on Android 12+
+* Option to hide media from gallery
+* Do not re-notify dismissed notifications
+* Experimental extensions support based on WebXDC
+* Experimental XEP-0227 export support
+* Links for more URI schemes
+* Option to disable custom tab UI for links
+* Add warnings to backup process
+* Unify camera/camcorder/picture as "choose media"
+* Try harder to send attachments in order
+* Better reaction notifications
+* Add account from drawer
+* Restore backup from add account

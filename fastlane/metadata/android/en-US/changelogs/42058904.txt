@@ -1,0 +1,3 @@
+* Show dot on drawer when there are unseen unread messages (such as chat requests)
+* Fix several crashing bugs
+* Fix editing password on first account creation
