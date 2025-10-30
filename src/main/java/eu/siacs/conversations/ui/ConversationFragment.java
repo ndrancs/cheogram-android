@@ -2198,7 +2198,7 @@ public class ConversationFragment extends XmppFragment
             case R.id.encryption_choice_pgp:
             case R.id.encryption_choice_none:
                 handleEncryptionSelection(item);
-                break;
+                return true;
             case R.id.attach_choose_picture:
             //case R.id.attach_take_picture:
             //case R.id.attach_record_video:
@@ -2206,62 +2206,62 @@ public class ConversationFragment extends XmppFragment
             case R.id.attach_record_voice:
             case R.id.attach_location:
                 handleAttachmentSelection(item);
-                break;
+                return true;
             case R.id.attach_webxdc:
                 final Intent intent = new Intent(getActivity(), WebxdcStore.class);
                 startActivityForResult(intent, REQUEST_WEBXDC_STORE);
-                break;
+                return true;
             case R.id.attach_subject:
                 binding.textinputSubject.setVisibility(binding.textinputSubject.getVisibility() == View.GONE ? View.VISIBLE : View.GONE);
-                break;
+                return true;
             case R.id.attach_schedule:
                 scheduleMessage();
-                break;
+                return true;
             case R.id.action_search:
                 startSearch();
-                break;
+                return true;
             case R.id.action_archive:
                 activity.xmppConnectionService.archiveConversation(conversation);
-                break;
+                return true;
             case R.id.action_contact_details:
                 activity.switchToContactDetails(conversation.getContact());
-                break;
+                return true;
             case R.id.action_muc_details:
                 ConferenceDetailsActivity.open(activity, conversation);
-                break;
+                return true;
             case R.id.action_invite:
                 startActivityForResult(
                         ChooseContactActivity.create(activity, conversation),
                         REQUEST_INVITE_TO_CONVERSATION);
-                break;
+                return true;
             case R.id.action_clear_history:
                 clearHistoryDialog(conversation);
-                break;
+                return true;
             case R.id.action_mute:
                 muteConversationDialog(conversation);
-                break;
+                return true;
             case R.id.action_unmute:
                 unMuteConversation(conversation);
-                break;
+                return true;
             case R.id.action_block:
             case R.id.action_unblock:
                 BlockContactDialog.show(activity, conversation);
-                break;
+                return true;
             case R.id.action_audio_call:
                 checkPermissionAndTriggerAudioCall();
-                break;
+                return true;
             case R.id.action_video_call:
                 checkPermissionAndTriggerVideoCall();
-                break;
+                return true;
             case R.id.action_ongoing_call:
                 returnToOngoingCall();
-                break;
+                return true;
             case R.id.action_toggle_pinned:
                 togglePinned();
-                break;
+                return true;
             case R.id.action_add_shortcut:
                 addShortcut();
-                break;
+                return true;
             case R.id.action_block_avatar:
                 new AlertDialog.Builder(activity)
                     .setTitle(R.string.block_media)
@@ -2274,9 +2274,10 @@ public class ConversationFragment extends XmppFragment
                             activity.xmppConnectionService.updateConversationUi();
                     })
                     .setNegativeButton(R.string.no, null).show();
+                return true;
             case R.id.action_refresh_feature_discovery:
                 refreshFeatureDiscovery();
-                break;
+                return true;
             default:
                 break;
         }
