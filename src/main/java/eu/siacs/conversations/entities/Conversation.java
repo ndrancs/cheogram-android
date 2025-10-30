@@ -2206,7 +2206,8 @@ public class Conversation extends AbstractEntity
 
                     if (field.getType().equals(Optional.of("jid-single")) || field.getType().equals(Optional.of("jid-multi"))) {
                         binding.values.setOnItemClickListener((arg0, arg1, pos, id) -> {
-                            new FixedURLSpan("xmpp:" + Uri.encode(Jid.of(values.getItem(pos).getValue()).toString(), "@/+"), account).onClick(binding.values);
+                            final var jid = Uri.encode(Jid.of(values.getItem(pos).getValue()).toString(), "@/+");
+                            new FixedURLSpan("xmpp:" + jid, account).onClick(binding.values);
                         });
                     } else if ("xs:anyURI".equals(datatype)) {
                         binding.values.setOnItemClickListener((arg0, arg1, pos, id) -> {
@@ -2245,7 +2246,8 @@ public class Conversation extends AbstractEntity
                         String value = formatValue(datatype, cell.el.findChildContent("value", "jabber:x:data"), true);
                         SpannableStringBuilder text = new SpannableStringBuilder(value == null ? "" : value);
                         if (cell.reported.getType().equals(Optional.of("jid-single"))) {
-                            text.setSpan(new FixedURLSpan("xmpp:" + Jid.of(text.toString()).toString(), account), 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            final var jid = Uri.encode(Jid.of(text.toString()).toString(), "@/+");
+                            text.setSpan(new FixedURLSpan("xmpp:" + jid, account), 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                         } else if ("xs:anyURI".equals(datatype)) {
                             text.setSpan(new FixedURLSpan(text.toString(), account), 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                         } else if ("html:tel".equals(datatype)) {
