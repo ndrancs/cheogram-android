@@ -806,8 +806,8 @@ public class JingleConnectionManager extends AbstractConnectionManager {
             // subscription (to not leak presence). Therefor a timeout is only appropriate for
             // contacts where we can expect the 'ringing' response
             final boolean triggerTimeout = false &&
-                    Config.JINGLE_MESSAGE_INIT_STRICT_DEVICE_TIMEOUT
-                            || contact.mutualPresenceSubscription();
+                    (Config.JINGLE_MESSAGE_INIT_STRICT_DEVICE_TIMEOUT
+                            || contact.mutualPresenceSubscription());
             SCHEDULED_EXECUTOR_SERVICE.schedule(
                     () -> {
                         final var currentProposalState = rtpSessionProposals.get(proposal);
