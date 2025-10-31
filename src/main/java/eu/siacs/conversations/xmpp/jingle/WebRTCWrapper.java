@@ -735,9 +735,14 @@ public class WebRTCWrapper {
         }
         final var handler = new android.os.Handler(android.os.Looper.getMainLooper());
         handler.post(() -> {
-            final var toneGenerator = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, DEFAULT_TONE_VOLUME);
-            toneGenerator.startTone(TONE_CODES.get(tone), TONE_DURATION);
-            handler.postDelayed(() -> toneGenerator.release(), TONE_DURATION+2);
+            try {
+                final var toneGenerator = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, DEFAULT_TONE_VOLUME);
+                toneGenerator.startTone(TONE_CODES.get(tone), TONE_DURATION);
+                handler.postDelayed(() -> toneGenerator.release(), TONE_DURATION+2);
+                Log.d(EXTENDED_LOGGING_TAG, "tone generator created");
+            } catch (final RuntimeException e) {
+                Log.e(EXTENDED_LOGGING_TAG, "could not create tone generator for DTMF feedback", e);
+            }
         });
 
         return true;
