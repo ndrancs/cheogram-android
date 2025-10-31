@@ -3144,7 +3144,8 @@ public class Conversation extends AbstractEntity
                 mTitle = title;
                 mNode = node;
                 this.xmppConnectionService = xmppConnectionService;
-                if (mPager.get() != null) setupLayoutManager(mPager.get().getContext());
+                ViewPager pager = mPager.get();
+                if (pager != null) setupLayoutManager(pager.getContext());
             }
 
             public String getTitle() {
@@ -3652,7 +3653,7 @@ public class Conversation extends AbstractEntity
 
                 if (reported != null) {
                     float screenWidth = ctx.getResources().getDisplayMetrics().widthPixels;
-                    TextPaint paint = ((TextView) LayoutInflater.from(mPager.get().getContext()).inflate(R.layout.command_result_cell, null)).getPaint();
+                    TextPaint paint = ((TextView) LayoutInflater.from(ctx).inflate(R.layout.command_result_cell, null)).getPaint();
                     float tableHeaderWidth = reported.stream().reduce(
                         0f,
                         (total, field) -> total + StaticLayout.getDesiredWidth(field.getLabel().or("--------") + "\t", paint),
