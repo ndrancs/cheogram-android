@@ -1036,7 +1036,7 @@ public class FileBackend {
     }
 
     public Cid[] calculateCids(final Uri uri) throws IOException {
-        return calculateCids(mXmppConnectionService.getContentResolver().openInputStream(uri));
+        return calculateCids(openInputStream(uri));
     }
 
     public Cid[] calculateCids(final InputStream is) throws IOException {
