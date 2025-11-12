@@ -55,6 +55,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -190,101 +191,20 @@ public class EditAccountActivity extends OmemoActivity
 
                 @Override
                 public void onClick(final View v) {
-                    final String password = binding.accountPassword.getText().toString();
-                    final boolean wasDisabled =
-                            mAccount != null && mAccount.getStatus() == Account.State.DISABLED;
-                    final boolean accountInfoEdited = accountInfoEdited();
+                    final var passwordText = binding.accountPassword.getText();
+                    if (passwordText == null) return;
+                    final String password = passwordText.toString();
 
-                    ColorDrawable previewColor = (ColorDrawable) binding.colorPreview.getBackground();
-                    if (previewColor != null && previewColor.getColor() != mAccount.getColor(isDark())) {
-                        mAccount.setColor(previewColor.getColor());
-                    }
+                    final boolean registerNewAccount =
+                            Objects.requireNonNullElseGet(
+                                    mForceRegister,
+                                    () -> binding.accountRegisterNew.isChecked() && !Config.DISALLOW_REGISTRATION_IN_UI);
 
-                    if (mInitMode && mAccount != null) {
-                        mAccount.setOption(Account.OPTION_DISABLED, false);
-                    }
-                    if (mAccount != null
-                            && Arrays.asList(Account.State.DISABLED, Account.State.LOGGED_OUT)
-                                    .contains(mAccount.getStatus())
-                            && !accountInfoEdited) {
-                        mAccount.setOption(Account.OPTION_SOFT_DISABLED, false);
-                        mAccount.setOption(Account.OPTION_DISABLED, false);
-                        if (!xmppConnectionService.updateAccount(mAccount)) {
-                            Toast.makeText(
-                                            EditAccountActivity.this,
-                                            R.string.unable_to_update_account,
-                                            Toast.LENGTH_SHORT)
-                                    .show();
-                        }
-                        return;
-                    }
-                    final boolean registerNewAccount;
-                    if (mForceRegister != null) {
-                        registerNewAccount = mForceRegister;
-                    } else {
-                        registerNewAccount =
-                                binding.accountRegisterNew.isChecked()
-                                        && !Config.DISALLOW_REGISTRATION_IN_UI;
-                    }
                     if (mUsernameMode && binding.accountJid.getText().toString().contains("@")) {
                         binding.accountJidLayout.setError(getString(R.string.invalid_username));
                         removeErrorsOnAllBut(binding.accountJidLayout);
                         binding.accountJid.requestFocus();
                         return;
-                    }
-
-                    XmppConnection connection =
-                            mAccount == null ? null : mAccount.getXmppConnection();
-                    final boolean startOrbot =
-                            mAccount != null
-                                    && mAccount.getStatus() == Account.State.TOR_NOT_AVAILABLE;
-                    if (startOrbot) {
-                        if (TorServiceUtils.isOrbotInstalled(EditAccountActivity.this)) {
-                            TorServiceUtils.startOrbot(EditAccountActivity.this, REQUEST_ORBOT);
-                        } else {
-                            TorServiceUtils.downloadOrbot(EditAccountActivity.this, REQUEST_ORBOT);
-                        }
-                        return;
-                    }
-
-                    if (inNeedOfSaslAccept()) {
-                        mAccount.resetPinnedMechanism();
-                        if (!xmppConnectionService.updateAccount(mAccount)) {
-                            Toast.makeText(
-                                            EditAccountActivity.this,
-                                            R.string.unable_to_update_account,
-                                            Toast.LENGTH_SHORT)
-                                    .show();
-                        }
-                        return;
-                    }
-
-                    final boolean openRegistrationUrl =
-                            registerNewAccount
-                                    && !accountInfoEdited
-                                    && mAccount != null
-                                    && mAccount.getStatus() == Account.State.REGISTRATION_WEB;
-                    final boolean openPaymentUrl =
-                            mAccount != null
-                                    && mAccount.getStatus() == Account.State.PAYMENT_REQUIRED;
-                    final boolean redirectionWorthyStatus = openPaymentUrl || openRegistrationUrl;
-                    final HttpUrl url =
-                            connection != null && redirectionWorthyStatus
-                                    ? connection.getRedirectionUrl()
-                                    : null;
-                    if (url != null && !wasDisabled) {
-                        try {
-                            startActivity(
-                                    new Intent(Intent.ACTION_VIEW, Uri.parse(url.toString())));
-                            return;
-                        } catch (ActivityNotFoundException e) {
-                            Toast.makeText(
-                                            EditAccountActivity.this,
-                                            R.string.application_found_to_open_website,
-                                            Toast.LENGTH_SHORT)
-                                    .show();
-                            return;
-                        }
                     }
 
                     final Jid jid;
@@ -353,27 +273,9 @@ public class EditAccountActivity extends OmemoActivity
                         binding.accountJid.requestFocus();
                         return;
                     }
-                    if (mAccount != null) {
-                        if (mAccount.isOptionSet(Account.OPTION_MAGIC_CREATE)) {
-                            mAccount.setOption(
-                                    Account.OPTION_MAGIC_CREATE,
-                                    mAccount.getPassword().contains(password));
-                        }
-                        mAccount.setJid(jid);
-                        mAccount.setPort(numericPort);
-                        mAccount.setHostname(hostname);
-                        binding.accountJidLayout.setError(null);
-                        mAccount.setPassword(password);
-                        mAccount.setOption(Account.OPTION_REGISTER, registerNewAccount);
-                        if (!xmppConnectionService.updateAccount(mAccount)) {
-                            Toast.makeText(
-                                            EditAccountActivity.this,
-                                            R.string.unable_to_update_account,
-                                            Toast.LENGTH_SHORT)
-                                    .show();
-                            return;
-                        }
-                    } else {
+
+                    final boolean isNewAccount;
+                    if (mAccount == null) {
                         if (xmppConnectionService.findAccountByJid(jid) != null) {
                             binding.accountJidLayout.setError(
                                     getString(R.string.account_already_exists));
@@ -382,11 +284,112 @@ public class EditAccountActivity extends OmemoActivity
                             return;
                         }
                         mAccount = new Account(jid.asBareJid(), password);
-                        mAccount.setPort(numericPort);
-                        mAccount.setHostname(hostname);
-                        mAccount.setOption(Account.OPTION_REGISTER, registerNewAccount);
-                        xmppConnectionService.createAccount(mAccount);
+                        isNewAccount = true;
+                    } else {
+                        isNewAccount = false;
                     }
+
+                    if (mAccount.isOptionSet(Account.OPTION_MAGIC_CREATE)) {
+                        mAccount.setOption(
+                                Account.OPTION_MAGIC_CREATE,
+                                mAccount.getPassword().contains(password));
+                    }
+                    mAccount.setJid(jid);
+                    mAccount.setPort(numericPort);
+                    mAccount.setHostname(hostname);
+                    mAccount.setPassword(password);
+                    mAccount.setOption(Account.OPTION_REGISTER, registerNewAccount);
+
+                    final boolean wasDisabled = mAccount.getStatus() == Account.State.DISABLED;
+                    final boolean accountInfoEdited = accountInfoEdited();
+
+                    // Check TOR FIRST, before any network operations
+                    final boolean startOrbot = mAccount.getStatus() == Account.State.TOR_NOT_AVAILABLE;
+                    if (startOrbot) {
+                        if (TorServiceUtils.isOrbotInstalled(EditAccountActivity.this)) {
+                            TorServiceUtils.startOrbot(EditAccountActivity.this, REQUEST_ORBOT);
+                        } else {
+                            TorServiceUtils.downloadOrbot(EditAccountActivity.this, REQUEST_ORBOT);
+                        }
+                        return;
+                    }
+
+                    ColorDrawable previewColor = (ColorDrawable) binding.colorPreview.getBackground();
+                    if (previewColor != null && previewColor.getColor() != mAccount.getColor(isDark())) {
+                        mAccount.setColor(previewColor.getColor());
+                    }
+
+                    if (mInitMode) {
+                        mAccount.setOption(Account.OPTION_DISABLED, false);
+                    }
+                    if (Arrays.asList(Account.State.DISABLED, Account.State.LOGGED_OUT)
+                                    .contains(mAccount.getStatus())
+                            && !accountInfoEdited) {
+                        mAccount.setOption(Account.OPTION_SOFT_DISABLED, false);
+                        mAccount.setOption(Account.OPTION_DISABLED, false);
+                        if (!xmppConnectionService.updateAccount(mAccount)) {
+                            Toast.makeText(
+                                            EditAccountActivity.this,
+                                            R.string.unable_to_update_account,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                        }
+                        return;
+                    }
+
+                    XmppConnection connection = mAccount.getXmppConnection();
+
+                    if (inNeedOfSaslAccept()) {
+                        mAccount.resetPinnedMechanism();
+                        if (!xmppConnectionService.updateAccount(mAccount)) {
+                            Toast.makeText(
+                                            EditAccountActivity.this,
+                                            R.string.unable_to_update_account,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                        }
+                        return;
+                    }
+
+                    final boolean openRegistrationUrl =
+                            registerNewAccount
+                                    && !accountInfoEdited
+                                    && mAccount.getStatus() == Account.State.REGISTRATION_WEB;
+                    final boolean openPaymentUrl = mAccount.getStatus() == Account.State.PAYMENT_REQUIRED;
+                    final boolean redirectionWorthyStatus = openPaymentUrl || openRegistrationUrl;
+                    final HttpUrl url =
+                            connection != null && redirectionWorthyStatus
+                                    ? connection.getRedirectionUrl()
+                                    : null;
+                    if (url != null && !wasDisabled) {
+                        try {
+                            startActivity(
+                                    new Intent(Intent.ACTION_VIEW, Uri.parse(url.toString())));
+                            return;
+                        } catch (ActivityNotFoundException e) {
+                            Toast.makeText(
+                                            EditAccountActivity.this,
+                                            R.string.application_found_to_open_website,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                            return;
+                        }
+                    }
+
+                    binding.accountJidLayout.setError(null);
+                    if (isNewAccount) {
+                        xmppConnectionService.createAccount(mAccount);
+                    } else {
+                        if (!xmppConnectionService.updateAccount(mAccount)) {
+                            Toast.makeText(
+                                            EditAccountActivity.this,
+                                            R.string.unable_to_update_account,
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                            return;
+                        }
+                    }
+
                     binding.hostnameLayout.setError(null);
                     binding.portLayout.setError(null);
                     if (mAccount.isOnion()) {
