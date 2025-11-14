@@ -4945,6 +4945,7 @@ public class XmppConnectionService extends Service {
                         && conversation.getMode() == Conversation.MODE_SINGLE
                         && jidMatches) {
                     this.conversations.remove(conversation);
+                    getMessageArchiveService().kill(conversation);
                     markRead(conversation);
                     conversation.setStatus(Conversation.STATUS_ARCHIVED);
                     Log.d(
