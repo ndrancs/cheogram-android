@@ -1787,10 +1787,12 @@ public class EditAccountActivity extends OmemoActivity
                                             .register(data, input.getText().toString()));
                     builder.setNegativeButton(
                             getString(R.string.cancel),
-                            (dialog, which) -> account.getXmppConnection().cancelRegistration());
+                            (dialog, which) ->
+                                new Thread(() -> account.getXmppConnection().cancelRegistration()).start()
+                    );
 
                     builder.setOnCancelListener(
-                            dialog -> account.getXmppConnection().cancelRegistration());
+                            dialog -> new Thread(() -> account.getXmppConnection().cancelRegistration()).start());
                     mCaptchaDialog = builder.create();
                     mCaptchaDialog.show();
                     input.requestFocus();
