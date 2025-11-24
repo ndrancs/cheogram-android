@@ -29,15 +29,27 @@
         <com.google.android.material.button.MaterialButton
             style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/default_button"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginRight="40dp"
             android:layout_marginLeft="40dp"
             android:layout_marginBottom="24dp"
             android:layout_marginTop="24dp"
+				android:layout_gravity="center_horizontal"
             android:gravity="center"
             android:textAllCaps="false"
-            android:minHeight="75dp" />
+            android:minHeight="35dp" />
+
+        <TextView
+            android:id="@+id/default_button_seperator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingLeft="16dp"
+            android:paddingRight="8dp"
+            android:gravity="center"
+				android:layout_gravity="center_horizontal"
+            android:textAppearance="?textAppearanceBodyMedium"
+            android:text="or" />
 
         <com.cheogram.android.GridView
             android:id="@+id/buttons"

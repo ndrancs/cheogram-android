@@ -2674,14 +2674,16 @@ public class Conversation extends AbstractEntity
                     }
                     if (defaultOption == null) {
                         binding.defaultButton.setVisibility(View.GONE);
+                        binding.defaultButtonSeperator.setVisibility(View.GONE);
                     } else {
                         theOptions.remove(defaultOption);
                         binding.defaultButton.setVisibility(View.VISIBLE);
+                        binding.defaultButtonSeperator.setVisibility(View.VISIBLE);
 
                         final SVG defaultIcon = defaultOption.getIcon();
                         if (defaultIcon != null) {
                              DisplayMetrics display = mPager.get().getContext().getResources().getDisplayMetrics();
-                             int height = (int)(display.heightPixels*display.density/4);
+                             int height = (int)(display.heightPixels*display.density/8);
                              binding.defaultButton.setCompoundDrawablesRelativeWithIntrinsicBounds(null, getDrawableForSVG(defaultIcon, defaultOption.getIconEl(), height), null, null);
                         }
 
