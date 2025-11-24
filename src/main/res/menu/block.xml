@@ -4,9 +4,6 @@
         android:id="@+id/reject"
         android:title="@string/reject_request"/>
     <item
-        android:id="@+id/block_domain"
-        android:title="@string/block_entire_domain" />
-    <item
         android:id="@+id/block_contact"
         android:title="@string/block_stranger" />
     <item

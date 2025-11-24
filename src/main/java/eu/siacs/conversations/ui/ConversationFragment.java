@@ -3855,13 +3855,13 @@ public class ConversationFragment extends XmppFragment
                         case R.id.add_contact:
                             mAddBackClickListener.onClick(view);
                             return true;
-                        case R.id.block_domain:
-                            blockable =
-                                    conversation
-                                            .getAccount()
-                                            .getRoster()
-                                            .getContact(jid.getDomain());
-                            break;
+                        // case R.id.block_domain:
+                        //     blockable =
+                        //             conversation
+                        //                     .getAccount()
+                        //                     .getRoster()
+                        //                     .getContact(jid.getDomain());
+                        //     break;
                         default:
                             blockable = conversation;
                     }

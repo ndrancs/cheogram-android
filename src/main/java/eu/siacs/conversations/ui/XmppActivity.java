@@ -4,6 +4,7 @@ import android.telephony.TelephonyManager;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Application;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
@@ -164,6 +165,12 @@ public abstract class XmppActivity extends ActionBarActivity {
 
                 @Override
                 public void onServiceConnected(ComponentName className, IBinder service) {
+                    if (!(service instanceof XmppConnectionBinder)) {
+                        throw new ClassCastException("Expected XmppConnectionBinder but got "
+                                + service.getClass().getName()
+                                + " from component: " + className
+                                + " in process: " + Application.getProcessName());
+                    }
                     XmppConnectionBinder binder = (XmppConnectionBinder) service;
                     xmppConnectionService = binder.getService();
                     xmppConnectionServiceBound = true;
