@@ -369,7 +369,8 @@ public class ConversationFragment extends XmppFragment
                         if (firstVisibleItem < 5
                                 && conversation != null
                                 && conversation.messagesLoaded.compareAndSet(true, false)
-                                && messageList.size() > 0) {
+                                && messageList.size() > 0
+                                && activity != null) {
                             long timestamp = conversation.loadMoreTimestamp();
                             activity.xmppConnectionService.loadMoreMessages(
                                     conversation,
