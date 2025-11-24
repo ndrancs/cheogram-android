@@ -33,7 +33,7 @@ tasks:
 - sentry: |
     cd cheogram-android
     sed -ie 's/<!-- INSERT -->/<meta-data android:name="io.sentry.dsn" android:value="https:\/\/ef8be0f096894172885533d912826e3e@app.glitchtip.com\/5857" \/>/' src/cheogram/AndroidManifest.xml
-    sed -ie 's/\/\/ PLUGIN INSERT/id "io.sentry.android.gradle" version "4.2.0"/' build.gradle
+    sed -ie 's/\/\/ PLUGIN INSERT/id "io.sentry.android.gradle" version "5.12.2"/' build.gradle
     sed -ie 's/\/\/ ROOT INSERT/sentry { includeSourceContext = true }/' build.gradle
 - build_free: |
     set +x
