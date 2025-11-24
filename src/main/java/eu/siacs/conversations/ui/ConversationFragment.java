@@ -2345,7 +2345,7 @@ public class ConversationFragment extends XmppFragment
                         .getOngoingRtpConnection(conversation.getContact());
         if (ongoingRtpSession.isPresent()) {
             final OngoingRtpSession id = ongoingRtpSession.get();
-            final Intent intent = new Intent(getActivity(), RtpSessionActivity.class);
+            final Intent intent = new Intent(activity, RtpSessionActivity.class);
             intent.setAction(Intent.ACTION_VIEW);
             intent.putExtra(
                     RtpSessionActivity.EXTRA_ACCOUNT,
@@ -2353,7 +2353,7 @@ public class ConversationFragment extends XmppFragment
             intent.putExtra(RtpSessionActivity.EXTRA_WITH, id.getWith().toString());
             if (id instanceof AbstractJingleConnection) {
                 intent.putExtra(RtpSessionActivity.EXTRA_SESSION_ID, id.getSessionId());
-                startActivity(intent);
+                activity.startActivity(intent);
             } else if (id instanceof JingleConnectionManager.RtpSessionProposal proposal) {
                 if (Media.audioOnly(proposal.media)) {
                     intent.putExtra(
@@ -2365,7 +2365,7 @@ public class ConversationFragment extends XmppFragment
                             RtpSessionActivity.ACTION_MAKE_VIDEO_CALL);
                 }
                 intent.putExtra(RtpSessionActivity.EXTRA_PROPOSED_SESSION_ID, proposal.sessionId);
-                startActivity(intent);
+                activity.startActivity(intent);
             }
         }
     }
