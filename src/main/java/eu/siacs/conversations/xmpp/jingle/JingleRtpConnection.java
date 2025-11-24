@@ -179,6 +179,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
         if (isResponder() && isInState(State.PROPOSED, State.SESSION_INITIALIZED)) {
             xmppConnectionService.getNotificationService().cancelIncomingCallNotification();
         }
+        setExtraState("rebound");
         if (isInState(
                 State.SESSION_INITIALIZED,
                 State.SESSION_INITIALIZED_PRE_APPROVED,
@@ -1219,6 +1220,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
                     String.format(
                             "%s: received session-initiate while in state %s",
                             id.account.getJid().asBareJid(), state));
+            setExtraState("out of order");
             terminateWithOutOfOrder(jinglePacket);
         }
     }
@@ -1258,6 +1260,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
             contentMap.requireContentDescriptions();
             contentMap.requireDTLSFingerprint();
         } catch (final RuntimeException e) {
+            setExtraState("bad contents");
             respondOk(jinglePacket);
             Log.d(
                     Config.LOGTAG,
@@ -1527,6 +1530,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
                         + ": receive message error for proceed message ("
                         + Strings.nullToEmpty(message)
                         + ")");
+        setExtraState("proceed error");
         if (transition(State.TERMINATED_CONNECTIVITY_ERROR)) {
             webRTCWrapper.close();
             Log.d(
@@ -1598,6 +1602,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
     }
 
     private void receiveRejectFromMyself(String serverMsgId, long timestamp) {
+        setExtraState("rejected");
         if (transition(State.REJECTED)) {
             this.xmppConnectionService.getNotificationService().cancelIncomingCallNotification();
             this.finish();
@@ -1615,6 +1620,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
     }
 
     private void receiveRejectFromResponder() {
+        setExtraState("responder rejected");
         if (isInState(State.PROCEED)) {
             Log.d(
                     Config.LOGTAG,
@@ -1854,6 +1860,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
         try {
             setupWebRTC(media, iceServers, !includeCandidates);
         } catch (final WebRTCWrapper.InitializationException e) {
+            setExtraState("Unable to init WebRTC");
             Log.d(Config.LOGTAG, id.account.getJid().asBareJid() + ": unable to initialize WebRTC");
             webRTCWrapper.close();
             sendRetract(Reason.ofThrowable(e));
@@ -1864,6 +1871,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
                     this.webRTCWrapper.setLocalDescription(includeCandidates).get();
             prepareSessionInitiate(webRTCSessionDescription, includeCandidates, targetState);
         } catch (final Exception e) {
+            setExtraState("Unable to setLocalDescription");
             // TODO sending the error text is worthwhile as well. Especially for FailureToSet
             // exceptions
             failureToInitiateSession(e, targetState);
@@ -1931,6 +1939,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
 
                     @Override
                     public void onFailure(@NonNull final Throwable throwable) {
+                        setExtraState("Unable to outgoingContentMapFuture");
                         failureToInitiateSession(throwable, targetState);
                     }
                 },
@@ -2689,6 +2698,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
                                 + " Other party already did");
                 return;
             }
+            setExtraState("WebRTC failed");
             sendSessionTerminate(Reason.CONNECTIVITY_ERROR);
         }
     }

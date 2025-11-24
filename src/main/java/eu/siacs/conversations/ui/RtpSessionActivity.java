@@ -146,6 +146,7 @@ public class RtpSessionActivity extends XmppActivity
             };
     private boolean buttonsHiddenAfterTimeout = false;
     private final Runnable mVisibilityToggleExecutor = this::updateButtonInVideoCallVisibility;
+    private String extraState = null;
 
     public static Set<Media> actionToMedia(final String action) {
         if (ACTION_MAKE_VIDEO_CALL.equals(action)) {
@@ -939,6 +940,16 @@ public class RtpSessionActivity extends XmppActivity
             default ->
                     throw new IllegalStateException(
                             String.format("State %s has not been handled in UI", state));
+        }
+
+        final var connection =
+                this.rtpConnectionReference != null ? this.rtpConnectionReference.get() : null;
+        if (connection != null) extraState = connection.extraState();
+        if (extraState != null) {
+            binding.extraState.setText(extraState);
+            binding.extraState.setVisibility(View.VISIBLE);
+        } else {
+            binding.extraState.setVisibility(View.GONE);
         }
     }
 

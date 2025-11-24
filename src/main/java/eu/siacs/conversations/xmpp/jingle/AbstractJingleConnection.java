@@ -118,6 +118,7 @@ public abstract class AbstractJingleConnection {
     private final Jid initiator;
 
     protected State state = State.NULL;
+    protected String extraState = null;
 
     AbstractJingleConnection(
             final JingleConnectionManager jingleConnectionManager,
@@ -147,6 +148,14 @@ public abstract class AbstractJingleConnection {
 
     protected synchronized boolean isInState(State... state) {
         return Arrays.asList(state).contains(this.state);
+    }
+
+    public synchronized String extraState() {
+       return extraState;
+    }
+
+    protected synchronized void setExtraState(final String s) {
+        extraState = s;
     }
 
     protected boolean transition(final State target) {

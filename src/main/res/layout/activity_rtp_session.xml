@@ -68,6 +68,16 @@
                 android:visibility="visible"
                 tools:text="jcapulet@example.com" />
 
+            <TextView
+                android:id="@+id/extra_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="16dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginRight="16dp"
+                android:textAppearance="?textAppearanceBodyMedium"
+                android:visibility="gone" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="32dp" />
