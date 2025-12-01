@@ -151,6 +151,7 @@ public class Presences {
                 jids.add(jid);
             }
         }
+        jids.add(contact.getJid().asBareJid());
         return jids;
     }
 
@@ -202,7 +203,7 @@ public class Presences {
         for (final var jid : getFullJids()) {
             final var disco = connection.getManager(DiscoManager.class).get(jid);
             if (disco != null && disco.hasFeature(namespace)) {
-                return jid.getResource();
+                return jid.getResource() == null ? "" : jid.getResource();
             }
         }
         return null;
