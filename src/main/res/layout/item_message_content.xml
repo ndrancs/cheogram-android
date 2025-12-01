@@ -28,7 +28,7 @@
                 android:layout_marginEnd="10dp"
                 android:textStyle="bold|italic"
                 android:longClickable="false"
-                android:textAppearance="?textAppearanceBodyMedium" />
+                android:textAppearance="?textAppearanceMessageContentLarge" />
         </LinearLayout>
 
         <TextView
@@ -39,7 +39,7 @@
             android:layout_marginBottom="2dp"
             android:longClickable="false"
             android:visibility="gone"
-            android:textAppearance="?textAppearanceBodyMedium" />
+            android:textAppearance="?textAppearanceMessageContentLarge" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -67,7 +67,7 @@
             android:autoLink="web"
             android:longClickable="false"
             android:breakStrategy="simple"
-            android:textAppearance="?textAppearanceBodyMedium" />
+            android:textAppearance="?textAppearanceMessageContentLarge" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/download_button"

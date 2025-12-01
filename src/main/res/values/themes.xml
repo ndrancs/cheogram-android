@@ -54,6 +54,9 @@
         <item name="materialDrawerStyle">@style/Widget.MaterialDrawerStyle</item>
         <item name="materialDrawerHeaderStyle">@style/Widget.MaterialDrawerHeaderStyle</item>
         <item name="preferenceTheme">@style/MaterialPreferenceThemeOverlay</item>
+
+        <item name="textAppearanceMessageContentNormal">@style/TextAppearance.Snikket.MessageContentNormal</item>
+        <item name="textAppearanceMessageContentLarge">@style/TextAppearance.Snikket.MessageContentLarge</item>
     </style>
 
     <style name="Theme.Conversations3.Dark" parent="Theme.Material3.Dark.NoActionBar">
@@ -85,6 +88,9 @@
         <item name="colorSurfaceInverse">@color/md_theme_dark_inverseSurface</item>
         <item name="colorPrimaryInverse">@color/md_theme_dark_inversePrimary</item>
         <item name="preferenceTheme">@style/MaterialPreferenceThemeOverlay</item>
+
+        <item name="textAppearanceMessageContentNormal">@style/TextAppearance.Snikket.MessageContentNormal</item>
+        <item name="textAppearanceMessageContentLarge">@style/TextAppearance.Snikket.MessageContentLarge</item>
     </style>
 
     <style name="MaterialPreferenceThemeOverlay" parent="@style/PreferenceThemeOverlay">
@@ -93,6 +99,15 @@
 
     <style name="MaterialSwitchPreference" parent="@style/Preference.SwitchPreferenceCompat.Material">
         <item name="widgetLayout">@layout/preference_material_switch</item>
+    </style>
+
+    <style name="TextAppearance.Snikket.MessageContentNormal" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">16sp</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
+    <style name="TextAppearance.Snikket.MessageContentLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textSize">20sp</item>
+        <item name="android:letterSpacing">0</item>
     </style>
 
 </resources>

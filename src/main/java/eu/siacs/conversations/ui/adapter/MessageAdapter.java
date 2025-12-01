@@ -1973,11 +1973,10 @@ public class MessageAdapter extends ArrayAdapter<Message> {
     private static void setTextSize(final TextView textView, final boolean largeFont) {
         if (largeFont) {
             textView.setTextAppearance(
-                    com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
-            textView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
+                    R.style.TextAppearance_Snikket_MessageContentLarge);
         } else {
             textView.setTextAppearance(
-                    com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+                    R.style.TextAppearance_Snikket_MessageContentNormal);
         }
     }
 
