@@ -611,6 +611,8 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         viewHolder.messageBody().setVisibility(View.VISIBLE);
         setTextColor(viewHolder.messageBody(), bubbleColor);
         setTextSize(viewHolder.messageBody(), this.bubbleDesign.largeFont);
+        setTextSize(viewHolder.inReplyTo(), this.bubbleDesign.largeFont);
+        setTextSize(viewHolder.inReplyToQuote(), this.bubbleDesign.largeFont);
         viewHolder.messageBody().setTypeface(null, Typeface.NORMAL);
 
         final ViewGroup.LayoutParams layoutParams = viewHolder.messageBody().getLayoutParams();
