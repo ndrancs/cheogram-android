@@ -162,6 +162,20 @@ public class NotificationService {
                 && message.getFileParams().height > 0;
     }
 
+    public static void ensureChannelExists(
+            final NotificationManager notificationManager,
+            final String channelId,
+            final String channelName,
+            final int importance) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return;
+        }
+        final NotificationChannel channel =
+                new NotificationChannel(channelId, channelName, importance);
+        channel.setShowBadge(false);
+        notificationManager.createNotificationChannel(channel);
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.O)
     void initializeChannels() {
         final Context c = mXmppConnectionService;

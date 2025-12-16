@@ -83,8 +83,10 @@ public class ImportBackupService extends Service {
 
     @Override
     public void onCreate() {
+        notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationService.ensureChannelExists(
+                notificationManager, "backup", getString(R.string.backup_channel_name), NotificationManager.IMPORTANCE_LOW);
         mDatabaseBackend = DatabaseBackend.getInstance(getBaseContext());
-        notificationManager = (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
     }
 
     @Override

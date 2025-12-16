@@ -45,6 +45,7 @@ import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.http.HttpConnectionManager;
 import eu.siacs.conversations.persistance.DatabaseBackend;
 import eu.siacs.conversations.persistance.FileBackend;
+import eu.siacs.conversations.services.NotificationService;
 import eu.siacs.conversations.utils.Compatibility;
 import eu.siacs.conversations.utils.FileUtils;
 import eu.siacs.conversations.utils.MimeUtils;
@@ -61,8 +62,10 @@ public class DownloadDefaultStickers extends Service {
 
 	@Override
 	public void onCreate() {
-		mDatabaseBackend = DatabaseBackend.getInstance(getBaseContext());
 		notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+		NotificationService.ensureChannelExists(
+				notificationManager, "backup", getString(R.string.backup_channel_name), NotificationManager.IMPORTANCE_LOW);
+		mDatabaseBackend = DatabaseBackend.getInstance(getBaseContext());
 		mStickerDir = stickerDir();
 	}
 

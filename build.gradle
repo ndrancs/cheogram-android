@@ -293,6 +293,12 @@ android {
         abortOnError false
     }
 
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+
     subprojects {
 
         afterEvaluate {
