@@ -1119,7 +1119,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatarable 
             spannableBody.setSpan(PLAIN_TEXT_SPAN, 0, spannableBody.length(), 0); // Let adapter know it can do more formatting
         } else {
             SpannableStringBuilder spannable = new SpannableStringBuilder(Html.fromHtml(
-                MessageUtils.filterLtrRtl(html.toString()).trim(),
+                MessageUtils.filterLtrRtl(html.toString().replace("<code>", "<tt>").replace("</code>", "</tt>")).trim(),
                 Html.FROM_HTML_MODE_COMPACT,
                 (source) -> {
                    try {
