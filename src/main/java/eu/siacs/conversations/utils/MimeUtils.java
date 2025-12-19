@@ -150,6 +150,7 @@ public final class MimeUtils {
         add("application/vnd.tcpdump.pcap", "cap");
         add("application/vnd.tcpdump.pcap", "dmp");
         add("application/x-pcapng", "pcapng");
+        add("application/wasm", "wasm");
         add("application/x-7z-compressed", "7z");
         add("application/x-abiword", "abw");
         add("application/x-apple-diskimage", "dmg");
