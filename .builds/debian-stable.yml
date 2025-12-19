@@ -3,7 +3,7 @@ sources:
 - https://git.sr.ht/~singpolyma/cheogram-android
 artifacts:
 - cheogram.apk
-- cheogram_google_play.apk
+- cheogram.aab
 - cheogram_google_play.aab
 packages:
 - wget
@@ -35,25 +35,31 @@ tasks:
     sed -ie 's/<!-- INSERT -->/<meta-data android:name="io.sentry.dsn" android:value="https:\/\/ef8be0f096894172885533d912826e3e@app.glitchtip.com\/5857" \/>/' src/cheogram/AndroidManifest.xml
     sed -ie 's/\/\/ PLUGIN INSERT/id "io.sentry.android.gradle" version "5.12.2"/' build.gradle
     sed -ie 's/\/\/ ROOT INSERT/sentry { includeSourceContext = true }/' build.gradle
-- build_free: |
+- free_debug: |
     set +x
     export SENTRY_AUTH_TOKEN=$(cat ~/sentry_auth_token)
     set -x
     cd cheogram-android
     ./gradlew assembleCheogramFreeDebug
-- build_google_play: |
+- setup_signing: |
+    echo keystore=$HOME/.android/cheogram.keystore > signing.properties
+    echo keystore.password=cheogram >> signing.properties
+    echo keystore.alias=cheogram >> signing.properties
+- free_bundle: |
+    set +x
+    export SENTRY_AUTH_TOKEN=$(cat ~/sentry_auth_token)
+    set -x
+    cd cheogram-android
+    ./gradlew bundleCheogramFreeRelease
+- google_play_bundle: |
     set +x
     export SENTRY_AUTH_TOKEN=$(cat ~/sentry_auth_token)
     set -x
     cd cheogram-android
     mkdir -p src/playstore/res/values/
     mv ~/push.xml src/playstore/res/values/
-    ./gradlew assembleCheogramPlaystoreDebug
-    echo keystore=$HOME/.android/cheogram.keystore > signing.properties
-    echo keystore.password=cheogram >> signing.properties
-    echo keystore.alias=cheogram >> signing.properties
     ./gradlew bundleCheogramPlaystoreRelease
 - assets: |
     mv cheogram-android/build/outputs/apk/cheogramFree/debug/*universal*.apk cheogram.apk
-    mv cheogram-android/build/outputs/apk/cheogramPlaystore/debug/*universal*.apk cheogram_google_play.apk
+    mv cheogram-android/build/outputs/bundle/cheogramFreeRelease/*.aab cheogram.aab
     mv cheogram-android/build/outputs/bundle/cheogramPlaystoreRelease/*.aab cheogram_google_play.aab
