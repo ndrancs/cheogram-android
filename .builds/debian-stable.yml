@@ -42,6 +42,7 @@ tasks:
     cd cheogram-android
     ./gradlew assembleCheogramFreeDebug
 - setup_signing: |
+    cd cheogram-android
     echo keystore=$HOME/.android/cheogram.keystore > signing.properties
     echo keystore.password=cheogram >> signing.properties
     echo keystore.alias=cheogram >> signing.properties
