@@ -1,9 +1,9 @@
 package eu.siacs.conversations.services;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Set;
 import java.util.Objects;
 import java.util.ArrayList;
@@ -16,6 +16,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableList;
 
 import android.content.Intent;
+import android.os.Binder;
 import android.os.SystemClock;
 import android.net.Uri;
 import android.util.Log;
@@ -30,9 +31,15 @@ import eu.siacs.conversations.xmpp.manager.RosterManager;
 
 public class QuickConversationsService extends AbstractQuickConversationsService {
 
+	public class QuickConversationsBinder extends Binder {
+		public QuickConversationsService getService() {
+			return QuickConversationsService.this;
+		}
+	}
+
     protected final AtomicInteger mRunningSyncJobs = new AtomicInteger(0);
     protected final SerialSingleThreadExecutor mSerialSingleThreadExecutor = new SerialSingleThreadExecutor(QuickConversationsService.class.getSimpleName());
-    protected HashMap<String,Attempt> mLastSyncAttempt = new HashMap<>();
+    protected Map<String, Attempt> mLastSyncAttempt = new ConcurrentHashMap<>();
 
     QuickConversationsService(XmppConnectionService xmppConnectionService) {
         super(xmppConnectionService);
