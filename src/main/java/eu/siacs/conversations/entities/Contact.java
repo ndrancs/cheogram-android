@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 import eu.siacs.conversations.BuildConfig;
 import eu.siacs.conversations.Config;
@@ -82,7 +83,7 @@ public class Contact implements ListItem, Blockable {
     private String photoUri;
     private final JSONObject keys;
     private JSONArray groups = new JSONArray();
-    private JSONArray systemTags = new JSONArray();
+    private final AtomicReference<JSONArray> systemTags = new AtomicReference<>(new JSONArray());
     private final Presences presences = new Presences(this);
     protected Account account;
     protected String avatar;
@@ -362,12 +363,9 @@ public class Contact implements ListItem, Blockable {
     }
 
     public boolean setSystemTags(Collection<String> systemTags) {
-        final JSONArray old = this.systemTags;
-        this.systemTags = new JSONArray();
-        for(String tag : systemTags) {
-            this.systemTags.put(tag);
-        }
-        return !old.equals(this.systemTags);
+        final var newArray = new JSONArray(systemTags);
+        final var oldArray = this.systemTags.getAndSet(newArray);
+        return !oldArray.equals(newArray);
     }
 
     public boolean setPresenceName(String presenceName) {
@@ -406,10 +404,11 @@ public class Contact implements ListItem, Blockable {
     }
 
     private Collection<String> getSystemTags(final boolean unique) {
+        final JSONArray systemTags = this.systemTags.get();
         final Collection<String> tags = unique ? new HashSet<>() : new ArrayList<>();
-        for (int i = 0; i < this.systemTags.length(); ++i) {
+        for (int i = 0; i < systemTags.length(); ++i) {
             try {
-                tags.add(this.systemTags.getString(i));
+                tags.add(systemTags.getString(i));
             } catch (final JSONException ignored) {
             }
         }
