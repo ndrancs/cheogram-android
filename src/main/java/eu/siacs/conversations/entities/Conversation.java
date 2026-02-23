@@ -110,6 +110,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.Timer;
@@ -218,7 +219,7 @@ public class Conversation extends AbstractEntity
     private int mode;
     private final JSONObject attributes;
     private Jid nextCounterpart;
-    private transient MucOptions mucOptions = null;
+    private final transient AtomicReference<MucOptions> mucOptions = new AtomicReference<>();
     private boolean messagesLeftOnServer = true;
     private ChatState mOutgoingChatState = Config.DEFAULT_CHAT_STATE;
     private ChatState mIncomingChatState = Config.DEFAULT_CHAT_STATE;
@@ -1141,15 +1142,16 @@ public class Conversation extends AbstractEntity
         return getMucOptions().isPrivateAndNonAnonymous();
     }
 
-    public synchronized MucOptions getMucOptions() {
-        if (this.mucOptions == null) {
-            this.mucOptions = new MucOptions(this);
-        }
-        return this.mucOptions;
+    public @NonNull MucOptions getMucOptions() {
+        return this.mucOptions.updateAndGet(
+            existing -> existing != null ? existing : new MucOptions(this)
+        );
     }
 
-    public void resetMucOptions() {
-        this.mucOptions = null;
+    public @NonNull MucOptions resetMucOptions() {
+        return this.mucOptions.updateAndGet(
+            ignoredExisting -> new MucOptions(this)
+        );
     }
 
     public void setContactJid(final Jid jid) {
@@ -1344,7 +1346,7 @@ public class Conversation extends AbstractEntity
     public boolean storeInCache() {
         if ("cache".equals(getAttribute("storeMedia"))) return true;
         if ("shared".equals(getAttribute("storeMedia"))) return false;
-        if (mode == Conversation.MODE_MULTI && !mucOptions.isPrivateAndNonAnonymous()) return true;
+        if (mode == Conversation.MODE_MULTI && !getMucOptions().isPrivateAndNonAnonymous()) return true;
         return false;
     }
 

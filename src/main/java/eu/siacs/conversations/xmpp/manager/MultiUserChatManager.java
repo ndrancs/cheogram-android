@@ -87,8 +87,7 @@ public class MultiUserChatManager extends AbstractManager {
         if (Config.MUC_LEAVE_BEFORE_JOIN) {
             unavailable(conversation);
         }
-        conversation.resetMucOptions();
-        conversation.getMucOptions().setAutoPushConfiguration(autoPushConfiguration);
+        conversation.resetMucOptions().setAutoPushConfiguration(autoPushConfiguration);
         conversation.setHasMessagesLeftOnServer(false);
         final var disco = fetchDiscoInfo(conversation);
 
