@@ -17,6 +17,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import eu.siacs.conversations.entities.Account;
@@ -111,6 +113,56 @@ public class DatabaseBackendTest {
     private static ConversationFixture CONFORMING;
     private static ConversationFixture NO_CACHED_MUC_USERS;
     private static ConversationFixture[] FIXTURES;
+
+    private Set<String> getCheogramSchema(SQLiteDatabase db) {
+        var schema = new HashSet<String>();
+
+        var cursor = db.rawQuery(
+            "SELECT name FROM cheogram.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+            null
+        );
+        final var tables = new java.util.ArrayList<String>();
+        while (cursor.moveToNext()) {
+            tables.add(cursor.getString(0));
+        }
+        cursor.close();
+
+        for (final var table : tables) {
+            cursor = db.rawQuery("PRAGMA cheogram.table_info(" + table + ")", null);
+            while (cursor.moveToNext()) {
+                final var colName = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                final var colType = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                schema.add("table:" + table + ":col:" + colName + ":" + colType);
+            }
+            cursor.close();
+        }
+
+        cursor = db.rawQuery(
+            "SELECT name, tbl_name, sql FROM cheogram.sqlite_master WHERE type='index' AND sql IS NOT NULL",
+            null
+        );
+        while (cursor.moveToNext()) {
+            final var name = cursor.getString(0);
+            final var tbl = cursor.getString(1);
+            final var sql = cursor.getString(2);
+            schema.add("index:" + name + ":" + tbl + ":" + sql);
+        }
+        cursor.close();
+
+        return schema;
+    }
+
+    private int getCheogramVersion(SQLiteDatabase db) {
+        final var cursor = db.rawQuery("PRAGMA cheogram.user_version", null);
+        var version = -1;
+        try {
+            cursor.moveToNext();
+            version = cursor.getInt(0);
+        } finally {
+            cursor.close();
+        }
+        return version;
+    }
 
     @BeforeClass
     public static void setupClass() throws JSONException {
@@ -230,6 +282,28 @@ public class DatabaseBackendTest {
             expected.toString(),
             attributes.toString()
         );
+    }
+
+    @Test
+    public void cheogramMigrateIsIdempotent() throws Exception {
+        final var sqDb = db.getWritableDatabase();
+
+        final var schemaAfterFirst = getCheogramSchema(sqDb);
+        int versionAfterFirst = getCheogramVersion(sqDb);
+
+        Assert.assertTrue("Version should be > 0 after migration", versionAfterFirst > 0);
+
+        final var migrateMethod = DatabaseBackend.class.getDeclaredMethod("cheogramMigrate", SQLiteDatabase.class);
+        migrateMethod.setAccessible(true);
+        migrateMethod.invoke(db, sqDb);
+
+        final var schemaAfterSecond = getCheogramSchema(sqDb);
+        var versionAfterSecond = getCheogramVersion(sqDb);
+
+        Assert.assertEquals("Schema should be identical after re-running migration",
+            schemaAfterFirst, schemaAfterSecond);
+        Assert.assertEquals("Version should be unchanged after re-running migration",
+            versionAfterFirst, versionAfterSecond);
     }
 
     @Test
