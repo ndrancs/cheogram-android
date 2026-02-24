@@ -1,7 +1,9 @@
 package eu.siacs.conversations.persistance;
 
 import android.content.ContentValues;
+import android.database.sqlite.SQLiteBlobTooBigException;
 import android.database.sqlite.SQLiteDatabase;
+import android.util.Log;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
@@ -102,8 +104,10 @@ public class DatabaseBackendTest {
 
     private DatabaseBackend db;
     private static final InfoQuery INFO_QUERY_WITH_OCCUPANT_ID = new InfoQuery();
+    private static final int MANY_USERS = 20_000;
 
     private static AccountFixture ACCOUNT;
+    private static ConversationFixture ROW_TOO_BIG;
     private static ConversationFixture CONFORMING;
     private static ConversationFixture NO_CACHED_MUC_USERS;
     private static ConversationFixture[] FIXTURES;
@@ -116,6 +120,30 @@ public class DatabaseBackendTest {
 
         ACCOUNT = new AccountFixture(
             UUID.randomUUID().toString(), "test", "example.com");
+
+        final var rowTooBigAttrs = new JSONObject();
+        for (int i = 0; i < MANY_USERS; i++) {
+            final var occupantId = UUID.randomUUID().toString();
+            rowTooBigAttrs.put("occupantNick/" + occupantId, "User" + i);
+            rowTooBigAttrs.put("occupantAvatar/" + occupantId,
+                UUID.randomUUID().toString().repeat(5));
+        }
+        rowTooBigAttrs.put("mucNick", "testMucNick");
+
+        final var rowTooBigCache =
+            new HashMap<MucOptions.User.OccupantId, MucOptions.User.CacheEntry>();
+        rowTooBigCache.put(
+            new MucOptions.User.OccupantId(UUID.randomUUID().toString()),
+            new MucOptions.User.CacheEntry(UUID.randomUUID().toString(), "RowTooBigUser"));
+
+        ROW_TOO_BIG = new ConversationFixture(
+            UUID.randomUUID().toString(),
+            ACCOUNT,
+            "Big MUC",
+            "room@conference.example.com",
+            rowTooBigAttrs.toString(),
+            rowTooBigCache
+        );
 
         final var conformingCache =
             new HashMap<MucOptions.User.OccupantId, MucOptions.User.CacheEntry>();
@@ -141,7 +169,8 @@ public class DatabaseBackendTest {
             new HashMap<>()
         );
 
-        FIXTURES = new ConversationFixture[] { CONFORMING, NO_CACHED_MUC_USERS };
+        FIXTURES = new ConversationFixture[] {
+            ROW_TOO_BIG, CONFORMING, NO_CACHED_MUC_USERS };
     }
 
     @Before
@@ -178,6 +207,28 @@ public class DatabaseBackendTest {
                 .extractAndConfigure(db)
                 .getMucOccupantCache(),
             CONFORMING.occupantCache()
+        );
+    }
+
+    @Test
+    public void getConversationsTruncatesTooBigRow() throws Exception {
+        final var conversation = ROW_TOO_BIG.extractAndConfigure(db);
+        java.lang.reflect.Field attributesField =
+            conversation.getClass().getDeclaredField("attributes");
+
+        attributesField.setAccessible(true);
+        org.json.JSONObject attributes =
+            (org.json.JSONObject) attributesField.get(conversation);
+
+        final var expected = new JSONObject();
+        expected.put("members_only", "false");
+        expected.put("moderated", "false");
+        expected.put("non_anonymous", "false");
+
+        Assert.assertEquals(
+            "Attributes should not contain occupant cache after truncation:\n" + attributes.toString(4),
+            expected.toString(),
+            attributes.toString()
         );
     }
 
