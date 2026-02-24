@@ -13,6 +13,9 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class XmlReader implements Closeable {
+
+    private static final int XML_ELEMENT_MAX_DEPTH = 128;
+
     private final XmlPullParser parser;
     private InputStream is;
 
@@ -53,35 +56,35 @@ public class XmlReader implements Closeable {
         this.is = null;
     }
 
-	public Tag readTag() throws IOException {
-		try {
-			while (this.is != null && parser.next() != XmlPullParser.END_DOCUMENT) {
-				if (parser.getEventType() == XmlPullParser.START_TAG) {
-					Tag tag = Tag.start(parser.getName());
-					final String xmlns = parser.getNamespace();
-					for (int i = 0; i < parser.getAttributeCount(); ++i) {
-						final var prefix = parser.getAttributePrefix(i);
-						final var ns = parser.getAttributeNamespace(i);
-						String name;
-						if ("xml".equals(prefix)) {
-							name = "xml:" + parser.getAttributeName(i);
-						} else if (ns != null && !ns.isEmpty()) {
-							name = "{" + ns + "}" + parser.getAttributeName(i);
-						} else {
-							name = parser.getAttributeName(i);
-						}
-						tag.setAttribute(name,parser.getAttributeValue(i));
-					}
-					if (xmlns != null) {
-						tag.setAttribute("xmlns", xmlns);
-					}
-					return tag;
-				} else if (parser.getEventType() == XmlPullParser.END_TAG) {
-					return Tag.end(parser.getName());
-				} else if (parser.getEventType() == XmlPullParser.TEXT) {
-					return Tag.no(parser.getText());
-				}
-			}
+    public Tag readTag() throws IOException {
+        try {
+            while (this.is != null && parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.getEventType() == XmlPullParser.START_TAG) {
+                    Tag tag = Tag.start(parser.getName());
+                    final String xmlns = parser.getNamespace();
+                    for (int i = 0; i < parser.getAttributeCount(); ++i) {
+                        final var prefix = parser.getAttributePrefix(i);
+                        final var ns = parser.getAttributeNamespace(i);
+                        String name;
+                        if ("xml".equals(prefix)) {
+                            name = "xml:" + parser.getAttributeName(i);
+                        } else if (ns != null && !ns.isEmpty()) {
+                            name = "{" + ns + "}" + parser.getAttributeName(i);
+                        } else {
+                            name = parser.getAttributeName(i);
+                        }
+                        tag.setAttribute(name,parser.getAttributeValue(i));
+                    }
+                    if (xmlns != null) {
+                        tag.setAttribute("xmlns", xmlns);
+                    }
+                    return tag;
+                } else if (parser.getEventType() == XmlPullParser.END_TAG) {
+                    return Tag.end(parser.getName());
+                } else if (parser.getEventType() == XmlPullParser.TEXT) {
+                    return Tag.no(parser.getText());
+                }
+            }
 
         } catch (Throwable throwable) {
             throw new IOException(
@@ -105,28 +108,37 @@ public class XmlReader implements Closeable {
                 String.format("Read unexpected {%s}%s", element.getNamespace(), element.getName()));
     }
 
-	public Element readElement(final Tag currentTag) throws IOException {
-		final var attributes = currentTag.getAttributes();
-		final var namespace = attributes.get("xmlns");
-		final var name = currentTag.getName();
-		final Element element = ExtensionFactory.create(name, namespace);
-		element.setAttributes(currentTag.getAttributes());
-		Tag nextTag = this.readTag();
-		if (nextTag == null) {
-			throw new IOException("interrupted mid tag");
-		}
-		while (!nextTag.isEnd(element.getName())) {
-			if (nextTag.isNo()) {
-				if (nextTag.getName() != null) element.addChild(new TextNode(nextTag.getName()));
-			} else {
-				Element child = this.readElement(nextTag);
-				element.addChild(child);
-			}
-			nextTag = this.readTag();
-			if (nextTag == null) {
-				throw new IOException("interrupted mid tag");
-			}
-		}
-		return element;
-	}
+    public Element readElement(final Tag currentTag) throws IOException {
+        return readElement(currentTag, 0);
+    }
+
+    private Element readElement(final Tag currentTag, final int depth) throws IOException {
+        if (depth >= XML_ELEMENT_MAX_DEPTH) {
+            throw new XmlMaxDepthReachedException();
+        }
+        final var namespace = currentTag.getAttributes().get("xmlns");
+        final var name = currentTag.getName();
+        final Element element = ExtensionFactory.create(name, namespace);
+        element.setAttributes(currentTag.getAttributes());
+        Tag nextTag = this.readTag();
+        if (nextTag == null) {
+            throw new IOException("interrupted mid tag");
+        }
+        while (!nextTag.isEnd(element.getName())) {
+            if (nextTag.isNo()) {
+                if (nextTag.getName() != null) element.addChild(new TextNode(nextTag.getName()));
+            } else {
+                final var child = this.readElement(nextTag, depth + 1);
+                element.addChild(child);
+            }
+            nextTag = this.readTag();
+        }
+        return element;
+    }
+
+    public static class XmlMaxDepthReachedException extends IOException {
+        public XmlMaxDepthReachedException() {
+            super("Reached maximum depth of XML stream");
+        }
+    }
 }
