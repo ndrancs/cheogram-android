@@ -1,5 +1,6 @@
 package eu.siacs.conversations.entities;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.net.Uri;
 import android.text.TextUtils;
@@ -14,6 +15,8 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.gson.JsonObject;
+
 import de.gultsch.common.IntMap;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.services.AvatarService;
@@ -27,25 +30,32 @@ import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.chatstate.ChatState;
 import eu.siacs.conversations.xmpp.pep.Avatar;
 import eu.siacs.conversations.xml.Element;
-
+import im.conversations.android.xmpp.model.Hash;
 import im.conversations.android.xmpp.model.data.Data;
 import im.conversations.android.xmpp.model.data.Field;
 import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import im.conversations.android.xmpp.model.muc.Affiliation;
 import im.conversations.android.xmpp.model.muc.Item;
 import im.conversations.android.xmpp.model.muc.Role;
+
+import java.io.Serializable;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class MucOptions {
-
     private static final IntMap<Affiliation> AFFILIATION_RANKS =
             new IntMap<>(
                     new ImmutableMap.Builder<Affiliation, Integer>()
@@ -120,6 +130,7 @@ public class MucOptions {
             user.affiliation = affiliation;
         }
     }
+
 
     public void setAutoPushConfiguration(final boolean auto) {
         this.mAutoPushConfiguration = auto;
@@ -338,6 +349,8 @@ public class MucOptions {
 
     // returns true if real jid was new;
     public boolean updateUser(User user) {
+        assert(user.options == null || user.options == this);
+
         User old;
         boolean realJidFound = false;
         if (user.fullJid == null && user.realJid != null) {
@@ -902,6 +915,18 @@ public class MucOptions {
     }
 
     public static class User implements Comparable<User>, AvatarService.Avatarable {
+        public record CacheEntry(String avatar, String nick) {
+            public static final String TABLENAME = "muc_user";
+            public static final String AVATAR = "avatar";
+            public static final String NICK = "nick";
+            public static final String OCCUPANT_ID = "occupant_id";
+            public static final String CONVERSATION_UUID = "conversation_uuid";
+
+            public static CacheEntry fromUser(final User user) {
+                return new CacheEntry(user.getAvatar(), user.getNick());
+            }
+        }
+        public record OccupantId(String inner) { }
         private Role role = Role.NONE;
         private Affiliation affiliation = Affiliation.NONE;
         private Jid realJid;
@@ -922,15 +947,16 @@ public class MucOptions {
             this.nick = nick;
             this.hats = hats;
 
+            final var cacheKey = new OccupantId(occupantId);
             if (occupantId != null && options != null) {
-                avatar = options.getConversation().getAttribute("occupantAvatar/" + occupantId);
+                avatar = options.conversation.getCachedOccupantAvatar(cacheKey);
 
                 if (nick == null) {
-                    this.nick = options.getConversation().getAttribute("occupantNick/" + occupantId);
+                    this.nick = options.conversation.getCachedOccupantNick(cacheKey);
                 } else if (!getNick().equals(getName())) {
-                    options.getConversation().setAttribute("occupantNick/" + occupantId, nick);
+                    options.conversation.setCachedOccupantNick(cacheKey, nick);
                 } else {
-                    options.getConversation().setAttribute("occupantNick/" + occupantId, (String) null);
+                    options.conversation.setCachedOccupantNick(cacheKey, null);
                 }
             }
         }
@@ -1014,7 +1040,7 @@ public class MucOptions {
 
         public boolean setAvatar(final String avatar) {
             if (occupantId != null) {
-                options.getConversation().setAttribute("occupantAvatar/" + occupantId, getContact() == null && avatar != null ? avatar : null);
+                options.conversation.setCachedOccupantAvatar(new OccupantId(occupantId), avatar);
             }
             if (this.avatar != null && this.avatar.equals(avatar)) {
                 return false;

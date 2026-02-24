@@ -4,7 +4,9 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
+import android.database.sqlite.SQLiteAbortException;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.text.TextUtils;
 import android.os.Build;
@@ -12,7 +14,6 @@ import android.os.Environment;
 import android.os.SystemClock;
 import android.util.Base64;
 import android.util.Log;
-
 import com.cheogram.android.WebxdcUpdate;
 
 import com.google.common.base.Stopwatch;
@@ -21,6 +22,8 @@ import com.google.common.collect.HashMultimap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.jxmpp.jid.parts.Localpart;
+import org.jxmpp.stringprep.XmppStringprepException;
 import org.whispersystems.libsignal.IdentityKey;
 import org.whispersystems.libsignal.IdentityKeyPair;
 import org.whispersystems.libsignal.InvalidKeyException;
@@ -32,6 +35,7 @@ import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -47,6 +51,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import im.conversations.android.xmpp.model.occupant.OccupantId;
 import io.ipfs.cid.Cid;
 
 import com.google.common.collect.ImmutableMap;
@@ -68,38 +73,13 @@ import eu.siacs.conversations.utils.CursorUtils;
 import eu.siacs.conversations.utils.FtsUtils;
 import eu.siacs.conversations.utils.MimeUtils;
 import eu.siacs.conversations.utils.Resolver;
+import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.mam.MamReference;
 import im.conversations.android.xml.XmlElementReader;
 import im.conversations.android.xmpp.EntityCapabilities;
 import im.conversations.android.xmpp.EntityCapabilities2;
 import im.conversations.android.xmpp.model.disco.info.InfoQuery;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.cert.CertificateEncodingException;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import org.json.JSONObject;
-import org.jxmpp.jid.parts.Localpart;
-import org.jxmpp.stringprep.XmppStringprepException;
-import org.whispersystems.libsignal.IdentityKey;
-import org.whispersystems.libsignal.IdentityKeyPair;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.SignalProtocolAddress;
-import org.whispersystems.libsignal.state.PreKeyRecord;
-import org.whispersystems.libsignal.state.SessionRecord;
-import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 
 public class DatabaseBackend extends SQLiteOpenHelper {
 
@@ -541,6 +521,19 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                 db.execSQL("PRAGMA cheogram.user_version = 12");
             }
 
+            if (cheogramVersion < 13) {
+                db.execSQL(
+                        "CREATE TABLE cheogram." + MucOptions.User.CacheEntry.TABLENAME + " (" +
+                                "conversation_uuid TEXT NOT NULL, " +
+                                "occupant_id TEXT NOT NULL, " +
+                                "nick TEXT, " +
+                                "avatar TEXT, " +
+                                "PRIMARY KEY (conversation_uuid, occupant_id)" +
+                                ")"
+                );
+                db.execSQL("PRAGMA cheogram.user_version = 13");
+            }
+
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();
@@ -549,7 +542,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
 
     @Override
     public void onConfigure(SQLiteDatabase db) {
-        db.execSQL("PRAGMA foreign_keys=ON");
+        db.setForeignKeyConstraintsEnabled(true);
         db.rawQuery("PRAGMA secure_delete=ON", null).close();
         db.execSQL("ATTACH DATABASE ? AS cheogram", new Object[]{context.getDatabasePath("cheogram").getPath()});
         cheogramMigrate(db);
@@ -1628,13 +1621,45 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         return templates;
     }
 
+    public HashMap<MucOptions.User.OccupantId, MucOptions.User.CacheEntry>
+    getMucUsersForConversation(Conversation conversation)
+    {
+        HashMap<MucOptions.User.OccupantId, MucOptions.User.CacheEntry> cache = new HashMap<>();
+        Cursor cursor = null;
+        try {
+            SQLiteDatabase db = this.getReadableDatabase();
+            String[] selectionArgs = {conversation.getUuid()};
+            cursor = db.rawQuery(
+                    "select * from "
+                            + MucOptions.User.CacheEntry.TABLENAME
+                            + " where "
+                            + MucOptions.User.CacheEntry.CONVERSATION_UUID
+                            + "= ?",
+                        selectionArgs
+            );
+            while (cursor.moveToNext()) {
+                final var avatar = cursor.getString(cursor.getColumnIndexOrThrow(MucOptions.User.CacheEntry.AVATAR));
+                final var nick = cursor.getString(cursor.getColumnIndexOrThrow(MucOptions.User.CacheEntry.NICK));
+                final var occupantId = cursor.getString(cursor.getColumnIndexOrThrow(MucOptions.User.CacheEntry.OCCUPANT_ID));
+                cache.put(
+                    new MucOptions.User.OccupantId(occupantId),
+                    new MucOptions.User.CacheEntry(avatar, nick)
+                );
+            }
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+
+        return cache;
+    }
+
     public CopyOnWriteArrayList<Conversation> getConversations(int status) {
         CopyOnWriteArrayList<Conversation> list = new CopyOnWriteArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         String[] selectionArgs = {Integer.toString(status)};
         Cursor cursor =
                 db.rawQuery(
-                        "select * from "
+                        "select " + String.join(", ", Conversation.ALL_COLUMNS) + " from "
                                 + Conversation.TABLENAME
                                 + " where "
                                 + Conversation.STATUS
@@ -1649,6 +1674,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
             if (conversation.getJid() instanceof Jid.Invalid) {
                 continue;
             }
+            conversation.putAllInMucOccupantCache(getMucUsersForConversation(conversation));
             list.add(conversation);
         }
         cursor.close();
@@ -2148,14 +2174,27 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         }
     }
 
-    public void updateConversation(final Conversation conversation) {
+    public void updateConversation(final Conversation conversation) throws SQLiteException {
         final SQLiteDatabase db = this.getWritableDatabase();
-        final String[] args = {conversation.getUuid()};
-        db.update(
-                Conversation.TABLENAME,
-                conversation.getContentValues(),
-                Conversation.UUID + "=?",
-                args);
+        db.beginTransaction();
+        try {
+            final String[] args = {conversation.getUuid()};
+            db.update(
+                    Conversation.TABLENAME,
+                    conversation.getContentValues(),
+                    Conversation.UUID + "=?",
+                    args);
+            for (final var cv : conversation.mucOccupantCacheAsContentValues()) {
+                db.insertWithOnConflict(
+                        MucOptions.User.CacheEntry.TABLENAME,
+                        null,
+                        cv,
+                        SQLiteDatabase.CONFLICT_REPLACE);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public List<Account> getAccounts() {

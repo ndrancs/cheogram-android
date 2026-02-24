@@ -48,6 +48,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebChromeClient;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.LruCache;
 import android.util.Pair;
 import android.util.SparseArray;
@@ -77,6 +78,7 @@ import com.cheogram.android.WebxdcPage;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.textfield.TextInputLayout;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
@@ -85,6 +87,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 
+import im.conversations.android.xmpp.model.occupant.OccupantId;
 import io.ipfs.cid.Cid;
 
 import io.michaelrocks.libphonenumber.android.NumberParseException;
@@ -105,10 +108,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -116,6 +122,7 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import me.saket.bettermovementmethod.BetterLinkMovementMethod;
 
@@ -161,21 +168,13 @@ import eu.siacs.conversations.xmpp.chatstate.ChatState;
 import eu.siacs.conversations.xmpp.forms.Data;
 import eu.siacs.conversations.xmpp.forms.Option;
 import eu.siacs.conversations.xmpp.mam.MamReference;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import static eu.siacs.conversations.entities.Bookmark.printableValue;
 
 import im.conversations.android.xmpp.model.stanza.Iq;
 
 public class Conversation extends AbstractEntity
         implements Blockable, Comparable<Conversation>, Conversational, AvatarService.Avatarable {
+
+    public static final String TAG = "eu.siacs.conversations.entities.Conversation";
     public static final String TABLENAME = "conversations";
 
     public static final int STATUS_AVAILABLE = 0;
@@ -189,6 +188,24 @@ public class Conversation extends AbstractEntity
     public static final String CREATED = "created";
     public static final String MODE = "mode";
     public static final String ATTRIBUTES = "attributes";
+
+    public static final String[] ALL_COLUMNS = new String[] {
+        UUID,
+        NAME,
+        ACCOUNT,
+        CONTACT,
+        CONTACTJID,
+        STATUS,
+        CREATED,
+        MODE,
+        String.format(
+            "SUBSTR(%s, 0, %d) AS %s",
+            ATTRIBUTES,
+            Short.MAX_VALUE << 1,
+            ATTRIBUTES
+        )
+    };
+
 
     public static final String ATTRIBUTE_MUTED_TILL = "muted_till";
     public static final String ATTRIBUTE_ALWAYS_NOTIFY = "always_notify";
@@ -220,6 +237,9 @@ public class Conversation extends AbstractEntity
     private final JSONObject attributes;
     private Jid nextCounterpart;
     private final transient AtomicReference<MucOptions> mucOptions = new AtomicReference<>();
+    private transient ConcurrentMap<
+        MucOptions.User.OccupantId, MucOptions.User.CacheEntry
+    > mucOccupantCache = new ConcurrentHashMap<>();
     private boolean messagesLeftOnServer = true;
     private ChatState mOutgoingChatState = Config.DEFAULT_CHAT_STATE;
     private ChatState mIncomingChatState = Config.DEFAULT_CHAT_STATE;
@@ -271,7 +291,7 @@ public class Conversation extends AbstractEntity
         this.attributes = parseAttributes(attributes);
     }
 
-    private static JSONObject parseAttributes(final String attributes) {
+    private static JSONObject parseAttributes(@Nullable final String attributes) {
         if (Strings.isNullOrEmpty(attributes)) {
             return new JSONObject();
         } else {
@@ -1160,6 +1180,70 @@ public class Conversation extends AbstractEntity
 
     public Jid getNextCounterpart() {
         return this.nextCounterpart;
+    }
+
+    protected String getCachedOccupantNick(MucOptions.User.OccupantId cacheKey) {
+        final var cacheEntry = this.getMucOccupantCache().get(cacheKey);
+        if (cacheEntry == null) {
+            return null;
+        }
+        return cacheEntry.nick();
+    }
+
+    protected String getCachedOccupantAvatar(MucOptions.User.OccupantId cacheKey) {
+        final var cacheEntry = this.getMucOccupantCache().get(cacheKey);
+        if (cacheEntry == null) {
+            return null;
+        }
+        return cacheEntry.avatar();
+    }
+
+    protected boolean setCachedOccupantAvatar(MucOptions.User.OccupantId cacheKey, String newAvatar) {
+        final var newEntry = new MucOptions.User.CacheEntry(newAvatar, null);
+        return this.mucOccupantCache.merge(
+            cacheKey,
+            newEntry,
+            (prev, next) -> new MucOptions.User.CacheEntry(newAvatar, prev.nick())
+        ).equals(newEntry);
+    }
+
+    protected boolean setCachedOccupantNick(MucOptions.User.OccupantId cacheKey, String newNick) {
+        final var newEntry = new MucOptions.User.CacheEntry(null, newNick);
+        return this.mucOccupantCache.merge(
+            cacheKey,
+            newEntry,
+            (prev, next) -> new MucOptions.User.CacheEntry(prev.avatar(), newNick)
+        ).equals(newEntry);
+    }
+
+    public Map<MucOptions.User.OccupantId, MucOptions.User.CacheEntry> getMucOccupantCache() {
+        return this.mucOccupantCache.entrySet().stream().collect(
+            Collectors.toUnmodifiableMap(
+                Map.Entry::getKey,
+                Map.Entry::getValue
+            )
+        );
+    }
+
+    public void putAllInMucOccupantCache(Map<MucOptions.User.OccupantId, MucOptions.User.CacheEntry> newEntries) {
+        this.mucOccupantCache.putAll(newEntries);
+    }
+
+    public List<ContentValues> mucOccupantCacheAsContentValues() {
+        final var cvs = new ArrayList<ContentValues>();
+        mucOccupantCache.entrySet().forEach((entry) -> {
+            final var cv = new ContentValues();
+            final var occupantId = entry.getKey();
+            final var cacheEntry = entry.getValue();
+            final var avatar = cacheEntry.avatar();
+            final var nick = cacheEntry.nick();
+            cv.put(MucOptions.User.CacheEntry.OCCUPANT_ID, occupantId.inner());
+            cv.put(MucOptions.User.CacheEntry.CONVERSATION_UUID, this.getUuid());
+            cv.put(MucOptions.User.CacheEntry.AVATAR, avatar);
+            cv.put(MucOptions.User.CacheEntry.NICK, nick);
+            cvs.add(cv);
+        });
+        return cvs;
     }
 
     public void setNextCounterpart(Jid jid) {
