@@ -77,7 +77,7 @@ public class EmojiSearch {
 	public synchronized List<Emoji> find(final String q) {
 		final ResultPQ pq = new ResultPQ();
 		for (Emoji e : emoji) {
-			if (e.emoticonMatch(q)) {
+			if (e.emoticonMatch(q) || e.uniquePart().equals(q)) {
 				pq.addTopK(e, 999999, 10);
 			}
 			int shortcodeScore = e.shortcodes.isEmpty() ? 0 : Collections.max(Lists.transform(e.shortcodes, (shortcode) -> FuzzySearch.ratio(q, shortcode)));
