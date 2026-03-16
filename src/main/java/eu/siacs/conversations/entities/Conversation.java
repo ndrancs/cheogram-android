@@ -1746,7 +1746,7 @@ public class Conversation extends AbstractEntity
     public int getCurrentTab() {
         if (mCurrentTab >= 0) return mCurrentTab;
 
-        if (!isRead(null) || getContact().resourceWhichSupport(Namespace.COMMANDS) == null) {
+        if (!getContact().isApp() || !isRead(null)) {
             return 0;
         }
 

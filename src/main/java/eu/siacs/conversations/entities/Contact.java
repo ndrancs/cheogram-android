@@ -51,6 +51,7 @@ import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.utils.JidHelper;
 import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.xml.Element;
+import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.jingle.RtpCapability;
 import eu.siacs.conversations.xmpp.pep.Avatar;
@@ -338,6 +339,28 @@ public class Contact implements ListItem, Blockable {
         if (resource == null) return null;
 
         return resource.equals("") ? getJid() : getJid().withResource(resource);
+    }
+
+    public boolean isApp() {
+        if (getPresences().isEmpty()) {
+            // No caps so let's guess that domains are apps
+            return getJid().isDomainJid();
+        }
+
+        final var hasCommands = resourceWhichSupport(Namespace.COMMANDS) != null;
+        final var bot = getPresences().anyIdentity("client", "bot");
+        final var client = getPresences().anyIdentity("client", null);
+        final var account = getPresences().anyIdentity("account", null);
+
+        // Clients are not apps, we chat with them
+        if ((client || account) && !bot) return false;
+
+        final var conference = getPresences().anyIdentity("conference", null);
+        // A MUC component is an app
+        if (conference && getJid().isDomainJid()) return hasCommands;
+
+        // If it's not a client or conference, guess it's an app
+        return !client && !conference && hasCommands;
     }
 
     public boolean setPhotoUri(String uri) {
