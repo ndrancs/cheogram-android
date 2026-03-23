@@ -1,0 +1,7 @@
+* Never use iterative DNS for DNSSEC
+* Fallback public server is now jabber.fr
+* Many crash fixes
+* Merge security fixes from upstream
+* Allow emoji search by emoji (eg for reactions)
+* Better isApp logic to default to commands list or not
+* Fix for channel avatars on some older servers

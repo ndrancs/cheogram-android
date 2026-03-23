@@ -1,0 +1,9 @@
+* Fixes to tablet view
+* Fixes to insets for latest Android
+* Fix to account filters for starting new chat
+* Show an extra piece of context on call status/failure
+* Align message text size with upcoming Snikket release
+* Fix some crashing bugs
+* Put blank line after fallback quote
+* Put less quote for reaction fallback
+* Fix WASM in WebXDC
