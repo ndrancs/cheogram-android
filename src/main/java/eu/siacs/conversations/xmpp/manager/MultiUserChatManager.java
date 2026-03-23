@@ -390,9 +390,12 @@ public class MultiUserChatManager extends AbstractManager {
     private void setDiscoInfo(final Conversation conversation, final InfoQuery result) {
         final var account = conversation.getAccount();
         final var address = conversation.getJid().asBareJid();
-        final var avatarHash =
+        var avatarHash =
                 result.getServiceDiscoveryExtension(
                         Namespace.MUC_ROOM_INFO, "muc#roominfo_avatarhash");
+        if (avatarHash == null) {
+            avatarHash = result.getServiceDiscoveryExtension(Namespace.MUC_ROOM_INFO, "{http://modules.prosody.im/mod_vcard_muc}avatar#sha1");
+        }
         if (VCardUpdate.isValidSHA1(avatarHash)) {
             connection.getManager(AvatarManager.class).handleVCardUpdate(address, avatarHash);
         }
