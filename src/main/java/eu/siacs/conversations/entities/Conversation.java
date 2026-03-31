@@ -189,6 +189,10 @@ public class Conversation extends AbstractEntity
     public static final String MODE = "mode";
     public static final String ATTRIBUTES = "attributes";
 
+    static String truncatedAttributesColumn() {
+        return "SUBSTR(" + ATTRIBUTES + ", 0, " + (Short.MAX_VALUE << 1) + ") AS " + ATTRIBUTES;
+    }
+
     public static final String[] ALL_COLUMNS = new String[] {
         UUID,
         NAME,
@@ -198,12 +202,7 @@ public class Conversation extends AbstractEntity
         STATUS,
         CREATED,
         MODE,
-        String.format(
-            "SUBSTR(%s, 0, %d) AS %s",
-            ATTRIBUTES,
-            Short.MAX_VALUE << 1,
-            ATTRIBUTES
-        )
+        truncatedAttributesColumn()
     };
 
 
