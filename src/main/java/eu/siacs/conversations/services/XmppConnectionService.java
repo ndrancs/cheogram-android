@@ -512,7 +512,9 @@ public class XmppConnectionService extends Service {
     public boolean isBlockedMediaSha1(@Nullable final String sha1sum) {
         if (sha1sum == null) return false;
         try {
-            return isBlockedMedia(CryptoHelper.cid(CryptoHelper.hexToBytes(sha1sum), "sha-1"));
+            final byte[] bytes = CryptoHelper.hexToBytes(sha1sum);
+            if (bytes.length != 20) return false;
+            return isBlockedMedia(CryptoHelper.cid(bytes, "sha-1"));
         } catch (final NoSuchAlgorithmException e) {
             return false;
         }
