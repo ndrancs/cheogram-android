@@ -136,7 +136,12 @@ public class ManageAccountActivity extends XmppActivity implements OnAccountUpda
         accountListView = binding.accountList;
         this.mAccountAdapter = new AccountAdapter(this, accountList);
         accountListView.setAdapter(this.mAccountAdapter);
-        accountListView.setOnItemClickListener((arg0, view, position, arg3) -> switchToAccount(accountList.get(position)));
+        accountListView.setOnItemClickListener((arg0, view, position, arg3) -> {
+            final Object item = arg0.getItemAtPosition(position);
+            if (item != null) {
+                switchToAccount((Account) item);
+            }
+        });
 
 
         LayoutInflater inflater = getLayoutInflater();
@@ -164,7 +169,9 @@ public class ManageAccountActivity extends XmppActivity implements OnAccountUpda
         ManageAccountActivity.this.getMenuInflater().inflate(
                 R.menu.manageaccounts_context, menu);
         AdapterContextMenuInfo acmi = (AdapterContextMenuInfo) menuInfo;
-        this.selectedAccount = accountList.get(acmi.position);
+        final Object item = accountListView.getItemAtPosition(acmi.position);
+        if (item == null) return;
+        this.selectedAccount = (Account) item;
         if (this.selectedAccount.isEnabled()) {
             menu.findItem(R.id.mgmt_account_enable).setVisible(false);
             menu.findItem(R.id.mgmt_account_announce_pgp).setVisible(Config.supportOpenPgp());
