@@ -160,9 +160,18 @@ public class WelcomeActivity extends XmppActivity implements XmppConnectionServi
         binding.buttonNext.setOnClickListener((v) ->
             binding.slideshowPager.setCurrentItem(binding.slideshowPager.getCurrentItem() + 1)
         );
-        binding.buttonPrivacy.setOnClickListener((v) ->
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://cheogram.com/android-privacy.html")))
-        );
+        binding.buttonPrivacy.setOnClickListener(
+                (v) -> {
+                    try {
+                        startActivity(
+                                new Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://cheogram.com/android-privacy.html")));
+                    } catch (final ActivityNotFoundException e) {
+                        Toast.makeText(this, R.string.no_application_found_to_open_link, Toast.LENGTH_SHORT)
+                                .show();
+                    }
+                });
         configureActionBar(getSupportActionBar(), false);
         binding.registerNewAccount.setOnClickListener(v -> {
             if (hasInviteUri()) {
