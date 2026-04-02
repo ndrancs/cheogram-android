@@ -1,6 +1,7 @@
 package eu.siacs.conversations.ui.fragment.settings;
 
 import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -94,7 +95,12 @@ public class BackupSettingsFragment extends XmppPreferenceFragment {
     }
 
     private boolean onBackupLocationPreferenceClicked(final Preference preference) {
-        this.pickBackupLocationLauncher.launch(null);
+        try {
+            this.pickBackupLocationLauncher.launch(null);
+        } catch (final ActivityNotFoundException e) {
+            Toast.makeText(requireActivity(), R.string.no_application_found, Toast.LENGTH_LONG)
+                    .show();
+        }
         return false;
     }
 
