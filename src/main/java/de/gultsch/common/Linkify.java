@@ -79,6 +79,13 @@ public class Linkify {
 
     public static void addLinks(final Spannable body) {
         android.text.util.Linkify.addLinks(body, Patterns.URI_GENERIC, null, MATCH_FILTER, null);
+        for (final URLSpan span : body.getSpans(0, body.length(), URLSpan.class)) {
+            try {
+                new java.net.URI(span.getURL());
+            } catch (final java.net.URISyntaxException e) {
+                body.removeSpan(span);
+            }
+        }
     }
 
     public static void addLinks(final Editable body, final Account account, final Jid context) {
