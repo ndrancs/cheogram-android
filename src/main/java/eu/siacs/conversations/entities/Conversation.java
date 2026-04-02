@@ -1856,6 +1856,7 @@ public class Conversation extends AbstractEntity
             }
             pager.removeView(page1.get());
             pager.removeView(page2.get());
+            pager.clearOnPageChangeListeners();
             pager.setAdapter(this);
             tabs.setupWithViewPager(pager);
             pager.post(() -> pager.setCurrentItem(getCurrentTab()));
