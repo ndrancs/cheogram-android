@@ -39,7 +39,11 @@ window.webxdc = (() => {
 		},
 
 		sendUpdate: (payload, descr) => {
-			InternalJSApi.sendStatusUpdate(JSON.stringify(payload), descr);
+			var serialized = JSON.stringify(payload);
+			if (serialized.length > 128 * 1024) {
+				throw new Error("sendUpdate() payload too large: " + serialized.length + " bytes (max 128 KB)");
+			}
+			InternalJSApi.sendStatusUpdate(serialized, descr);
 		},
 
 		importFiles: (filters) => {

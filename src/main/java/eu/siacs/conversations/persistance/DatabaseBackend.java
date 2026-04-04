@@ -1496,6 +1496,16 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         db.insertWithOnConflict("cheogram.webxdc_updates", null, update.getContentValues(), SQLiteDatabase.CONFLICT_IGNORE);
     }
 
+    private int deleteOversizedWebxdcUpdates(SQLiteDatabase db, String conversationUuid, String thread) {
+        int deleted = db.delete("cheogram.webxdc_updates",
+                Message.CONVERSATION + "=? AND thread=? AND length(payload) > 131072",
+                new String[]{conversationUuid, thread});
+        if (deleted > 0) {
+            Log.w(Config.LOGTAG, "Deleted " + deleted + " oversized webxdc update(s) for thread " + thread);
+        }
+        return deleted;
+    }
+
     public WebxdcUpdate findLastWebxdcUpdate(Message message) {
         if (message.getThread() == null) {
             Log.w(Config.LOGTAG, "WebXDC message with no thread!");
@@ -1507,12 +1517,19 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         Cursor cursor = db.query("cheogram.webxdc_updates", null,
                 Message.CONVERSATION + "=? AND thread=?",
                 selectionArgs, null, null, "serial ASC");
-        WebxdcUpdate update = null;
-        if (cursor.moveToLast()) {
-            update = new WebxdcUpdate(cursor, cursor.getLong(cursor.getColumnIndex("serial")));
+        try {
+            WebxdcUpdate update = null;
+            if (cursor.moveToLast()) {
+                update = new WebxdcUpdate(cursor, cursor.getLong(cursor.getColumnIndex("serial")));
+            }
+            return update;
+        } catch (final android.database.sqlite.SQLiteBlobTooBigException e) {
+            Log.w(Config.LOGTAG, "findLastWebxdcUpdate: blob too big, deleting oversized rows", e);
+            deleteOversizedWebxdcUpdates(db, message.getConversation().getUuid(), message.getThread().getContent());
+            return findLastWebxdcUpdate(message);
+        } finally {
+            cursor.close();
         }
-        cursor.close();
-        return update;
     }
 
     public List<WebxdcUpdate> findWebxdcUpdates(Message message, long serial) {
@@ -1521,19 +1538,26 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         Cursor cursor = db.query("cheogram.webxdc_updates", null,
                 Message.CONVERSATION + "=? AND thread=? AND serial>?",
                 selectionArgs, null, null, "serial ASC");
-        long maxSerial = 0;
-        if (cursor.moveToLast()) {
-            maxSerial = cursor.getLong(cursor.getColumnIndex("serial"));
-        }
-        cursor.moveToFirst();
-        cursor.moveToPrevious();
+        try {
+            long maxSerial = 0;
+            if (cursor.moveToLast()) {
+                maxSerial = cursor.getLong(cursor.getColumnIndex("serial"));
+            }
+            cursor.moveToFirst();
+            cursor.moveToPrevious();
 
-        List<WebxdcUpdate> updates = new ArrayList<>();
-        while (cursor.moveToNext()) {
-            updates.add(new WebxdcUpdate(cursor, maxSerial));
+            List<WebxdcUpdate> updates = new ArrayList<>();
+            while (cursor.moveToNext()) {
+                updates.add(new WebxdcUpdate(cursor, maxSerial));
+            }
+            return updates;
+        } catch (final android.database.sqlite.SQLiteBlobTooBigException e) {
+            Log.w(Config.LOGTAG, "findWebxdcUpdates: blob too big, deleting oversized rows", e);
+            deleteOversizedWebxdcUpdates(db, message.getConversation().getUuid(), message.getThread().getContent());
+            return findWebxdcUpdates(message, serial);
+        } finally {
+            cursor.close();
         }
-        cursor.close();
-        return updates;
     }
 
     public void createConversation(Conversation conversation) {
