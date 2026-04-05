@@ -45,6 +45,8 @@ import eu.siacs.conversations.entities.ListItem;
 import eu.siacs.conversations.utils.StylingHelper;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.Jid;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -57,6 +59,9 @@ public class Linkify {
     private static boolean isPassAdditionalValidation(final String match) {
         final var scheme = Iterables.getFirst(Splitter.on(':').limit(2).splitToList(match), null);
         if (scheme == null) {
+            return false;
+        }
+        if (!isValidUri(match)) {
             return false;
         }
         return switch (scheme) {
@@ -75,6 +80,15 @@ public class Linkify {
             }
             default -> true;
         };
+    }
+
+    private static boolean isValidUri(final String match) {
+        try {
+            new URI(match);
+            return true;
+        } catch (final URISyntaxException e) {
+            return false;
+        }
     }
 
     public static void addLinks(final Spannable body) {
