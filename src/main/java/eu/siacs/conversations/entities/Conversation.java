@@ -1861,14 +1861,28 @@ public class Conversation extends AbstractEntity
             tabs.setupWithViewPager(pager);
             pager.post(() -> pager.setCurrentItem(getCurrentTab()));
 
-            pager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
-                public void onPageScrollStateChanged(int state) { }
-                public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) { }
+            pager.addOnPageChangeListener(new PagerChangeListener(Conversation.this));
+        }
 
-                public void onPageSelected(int position) {
-                    setCurrentTab(position);
-                }
-            });
+        private static class PagerChangeListener implements ViewPager.OnPageChangeListener {
+            private final Conversation conversation;
+
+            PagerChangeListener(final Conversation conversation) {
+                this.conversation = conversation;
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int state) { }
+
+            @Override
+            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) { }
+
+            @Override
+            public void onPageSelected(int position) {
+                final ViewPager pager = conversation.pagerAdapter.mPager.get();
+                if (pager == null || pager.getAdapter() != conversation.pagerAdapter) return;
+                conversation.setCurrentTab(position);
+            }
         }
 
         public void show() {
