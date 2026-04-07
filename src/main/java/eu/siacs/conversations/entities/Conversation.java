@@ -2059,6 +2059,7 @@ public class Conversation extends AbstractEntity
 
         @Override
         public void destroyItem(@NonNull ViewGroup container, int position, Object o) {
+            if (o == null) return;
             if (position < 2) {
                 container.removeView((View) o);
                 return;
