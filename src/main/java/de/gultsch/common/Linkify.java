@@ -57,35 +57,27 @@ public class Linkify {
             (s, start, end) -> isPassAdditionalValidation(s.subSequence(start, end).toString());
 
     private static boolean isPassAdditionalValidation(final String match) {
-        final var scheme = Iterables.getFirst(Splitter.on(':').limit(2).splitToList(match), null);
-        if (scheme == null) {
-            return false;
-        }
-        if (!isValidUri(match)) {
-            return false;
-        }
-        return switch (scheme) {
-            case "tel" -> Patterns.URI_TEL.matcher(match).matches();
-            case "http", "https" -> Patterns.URI_HTTP.matcher(match).matches();
-            case "geo" -> Patterns.URI_GEO.matcher(match).matches();
-            case "xmpp" -> new XmppUri(Uri.parse(match)).isValidJid();
-            case "web+ap" -> {
-                if (Patterns.URI_WEB_AP.matcher(match).matches()) {
-                    final var webAp = new MiniUri(match);
-                    // TODO once we have fragment support check that there aren't any
-                    yield Objects.nonNull(webAp.getAuthority()) && webAp.getParameter().isEmpty();
-                } else {
-                    yield false;
-                }
-            }
-            default -> true;
-        };
-    }
-
-    private static boolean isValidUri(final String match) {
         try {
-            new URI(match);
-            return true;
+            final var uri = new URI(match);
+            if (uri.getScheme() == null) {
+                return false;
+            }
+            return switch (uri.getScheme()) {
+                case "tel" -> Patterns.URI_TEL.matcher(match).matches();
+                case "http", "https" -> Patterns.URI_HTTP.matcher(match).matches();
+                case "geo" -> Patterns.URI_GEO.matcher(match).matches();
+                case "xmpp" -> new XmppUri(Uri.parse(match)).isValidJid();
+                case "web+ap" -> {
+                    if (Patterns.URI_WEB_AP.matcher(match).matches()) {
+                        final var webAp = new MiniUri(match);
+                        // TODO once we have fragment support check that there aren't any
+                        yield Objects.nonNull(webAp.getAuthority()) && webAp.getParameter().isEmpty();
+                    } else {
+                        yield false;
+                    }
+                }
+                default -> true;
+            };
         } catch (final URISyntaxException e) {
             return false;
         }
@@ -93,13 +85,6 @@ public class Linkify {
 
     public static void addLinks(final Spannable body) {
         android.text.util.Linkify.addLinks(body, Patterns.URI_GENERIC, null, MATCH_FILTER, null);
-        for (final URLSpan span : body.getSpans(0, body.length(), URLSpan.class)) {
-            try {
-                new java.net.URI(span.getURL());
-            } catch (final java.net.URISyntaxException e) {
-                body.removeSpan(span);
-            }
-        }
     }
 
     public static void addLinks(final Editable body, final Account account, final Jid context) {
