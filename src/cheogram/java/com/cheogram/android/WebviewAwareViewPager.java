@@ -5,7 +5,7 @@ import android.util.AttributeSet;
 import android.view.View;
 import android.webkit.WebView;
 
-public class WebviewAwareViewPager extends androidx.viewpager.widget.ViewPager {
+public class WebviewAwareViewPager extends SafeViewPager {
 	public WebviewAwareViewPager(Context context) {
 		super(context);
 	}

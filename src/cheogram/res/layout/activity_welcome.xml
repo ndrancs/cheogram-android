@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <androidx.viewpager.widget.ViewPager
+    <com.cheogram.android.SafeViewPager
         android:id="@+id/slideshow_pager"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -274,7 +274,7 @@
         </ScrollView>
     </LinearLayout>
 
-    </androidx.viewpager.widget.ViewPager>
+    </com.cheogram.android.SafeViewPager>
 
    <androidx.constraintlayout.widget.Guideline
         android:id="@+id/gl_SlidePage"
