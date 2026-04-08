@@ -2071,8 +2071,16 @@ public class Conversation extends AbstractEntity
         @Override
         public int getItemPosition(Object o) {
             if (mPager.get() != null) {
-                if (o == page1.get()) return PagerAdapter.POSITION_UNCHANGED;
-                if (o == page2.get()) return PagerAdapter.POSITION_UNCHANGED;
+                final var page1Deref = page1.get();
+                if (o == page1Deref) {
+                    if (page1Deref == null) return PagerAdapter.POSITION_NONE;
+                    else return PagerAdapter.POSITION_UNCHANGED;
+                }
+                final var page2Deref = page2.get();
+                if (o == page2Deref) {
+                    if (page2Deref == null) return PagerAdapter.POSITION_NONE;
+                    else return PagerAdapter.POSITION_UNCHANGED;
+                }
             }
 
             int pos = sessions == null ? -1 : sessions.indexOf(o);
