@@ -763,6 +763,10 @@ public class MessageArchiveService implements OnAdvancedStreamFeaturesLoaded {
         }
 
         public boolean isImplausibleFrom(final Jid from) {
+            if (from instanceof Jid.Invalid) {
+                Log.w(Config.LOGTAG, "Invalid JID found in MAM query: " + from);
+                return true;
+            }
             if (muc()) {
                 if (from == null) {
                     return true;
