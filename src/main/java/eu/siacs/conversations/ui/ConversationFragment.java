@@ -4641,16 +4641,14 @@ public class ConversationFragment extends XmppFragment
                 && conversation.setOutgoingChatState(Config.DEFAULT_CHAT_STATE)) {
             service.sendChatState(conversation);
         }
-        if (storeNextMessage()) {
-            runOnUiThread(
-                    () -> {
-                        if (activity == null) {
-                            return;
-                        }
+        final boolean stored = storeNextMessage(null);
+        runOnUiThread(
+                () -> {
+                    if (stored && activity != null) {
                         activity.onConversationsListItemUpdated();
-                    });
-        }
-        runOnUiThread(this::updateSendButton);
+                    }
+                    updateSendButton();
+                });
     }
 
     @Override
