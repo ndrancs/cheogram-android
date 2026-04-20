@@ -124,6 +124,7 @@ import eu.siacs.conversations.entities.Transferable;
 import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.services.MessageArchiveService;
 import eu.siacs.conversations.services.NotificationService;
+import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.ui.Activities;
 import eu.siacs.conversations.ui.BindingAdapters;
 import eu.siacs.conversations.ui.ConversationFragment;
@@ -1515,8 +1516,22 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         } else {
             viewHolder.inReplyToBox().setVisibility(View.VISIBLE);
             viewHolder.inReplyTo().setText(UIHelper.getMessageDisplayName(message.getInReplyTo()));
-            viewHolder.inReplyTo().setOnClickListener((v) -> mConversationFragment.jumpTo(message.getInReplyTo()));
-            viewHolder.inReplyToQuote().setOnClickListener((v) -> mConversationFragment.jumpTo(message.getInReplyTo()));
+            final var replyToClickListener = (View.OnClickListener) (v) -> {
+                final Message inReplyTo = message.getInReplyTo();
+                if (inReplyTo == null || inReplyTo.getUuid() == null) return;
+                final var replyConversation = mConversationFragment.getConversation();
+                activity.xmppConnectionService.jumpToMessage(replyConversation, inReplyTo.getUuid(), new XmppConnectionService.JumpToMessageListener() {
+                    @Override
+                    public void onSuccess() {
+                        activity.runOnUiThread(() -> mConversationFragment.refresh());
+                    }
+
+                    @Override
+                    public void onNotFound() {}
+                });
+            };
+            viewHolder.inReplyTo().setOnClickListener(replyToClickListener);
+            viewHolder.inReplyToQuote().setOnClickListener(replyToClickListener);
             setTextColor(viewHolder.inReplyTo(), bubbleColor);
         }
 

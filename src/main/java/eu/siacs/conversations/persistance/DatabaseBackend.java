@@ -16,6 +16,8 @@ import android.util.Base64;
 import android.util.Log;
 import com.cheogram.android.WebxdcUpdate;
 
+import androidx.annotation.Nullable;
+
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.HashMultimap;
@@ -1728,8 +1730,44 @@ public class DatabaseBackend extends SQLiteOpenHelper {
     }
 
     public ArrayList<Message> getMessages(Conversation conversations, int limit) {
-        return getMessages(conversations, limit, -1);
+        return getMessages(conversations, limit, -1, false);
     }
+
+
+    @Nullable
+    public ArrayList<Message> getMessagesNearUuid(Conversation conversation, int limit, String uuid) {
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        String[] selectionArgs = {conversation.getUuid(), uuid, uuid, uuid};
+        Cursor cursor = db.query(Message.TABLENAME, null, Message.CONVERSATION
+                + "=? and (" + Message.SERVER_MSG_ID + "=? or " + Message.REMOTE_MSG_ID +  "=? or " + Message.UUID + "=?)", selectionArgs, null, null, Message.TIME_SENT
+                + " DESC", String.valueOf(1));
+        CursorUtils.upgradeCursorWindowSize(cursor);
+        Message anchorMessage = null;
+        while (cursor.moveToNext()) {
+            try {
+                anchorMessage = Message.fromCursor(cursor, conversation);
+            } catch (Exception e) {
+                Log.e(Config.LOGTAG, "unable to restore message");
+            }
+        }
+
+        cursor.close();
+
+        if (anchorMessage == null) {
+            return null;
+        }
+
+        List<Message> prev = getMessages(conversation, limit / 2, anchorMessage.getTimeSent(), false);
+        List<Message> next = getMessages(conversation, limit / 2, anchorMessage.getTimeSent(), true);
+
+        ArrayList<Message> list = new ArrayList<>(prev);
+        list.add(anchorMessage);
+        list.addAll(next);
+
+        return list;
+    }
+
 
     public Map<String, Message> getMessageFuzzyIds(Conversation conversation, Collection<String> ids) {
         final var result = new Hashtable<String, Message>();
@@ -1767,10 +1805,12 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         return result;
     }
 
-    public ArrayList<Message> getMessages(Conversation conversation, int limit, long timestamp) {
+    public ArrayList<Message> getMessages(Conversation conversation, int limit, long timestamp, boolean isForward) {
         ArrayList<Message> list = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor;
+        String comparsionOperation = isForward ? ">? " : "<? ";
+        String sorting = isForward ? " ASC " : " DESC ";
         if (timestamp == -1) {
             String[] selectionArgs = {conversation.getUuid()};
             cursor = db.rawQuery(
@@ -1780,9 +1820,9 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                 " WHERE " + Message.UUID + " IN (" +
                 "SELECT " + Message.UUID + " FROM " + Message.TABLENAME +
                 " WHERE " + Message.CONVERSATION + "=? " +
-                "ORDER BY " + Message.TIME_SENT + " DESC " +
+                "ORDER BY " + Message.TIME_SENT + sorting +
                 "LIMIT " + String.valueOf(limit) + ") " +
-                "ORDER BY " + Message.TIME_SENT + " DESC ",
+                "ORDER BY " + Message.TIME_SENT + sorting,
                 selectionArgs
             );
         } else {
@@ -1795,10 +1835,10 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                 " WHERE " + Message.UUID + " IN (" +
                 "SELECT " + Message.UUID + " FROM " + Message.TABLENAME +
                 " WHERE " + Message.CONVERSATION + "=? AND " +
-                Message.TIME_SENT + "<? " +
-                "ORDER BY " + Message.TIME_SENT + " DESC " +
+                Message.TIME_SENT + comparsionOperation +
+                "ORDER BY " + Message.TIME_SENT + sorting +
                 "LIMIT " + String.valueOf(limit) + ") " +
-                "ORDER BY " + Message.TIME_SENT + " DESC ",
+                "ORDER BY " + Message.TIME_SENT + sorting,
                 selectionArgs
             );
         }
@@ -1813,7 +1853,11 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                     replyIds.add(reply.getAttribute("id"));
                     waitingForReplies.put(reply.getAttribute("id"), m);
                 }
-                list.add(0, m);
+                if (isForward) {
+                    list.add(m);
+                } else {
+                    list.add(0, m);
+                }
             } catch (Exception e) {
                 Log.e(Config.LOGTAG, "unable to restore message", e);
             }

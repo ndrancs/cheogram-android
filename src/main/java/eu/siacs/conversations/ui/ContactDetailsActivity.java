@@ -300,6 +300,15 @@ public class ContactDetailsActivity extends OmemoActivity
         mMediaAdapter = new MediaAdapter(this, R.dimen.media_size);
         this.binding.media.setAdapter(mMediaAdapter);
         GridManager.setupLayoutManager(this, this.binding.media, R.dimen.media_size);
+        this.binding.recentThreads.setOnItemClickListener((a0, v, pos, a3) -> {
+            Account thisAccount = xmppConnectionService.findAccountByJid(accountJid);
+            if (thisAccount == null) {
+                return;
+            }
+            final var conversation = xmppConnectionService.findOrCreateConversation(thisAccount, contact.getJid(), false, true);
+            final Conversation.Thread thread = (Conversation.Thread) binding.recentThreads.getAdapter().getItem(pos);
+            switchToConversation(conversation, null, false, null, false, true, null, thread.getThreadId(), null);
+        });
     }
 
     @Override
