@@ -298,29 +298,8 @@ public class ConversationFragment extends XmppFragment
     private int identiconWidth = -1;
     private File savingAsSticker = null;
     private EmojiSearch emojiSearch = null;
-    File dirStickers = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/monocles chat" + File.separator + "Stickers");
-    private String[] StickerfilesPaths;
-    private String[] StickerfilesNames;
-    private String[] GifsfilesPaths;
-    private String[] GifsfilesNames;
 
     private LinkedList<Message> replyJumps = new LinkedList<>();
-
-    private PinnedMessageRepository pinnedMessageRepository;
-    private String currentDisplayedPinnedMessageUuid = null;
-
-    private final ExecutorService backgroundExecutor = Executors.newSingleThreadExecutor();
-
-    private KeyboardHeightProvider.KeyboardHeightListener keyboardHeightListener = null;
-    private KeyboardHeightProvider keyboardHeightProvider = null;
-    private static final String PINNED_MESSAGE_KEY_PREFIX = "pinned_message_";
-
-    protected OnClickListener clickToVerify = new OnClickListener() {
-        @Override
-        public void onClick(View v) {
-            activity.verifyOtrSessionDialog(conversation, v);
-        }
-    };
 
     private final OnClickListener clickToMuc =
             new OnClickListener() {
