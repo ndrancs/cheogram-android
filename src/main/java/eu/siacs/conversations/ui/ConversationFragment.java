@@ -1586,7 +1586,6 @@ public class ConversationFragment extends XmppFragment
         messageListAdapter.setOnContactPictureLongClicked(this);
         messageListAdapter.setOnInlineImageLongClicked(this);
         messageListAdapter.setConversationFragment(this);
-        // messageListAdapter.setReplyClickListener(this::scrollToReply);       //TODO add a better scrol to reply later
         binding.messagesView.setAdapter(messageListAdapter);
 
         binding.textinput.addTextChangedListener(
@@ -1892,19 +1891,6 @@ public class ConversationFragment extends XmppFragment
         updateSendButton();
     }
 
-
-    private void scrollToReply(Message message) {
-        Element reply = message.getReply();
-        if (reply == null) return;
-
-        String replyId = reply.getAttribute("id");
-
-        if (replyId != null) {
-            Runnable postSelectionRunnable = () -> highlightMessage(replyId);
-            replyJumps.push(message);
-            updateSelection(replyId, binding.messagesView.getHeight() / 2, postSelectionRunnable, true, false);
-        }
-    }
 
     private void highlightMessage(String uuid) {
         binding.messagesView.postDelayed(() -> {
