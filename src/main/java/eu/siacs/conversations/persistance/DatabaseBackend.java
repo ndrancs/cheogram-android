@@ -1739,9 +1739,14 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getReadableDatabase();
 
         String[] selectionArgs = {conversation.getUuid(), uuid, uuid, uuid};
-        Cursor cursor = db.query(Message.TABLENAME, null, Message.CONVERSATION
-                + "=? and (" + Message.SERVER_MSG_ID + "=? or " + Message.REMOTE_MSG_ID +  "=? or " + Message.UUID + "=?)", selectionArgs, null, null, Message.TIME_SENT
-                + " DESC", String.valueOf(1));
+        Cursor cursor = db.rawQuery(
+                "SELECT * FROM " + Message.TABLENAME + " " +
+                "LEFT JOIN cheogram." + Message.TABLENAME +
+                "  USING (" + Message.UUID + ")" +
+                " WHERE " + Message.CONVERSATION + "=? AND (" +
+                Message.SERVER_MSG_ID + "=? OR " + Message.REMOTE_MSG_ID + "=? OR " + Message.UUID + "=?)" +
+                " ORDER BY " + Message.TIME_SENT + " DESC LIMIT 1",
+                selectionArgs);
         CursorUtils.upgradeCursorWindowSize(cursor);
         Message anchorMessage = null;
         while (cursor.moveToNext()) {
@@ -1828,8 +1833,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         } else {
             String[] selectionArgs = {conversation.getUuid(),
                     Long.toString(timestamp)};
-            cursor = db.rawQuery(
-                "SELECT * FROM " + Message.TABLENAME + " " +
+            final String query = "SELECT * FROM " + Message.TABLENAME + " " +
                 "LEFT JOIN cheogram." + Message.TABLENAME +
                 "  USING (" + Message.UUID + ")" +
                 " WHERE " + Message.UUID + " IN (" +
@@ -1838,9 +1842,8 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                 Message.TIME_SENT + comparsionOperation +
                 "ORDER BY " + Message.TIME_SENT + sorting +
                 "LIMIT " + String.valueOf(limit) + ") " +
-                "ORDER BY " + Message.TIME_SENT + sorting,
-                selectionArgs
-            );
+                "ORDER BY " + Message.TIME_SENT + sorting;
+            cursor = db.rawQuery(query, selectionArgs);
         }
         CursorUtils.upgradeCursorWindowSize(cursor);
         final Multimap<String, Message> waitingForReplies = HashMultimap.create();
