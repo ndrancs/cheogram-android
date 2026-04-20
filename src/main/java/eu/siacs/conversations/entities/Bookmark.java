@@ -117,12 +117,15 @@ public class Bookmark extends Element implements ListItem {
 			return 1;
 		}
 
-		if (getDisplayName().equals(another.getDisplayName())) {
+		final var anotherName =
+			another.getDisplayName() == null ? "" : another.getDisplayName();
+		final var displayNameScore = getDisplayName().compareToIgnoreCase(anotherName);
+
+		if (displayNameScore == 0) {
 			return getJid().compareTo(another.getJid());
 		}
 
-		return this.getDisplayName().compareToIgnoreCase(
-				another.getDisplayName());
+		return displayNameScore;
 	}
 
     @Override

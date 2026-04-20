@@ -565,12 +565,15 @@ public class Contact implements ListItem, Blockable {
             return 1;
         }
 
-        if (getDisplayName().equals(another.getDisplayName())) {
+        final var anotherName =
+            another.getDisplayName() == null ? "" : another.getDisplayName();
+        final var displayNameScore = getDisplayName().compareToIgnoreCase(anotherName);
+
+        if (displayNameScore == 0) {
             return getJid().compareTo(another.getJid());
         }
 
-        final var anotherName = another.getDisplayName();
-        return this.getDisplayName().compareToIgnoreCase(anotherName == null ? "" : anotherName);
+        return displayNameScore;
     }
 
     public String getServer() {
