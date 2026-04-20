@@ -307,7 +307,14 @@ public class ManageAccountActivity extends XmppActivity implements OnAccountUpda
                         try {
                             startActivity(mMicIntent);
                         } catch (final android.content.ActivityNotFoundException e) {
-                            Toast.makeText(this, "Your OS has blocked dialler integration", Toast.LENGTH_SHORT).show();
+                            try {
+                                final Intent fallback = new Intent();
+                                fallback.setComponent(new ComponentName("com.google.android.telecomui",
+                                    "com.android.server.telecomui.settings.EnableAccountPreferenceActivity"));
+                                startActivity(fallback);
+                            } catch (final android.content.ActivityNotFoundException e2) {
+                                Toast.makeText(this, "Your OS has blocked dialler integration", Toast.LENGTH_SHORT).show();
+                            }
                         }
                         mMicIntent = null;
                         return;

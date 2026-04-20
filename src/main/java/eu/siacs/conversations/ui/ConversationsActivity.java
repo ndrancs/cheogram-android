@@ -1001,10 +1001,21 @@ public class ConversationsActivity extends XmppActivity
                         Intent intent = new Intent();
                         intent.setComponent(new ComponentName("com.android.server.telecom",
                             "com.android.server.telecom.settings.EnableAccountPreferenceActivity"));
+                        Log.d(Config.LOGTAG, "Dialler integration: launching " + intent.getComponent());
                         try {
                             startActivityForResult(intent, DIALLER_INTEGRATION);
                         } catch (ActivityNotFoundException e) {
-                            displayToast("Dialler integration not available on your OS");
+                            Log.w(Config.LOGTAG, "Dialler integration: missing legacy telecom enable-account activity, trying telecomui fallback", e);
+                            intent = new Intent();
+                            intent.setComponent(new ComponentName("com.google.android.telecomui",
+                                "com.android.server.telecomui.settings.EnableAccountPreferenceActivity"));
+                            Log.d(Config.LOGTAG, "Dialler integration: launching fallback " + intent.getComponent());
+                            try {
+                                startActivityForResult(intent, DIALLER_INTEGRATION);
+                            } catch (ActivityNotFoundException e2) {
+                                Log.w(Config.LOGTAG, "Dialler integration: telecomui fallback activity not found", e2);
+                                displayToast("Dialler integration not available on your OS");
+                            }
                         }
                         break;
                     case REQUEST_DOWNLOAD_STICKERS:
@@ -1034,8 +1045,18 @@ public class ConversationsActivity extends XmppActivity
         if (requestCode == DIALLER_INTEGRATION) {
             mRequestCode = requestCode;
             try {
-                startActivity(new Intent(android.telecom.TelecomManager.ACTION_CHANGE_PHONE_ACCOUNTS));
+                final Intent phoneAccountsIntent = new Intent(android.telecom.TelecomManager.ACTION_CHANGE_PHONE_ACCOUNTS);
+                Log.d(
+                        Config.LOGTAG,
+                        "Dialler integration: result="
+                                + resultCode
+                                + ", launching "
+                                + phoneAccountsIntent.getAction()
+                                + " resolved="
+                                + phoneAccountsIntent.resolveActivity(getPackageManager()));
+                startActivity(phoneAccountsIntent);
             } catch (ActivityNotFoundException e) {
+                Log.w(Config.LOGTAG, "Dialler integration: ACTION_CHANGE_PHONE_ACCOUNTS not available", e);
                 displayToast("Dialler integration not available on your OS");
             }
             return;
