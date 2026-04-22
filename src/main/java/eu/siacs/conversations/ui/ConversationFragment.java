@@ -372,6 +372,10 @@ public class ConversationFragment extends XmppFragment
                         int visibleItemCount,
                         int totalItemCount) {
                     toggleScrollDownButton(view);
+                    final Conversation conversation = ConversationFragment.this.conversation;
+                    if (conversation == null) {
+                        return;
+                    }
                     synchronized (ConversationFragment.this.messageList) {
                         boolean paginateBackward = firstVisibleItem < 5;
                         boolean paginationForward = conversation.isInHistoryPart() && firstVisibleItem + visibleItemCount + 5 > totalItemCount;
