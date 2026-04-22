@@ -1477,7 +1477,9 @@ public class ConversationFragment extends XmppFragment
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
         activity.getOnBackPressedDispatcher().addCallback(this, backPressedLeaveSingleThread);
-        if (savedInstanceState == null) {
+        // On wide-screen devices, `secondary_fragment` is initialized to an empty `ConversationFragment`
+        final var conversation = this.conversation;
+        if (savedInstanceState == null && conversation != null) {
             conversation.jumpToLatest();
         }
     }
