@@ -11,4 +11,5 @@ public interface ConversationPage {
 	public View inflateUi(Context context, Consumer<ConversationPage> remover);
 	public View getView();
 	public void refresh();
+	public default void close() { }
 }

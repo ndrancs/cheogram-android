@@ -93,7 +93,9 @@ public class WebxdcPage implements ConversationPage {
 			if (f != null) zip = new ZipFile(f);
 			final ZipEntry manifestEntry = zip == null ? null : zip.getEntry("manifest.toml");
 			if (manifestEntry != null) {
-				manifest = Toml.parse(zip.getInputStream(manifestEntry));
+				try (final InputStream is = zip.getInputStream(manifestEntry)) {
+					manifest = Toml.parse(is);
+				}
 			}
 		} catch (final IOException e) {
 			Log.w(Config.LOGTAG, "WebxdcPage: " + e);
@@ -116,22 +118,27 @@ public class WebxdcPage implements ConversationPage {
 
 	public Drawable getIcon(int dp) {
 		if (android.os.Build.VERSION.SDK_INT < 28) return null;
-		if (zip == null) return null;
-		ZipEntry entry = zip.getEntry("icon.webp");
-		if (entry == null) entry = zip.getEntry("icon.png");
-		if (entry == null) entry = zip.getEntry("icon.jpg");
-		if (entry == null) return null;
+		final ZipFile localZip = zip;
+		if (localZip == null) return null;
 
 		try {
+			ZipEntry entry = localZip.getEntry("icon.webp");
+			if (entry == null) entry = localZip.getEntry("icon.png");
+			if (entry == null) entry = localZip.getEntry("icon.jpg");
+			if (entry == null) return null;
 			DisplayMetrics metrics = xmppConnectionService.getResources().getDisplayMetrics();
-			ImageDecoder.Source source = ImageDecoder.createSource(ByteBuffer.wrap(ByteStreams.toByteArray(zip.getInputStream(entry))));
+			final byte[] data;
+			try (final InputStream is = localZip.getInputStream(entry)) {
+				data = ByteStreams.toByteArray(is);
+			}
+			ImageDecoder.Source source = ImageDecoder.createSource(ByteBuffer.wrap(data));
 			return ImageDecoder.decodeDrawable(source, (decoder, info, src) -> {
 				int w = info.getSize().getWidth();
 				int h = info.getSize().getHeight();
 				Rect r = FileBackend.rectForSize(w, h, (int)(metrics.density * dp));
 				decoder.setTargetSize(r.width(), r.height());
 			});
-		} catch (final IOException e) {
+		} catch (final IOException | IllegalStateException e) {
 			Log.w(Config.LOGTAG, "WebxdcPage.getIcon: " + e);
 			return null;
 		}
@@ -140,6 +147,19 @@ public class WebxdcPage implements ConversationPage {
 	public String getName() {
 		String title = manifest == null ? null : manifest.getString("name");
 		return title == null ? "Widget" : title;
+	}
+
+	@Override
+	public void close() {
+		final ZipFile localZip = zip;
+		if (localZip == null) return;
+		try {
+			localZip.close();
+		} catch (final IOException e) {
+			Log.w(Config.LOGTAG, "WebxdcPage.close: " + e);
+		} finally {
+			zip = null;
+		}
 	}
 
 	public String getTitle() {
@@ -176,7 +196,8 @@ public class WebxdcPage implements ConversationPage {
 		Log.i(Config.LOGTAG, "interceptRequest: " + rawUrl);
 		WebResourceResponse res = null;
 		try {
-			if (zip == null) {
+			final ZipFile localZip = zip;
+			if (localZip == null) {
 				throw new Exception("no zip found");
 			}
 			if (rawUrl == null) {
@@ -187,13 +208,13 @@ public class WebxdcPage implements ConversationPage {
 				InputStream targetStream = xmppConnectionService.getResources().openRawResource(R.raw.webxdc);
 				res = new WebResourceResponse("text/javascript", "UTF-8", targetStream);
 			} else {
-				ZipEntry entry = zip.getEntry(path.substring(1));
+				ZipEntry entry = localZip.getEntry(path.substring(1));
 				if (entry == null) {
 					throw new Exception("\"" + path + "\" not found");
 				}
 				String mimeType = MimeUtils.guessFromPath(path);
 				String encoding = mimeType.startsWith("text/") ? "UTF-8" : null;
-				res = new WebResourceResponse(mimeType, encoding, zip.getInputStream(entry));
+				res = new WebResourceResponse(mimeType, encoding, localZip.getInputStream(entry));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
