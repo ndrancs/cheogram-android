@@ -180,6 +180,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
     private BubbleDesign bubbleDesign = new BubbleDesign(false, false, false, true);
     private final boolean mForceNames;
     private final Map<String, WebxdcUpdate> lastWebxdcUpdate = new HashMap<>();
+    private final Map<String, String> webxdcNames = new HashMap<>();
     private String selectionUuid = null;
     private final AppSettings appSettings;
 
@@ -847,25 +848,15 @@ public class MessageAdapter extends ArrayAdapter<Message> {
 
     private void displayWebxdcMessage(BubbleMessageItemViewHolder viewHolder, final Message message, final BubbleColor bubbleColor) {
         Cid webxdcCid = message.getFileParams().getCids().get(0);
-        WebxdcPage webxdc = new WebxdcPage(activity, webxdcCid, message);
+        final String webxdcName = getWebxdcName(webxdcCid, message);
         displayTextMessage(viewHolder, message, bubbleColor);
         viewHolder.image().setVisibility(View.GONE);
         viewHolder.audioPlayer().setVisibility(View.GONE);
         viewHolder.downloadButton().setVisibility(View.VISIBLE);
         viewHolder.downloadButton().setIconResource(0);
-        viewHolder.downloadButton().setText("Open " + webxdc.getName());
-        viewHolder.downloadButton().setOnClickListener(v -> {
-            Conversation conversation = (Conversation) message.getConversation();
-            if (!conversation.switchToSession("webxdc\0" + message.getUuid())) {
-                conversation.startWebxdc(webxdc);
-            }
-        });
-        viewHolder.image().setOnClickListener(v -> {
-            Conversation conversation = (Conversation) message.getConversation();
-            if (!conversation.switchToSession("webxdc\0" + message.getUuid())) {
-                conversation.startWebxdc(webxdc);
-            }
-        });
+        viewHolder.downloadButton().setText("Open " + webxdcName);
+        viewHolder.downloadButton().setOnClickListener(v -> openWebxdcMessage(webxdcCid, message));
+        viewHolder.image().setOnClickListener(v -> openWebxdcMessage(webxdcCid, message));
 
         final WebxdcUpdate lastUpdate;
         synchronized(lastWebxdcUpdate) { lastUpdate = lastWebxdcUpdate.get(message.getUuid()); }
@@ -890,17 +881,55 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         final LruCache<String, Drawable> cache = activity.xmppConnectionService.getDrawableCache();
         final Drawable d = cache.get("webxdc:icon:" + webxdcCid);
         if (d == null) {
-            new Thread(() -> {
-                Drawable icon = webxdc.getIcon();
+            XmppConnectionService.FILE_ATTACHMENT_EXECUTOR.execute(() -> {
+                final WebxdcPage webxdc = new WebxdcPage(activity, webxdcCid, message);
+                final Drawable icon;
+                try {
+                    icon = webxdc.getIcon();
+                } finally {
+                    webxdc.close();
+                }
                 if (icon != null) {
                     cache.put("webxdc:icon:" + webxdcCid, icon);
                     activity.xmppConnectionService.updateConversationUi();
                 }
-            }).start();
+            });
         } else {
             viewHolder.image().setVisibility(View.VISIBLE);
             viewHolder.image().setImageDrawable(d);
             imagePreviewLayout(d.getIntrinsicWidth(), d.getIntrinsicHeight(), viewHolder.image(), message.getInReplyTo() != null, true, viewHolder);
+        }
+    }
+
+    private String getWebxdcName(final Cid webxdcCid, final Message message) {
+        final String key = message.getUuid() == null ? webxdcCid.toString() : message.getUuid();
+        final String fallbackName = message.getFileParams().getName();
+        final String fallback = fallbackName == null ? "Widget" : fallbackName;
+        synchronized (webxdcNames) {
+            final String cached = webxdcNames.get(key);
+            if (cached != null) return cached;
+            webxdcNames.put(key, fallback);
+        }
+        XmppConnectionService.FILE_ATTACHMENT_EXECUTOR.execute(() -> {
+            final WebxdcPage webxdc = new WebxdcPage(activity, webxdcCid, message);
+            final String name;
+            try {
+                name = webxdc.getName();
+            } finally {
+                webxdc.close();
+            }
+            synchronized (webxdcNames) {
+                webxdcNames.put(key, name);
+            }
+            activity.xmppConnectionService.updateConversationUi();
+        });
+        return fallback;
+    }
+
+    private void openWebxdcMessage(final Cid webxdcCid, final Message message) {
+        final Conversation conversation = (Conversation) message.getConversation();
+        if (!conversation.switchToSession("webxdc\0" + message.getUuid())) {
+            conversation.startWebxdc(new WebxdcPage(activity, webxdcCid, message));
         }
     }
 

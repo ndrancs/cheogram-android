@@ -41,6 +41,7 @@ import eu.siacs.conversations.worker.ExportBackupWorker;
 
 public class ExtensionSettingsFragment extends androidx.fragment.app.Fragment {
 	FragmentExtensionSettingsBinding binding;
+	ExtensionAdapter extensionAdapter;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -59,38 +60,9 @@ public class ExtensionSettingsFragment extends androidx.fragment.app.Fragment {
 			startActivityForResult(Intent.createChooser(intent, getString(R.string.perform_action_with)), 0x1);
 		});
 
-		binding.extensionList.setAdapter(new RecyclerView.Adapter<WebxdcViewHolder>() {
-			final ArrayList<WebxdcPage> xdcs = new ArrayList<>();
-
-			@Override
-			public int getItemCount() {
-				xdcs.clear();
-				final var activity = (XmppActivity) requireActivity();
-				final var xmppConnectionService = activity.xmppConnectionService;
-				if (xmppConnectionService == null) return xdcs.size();
-				final var dir = new File(xmppConnectionService.getExternalFilesDir(null), "extensions");
-				for (File file : Files.fileTraverser().breadthFirst(dir)) {
-					if (file.isFile() && file.canRead()) {
-						final var dummy = new Message(new StubConversation(null, "", null, 0), null, Message.ENCRYPTION_NONE);
-						dummy.setStatus(Message.STATUS_DUMMY);
-						dummy.setUuid(file.getName());
-						xdcs.add(new WebxdcPage(activity, file, dummy));
-					}
-				}
-				return xdcs.size();
-			}
-
-			@Override
-			public WebxdcViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-				final ExtensionItemBinding binding = DataBindingUtil.inflate(inflater, R.layout.extension_item, container, false);
-				return new WebxdcViewHolder(binding);
-			}
-
-			@Override
-			public void onBindViewHolder(WebxdcViewHolder holder, int position) {
-				holder.bind(xdcs.get(position));
-			}
-		});
+		extensionAdapter = new ExtensionAdapter(inflater);
+		binding.extensionList.setAdapter(extensionAdapter);
+		extensionAdapter.refresh();
 
 		return binding.getRoot();
 	}
@@ -104,6 +76,17 @@ public class ExtensionSettingsFragment extends androidx.fragment.app.Fragment {
 	public void onStart() {
 		super.onStart();
 		getActivity().setTitle("Extensions");
+		if (extensionAdapter != null) {
+			extensionAdapter.refresh();
+			extensionAdapter.notifyDataSetChanged();
+		}
+	}
+
+	@Override
+	public void onDestroyView() {
+		super.onDestroyView();
+		extensionAdapter = null;
+		binding = null;
 	}
 
 	public void addExtension(Uri uri) {
@@ -126,7 +109,71 @@ public class ExtensionSettingsFragment extends androidx.fragment.app.Fragment {
 		for (final var attachment : Attachment.extractAttachments(requireActivity(), data, Attachment.Type.FILE)) {
 			if ("application/webxdc+zip".equals(attachment.getMime())) addExtension(attachment.getUri());
 		}
-		binding.extensionList.getAdapter().notifyDataSetChanged();
+		if (extensionAdapter != null) {
+			extensionAdapter.refresh();
+			extensionAdapter.notifyDataSetChanged();
+		}
+	}
+
+	protected class ExtensionAdapter extends RecyclerView.Adapter<WebxdcViewHolder> {
+		final LayoutInflater inflater;
+		final ArrayList<ExtensionPreview> xdcs = new ArrayList<>();
+
+		ExtensionAdapter(final LayoutInflater inflater) {
+			this.inflater = inflater;
+		}
+
+		public void refresh() {
+			xdcs.clear();
+			final var activity = (XmppActivity) requireActivity();
+			final var xmppConnectionService = activity.xmppConnectionService;
+			if (xmppConnectionService == null) return;
+			final var dir = new File(xmppConnectionService.getExternalFilesDir(null), "extensions");
+			for (File file : Files.fileTraverser().breadthFirst(dir)) {
+				if (file.isFile() && file.canRead()) {
+					final var xdc = new WebxdcPage(activity, file, createExtensionPreviewSource(file));
+					try {
+						xdcs.add(new ExtensionPreview(file, xdc.getName()));
+					} finally {
+						xdc.close();
+					}
+				}
+			}
+		}
+
+		@Override
+		public int getItemCount() {
+			return xdcs.size();
+		}
+
+		@Override
+		public WebxdcViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+			final ExtensionItemBinding binding = DataBindingUtil.inflate(inflater, R.layout.extension_item, parent, false);
+			return new WebxdcViewHolder(binding);
+		}
+
+		@Override
+		public void onBindViewHolder(WebxdcViewHolder holder, int position) {
+			holder.bind((XmppActivity) requireActivity(), xdcs.get(position));
+		}
+	}
+
+	private static Message createExtensionPreviewSource(final File file) {
+		final var source = new Message(new StubConversation(null, "", null, 0), null, Message.ENCRYPTION_NONE);
+		source.setStatus(Message.STATUS_DUMMY);
+		source.setUuid(file.getName());
+		return source;
+	}
+
+	protected static class ExtensionPreview {
+		final File file;
+		final String name;
+		android.graphics.drawable.Drawable icon;
+
+		ExtensionPreview(final File file, final String name) {
+			this.file = file;
+			this.name = name;
+		}
 	}
 
 	protected static class WebxdcViewHolder extends RecyclerView.ViewHolder {
@@ -137,9 +184,17 @@ public class ExtensionSettingsFragment extends androidx.fragment.app.Fragment {
 			this.binding = binding;
 		}
 
-		public void bind(WebxdcPage xdc) {
-			binding.icon.setImageDrawable(xdc.getIcon());
-			binding.name.setText(xdc.getName());
+		public void bind(final XmppActivity activity, ExtensionPreview xdc) {
+			if (xdc.icon == null) {
+				final var page = new WebxdcPage(activity, xdc.file, createExtensionPreviewSource(xdc.file));
+				try {
+					xdc.icon = page.getIcon();
+				} finally {
+					page.close();
+				}
+			}
+			binding.name.setText(xdc.name);
+			binding.icon.setImageDrawable(xdc.icon);
 		}
 	}
 }

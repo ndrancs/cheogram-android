@@ -285,7 +285,7 @@ public class ConversationFragment extends XmppFragment
     private final PendingItem<String> pendingLastMessageUuid = new PendingItem<>();
     private final PendingItem<Message> pendingMessage = new PendingItem<>();
     public Uri mPendingEditorContent = null;
-    protected ArrayList<WebxdcPage> extensions = new ArrayList<>();
+    protected ArrayList<File> extensions = new ArrayList<>();
     protected MessageAdapter messageListAdapter;
     protected CommandAdapter commandAdapter;
     private MediaPreviewAdapter mediaPreviewAdapter;
@@ -1818,6 +1818,7 @@ public class ConversationFragment extends XmppFragment
     public void onDestroyView() {
         super.onDestroyView();
         Log.d(Config.LOGTAG, "ConversationFragment.onDestroyView()");
+        extensions.clear();
         messageListAdapter.setOnContactPictureClicked(null);
         messageListAdapter.setOnContactPictureLongClicked(null);
         messageListAdapter.setOnInlineImageLongClicked(null);
@@ -2020,14 +2021,14 @@ public class ConversationFragment extends XmppFragment
             final var dir = new File(xmppConnectionService.getExternalFilesDir(null), "extensions");
             for (File file : Files.fileTraverser().breadthFirst(dir)) {
                 if (file.isFile() && file.canRead()) {
-                    final var dummy = new Message(conversation, null, conversation.getNextEncryption());
-                    dummy.setStatus(Message.STATUS_DUMMY);
-                    dummy.setThread(conversation.getThread());
-                    dummy.setUuid(file.getName());
-                    final var xdc = new WebxdcPage(activity, file, dummy);
-                    extensions.add(xdc);
-                    final var item = menu.add(0x1, extensions.size() - 1, 0, xdc.getName());
-                    item.setIcon(xdc.getIcon(24));
+                    final var xdc = new WebxdcPage(activity, file, createExtensionSourceMessage(file));
+                    try {
+                        extensions.add(file);
+                        final var item = menu.add(0x1, extensions.size() - 1, 0, xdc.getName());
+                        item.setIcon(xdc.getIcon(24));
+                    } finally {
+                        xdc.close();
+                    }
                 }
             }
             ConversationMenuConfigurator.configureAttachmentMenu(conversation, menu, TextUtils.isEmpty(binding.textinput.getText()));
@@ -2378,7 +2379,8 @@ public class ConversationFragment extends XmppFragment
             return super.onOptionsItemSelected(item);
         }
         if (item.getGroupId() == 0x1) {
-            conversation.startWebxdc(extensions.get(item.getItemId()));
+            final File file = extensions.get(item.getItemId());
+            conversation.startWebxdc(new WebxdcPage(activity, file, createExtensionSourceMessage(file)));
             return true;
         }
         switch (item.getItemId()) {
@@ -2470,6 +2472,14 @@ public class ConversationFragment extends XmppFragment
                 break;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private Message createExtensionSourceMessage(final File file) {
+        final var source = new Message(conversation, null, conversation.getNextEncryption());
+        source.setStatus(Message.STATUS_DUMMY);
+        source.setThread(conversation.getThread());
+        source.setUuid(file.getName());
+        return source;
     }
 
     public boolean onBackPressed() {
@@ -3946,11 +3956,10 @@ public class ConversationFragment extends XmppFragment
             }
             if (message == null) return;
 
-            Cid webxdcCid = message.getFileParams().getCids().get(0);
-            WebxdcPage webxdc = new WebxdcPage(activity, webxdcCid, message);
             Conversation conversation = (Conversation) message.getConversation();
             if (!conversation.switchToSession("webxdc\0" + message.getUuid())) {
-                conversation.startWebxdc(webxdc);
+                Cid webxdcCid = message.getFileParams().getCids().get(0);
+                conversation.startWebxdc(new WebxdcPage(activity, webxdcCid, message));
             }
         }
         if (message != null) {

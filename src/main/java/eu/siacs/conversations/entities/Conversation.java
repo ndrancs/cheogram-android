@@ -2057,9 +2057,11 @@ public class Conversation extends AbstractEntity
         }
 
         public void removeSession(ConversationPage session) {
-            sessions.remove(session);
+            if (sessions == null) return;
+            if (!sessions.remove(session)) return;
+            session.close();
             notifyDataSetChanged();
-            if (session instanceof WebxdcPage) mPager.get().setCurrentItem(0);
+            if (session instanceof WebxdcPage && mPager.get() != null) mPager.get().setCurrentItem(0);
         }
 
         public boolean switchToSession(final String node) {

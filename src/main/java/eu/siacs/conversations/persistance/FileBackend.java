@@ -1881,14 +1881,15 @@ public class FileBackend {
                 fileParams.runtime = getMediaRuntime(file);
             }
             if ("application/webxdc+zip".equals(mime)) {
-                try {
-                    final var zip = new ZipFile(file);
-                    final ZipEntry manifestEntry = zip == null ? null : zip.getEntry("manifest.toml");
+                try (final var zip = new ZipFile(file)) {
+                    final ZipEntry manifestEntry = zip.getEntry("manifest.toml");
                     if (manifestEntry != null) {
-                        final var manifest = Toml.parse(zip.getInputStream(manifestEntry));
-                        if (manifest != null) {
-                            final var name = manifest.getString("name");
-                            if (name != null) fileParams.setName(name);
+                        try (final var is = zip.getInputStream(manifestEntry)) {
+                            final var manifest = Toml.parse(is);
+                            if (manifest != null) {
+                                final var name = manifest.getString("name");
+                                if (name != null) fileParams.setName(name);
+                            }
                         }
                     }
                 } catch (final IOException e2) { }
