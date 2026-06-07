@@ -213,7 +213,7 @@ public class WebxdcPage implements ConversationPage {
 					throw new Exception("\"" + path + "\" not found");
 				}
 				String mimeType = MimeUtils.guessFromPath(path);
-				String encoding = mimeType.startsWith("text/") ? "UTF-8" : null;
+				String encoding = (mimeType != null && mimeType.startsWith("text/")) ? "UTF-8" : null;
 				res = new WebResourceResponse(mimeType, encoding, localZip.getInputStream(entry));
 			}
 		} catch (Exception e) {
