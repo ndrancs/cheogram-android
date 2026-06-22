@@ -544,12 +544,27 @@ public class Contact implements ListItem, Blockable {
     }
 
     public Element asElement() {
+        return asElement(false);
+    }
+
+    public Element asElement(final boolean includeSubscription) {
         final Element item = new Element("item");
         item.setAttribute("jid", this.jid);
         if (this.serverName != null) {
             item.setAttribute("name", this.serverName);
         } else {
             item.setAttribute("name", getDisplayName());
+        }
+        if (includeSubscription) {
+            if (mutualPresenceSubscription()) {
+                 item.setAttribute("subscription", "both");
+            } else if (getOption(Options.FROM)) {
+                 item.setAttribute("subscription", "from");
+            } else if (getOption(Options.TO)) {
+                 item.setAttribute("subscription", "to");
+             } else {
+                 item.setAttribute("subscription", "none");
+            }
         }
         for (String group : getGroups(false)) {
             item.addChild("group").setContent(group);

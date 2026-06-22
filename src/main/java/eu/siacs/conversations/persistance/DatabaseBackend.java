@@ -536,6 +536,13 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                 db.execSQL("PRAGMA cheogram.user_version = 13");
             }
 
+            if (cheogramVersion < 14) {
+                db.execSQL(
+                    "CREATE INDEX cheogram_export_index ON " + Conversation.TABLENAME + "(mode, CASE WHEN mode<>0 THEN SUBSTR(contactJid, INSTR(contactJid, '@')) END, CASE WHEN mode<>0 THEN contactJid END)"
+                );
+                db.execSQL("PRAGMA cheogram.user_version = 14");
+            }
+
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();
