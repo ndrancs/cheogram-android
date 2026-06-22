@@ -306,6 +306,35 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                     + "("
                     + Message.CONVERSATION
                     + ")";
+    private static final String CREATE_MESSAGE_CONVERSATION_TIME_INDEX =
+            "CREATE INDEX message_conversation_time_index ON "
+                    + Message.TABLENAME
+                    + "("
+                    + Message.CONVERSATION
+                    + ","
+                    + Message.TIME_SENT
+                    + ")";
+    private static final String CREATE_CONVERSATION_EXPORT_INDEX =
+            "CREATE INDEX conversation_export_index ON "
+                    + Conversation.TABLENAME
+                    + "("
+                    + Conversation.ACCOUNT
+                    + ","
+                    + Conversation.MODE
+                    + ", CASE WHEN "
+                    + Conversation.MODE
+                    + "<>0 THEN SUBSTR("
+                    + Conversation.CONTACTJID
+                    + ", INSTR("
+                    + Conversation.CONTACTJID
+                    + ", '@') + 1) END"
+                    + ", CASE WHEN "
+                    + Conversation.MODE
+                    + "<>0 THEN "
+                    + Conversation.CONTACTJID
+                    + " END,"
+                    + Conversation.UUID
+                    + ")";
     private static final String CREATE_MESSAGE_DELETED_INDEX =
             "CREATE INDEX message_deleted_index ON "
                     + Message.TABLENAME
@@ -536,11 +565,10 @@ public class DatabaseBackend extends SQLiteOpenHelper {
                 db.execSQL("PRAGMA cheogram.user_version = 13");
             }
 
-            if (cheogramVersion < 14) {
-                db.execSQL(
-                    "CREATE INDEX cheogram_export_index ON " + Conversation.TABLENAME + "(mode, CASE WHEN mode<>0 THEN SUBSTR(contactJid, INSTR(contactJid, '@')) END, CASE WHEN mode<>0 THEN contactJid END)"
-                );
-                db.execSQL("PRAGMA cheogram.user_version = 14");
+            if (cheogramVersion < 15) {
+                db.execSQL(CREATE_MESSAGE_CONVERSATION_TIME_INDEX);
+                db.execSQL(CREATE_CONVERSATION_EXPORT_INDEX);
+                db.execSQL("PRAGMA cheogram.user_version = 15");
             }
 
             db.setTransactionSuccessful();

@@ -149,34 +149,31 @@ public class ExportBackupService extends Worker {
         }
     }
 
-    private Cursor messageExport(SQLiteDatabase db, Account account, PrintWriter writer, Progress progress) {
-        Cursor cursor = db.rawQuery("select conversations.mode, conversations.contactJid, messages.type, messages.status, messages.serverMsgId, messages.timeSent, messages.timeReceived, messages.counterpart, messages.trueCounterpart, messages.body, messages.subject, messages.payloads, messages.reactions, messages.occupant_id, messages.occupantId, messages.uuid, messages.remoteMsgId from messages left join cheogram.messages using (uuid) join conversations on conversations.uuid=messages.conversationUuid where conversations.accountUuid=? ORDER BY conversations.mode, CASE WHEN mode<>0 THEN SUBSTR(conversations.contactJid, INSTR(conversations.contactJid, '@')) END, CASE WHEN mode<>0 THEN conversations.contactJid END, timeReceived, timeSent", new String[]{account.getUuid()});
-		  return messageExport(cursor, account, writer, progress);
-	 }
+    private static final String MESSAGE_EXPORT_COLUMNS =
+            "conversations.mode, conversations.contactJid, messages.type, messages.status, "
+                    + "messages.serverMsgId, messages.timeSent, cheogram_messages.timeReceived, "
+                    + "messages.counterpart, messages.trueCounterpart, messages.body, "
+                    + "cheogram_messages.subject, cheogram_messages.payloads, messages.reactions, "
+                    + "cheogram_messages.occupant_id, messages.occupantId, messages.uuid, "
+                    + "messages.remoteMsgId";
 
-    private Cursor messageExport(Cursor cursor, Account account, PrintWriter writer, Progress progress) {
-		  if (cursor.isAfterLast()) return cursor;
-		  int mode = 0;
-		  String context = null;
-		  if (!cursor.isBeforeFirst()) {
-				mode = cursor.getInt(cursor.getColumnIndex(Conversation.MODE));
-				context = cursor.getString(cursor.getColumnIndex(Conversation.CONTACTJID));
-		  }
+    private int messageExport(
+            final Cursor cursor,
+            final Account account,
+            final PrintWriter writer,
+            final Progress progress,
+            final int total,
+            int exported) {
         final ImmutableMap<String,String> emptyMap = ImmutableMap.of();
         final var mDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
         mDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
         final var accountJid = account.getJid().toString();
         final var notificationManager = getApplicationContext().getSystemService(NotificationManager.class);
-        int size = cursor != null ? cursor.getCount() : 0;
-        Log.d(Config.LOGTAG, "exporting " + size + " messages for account " + account.getUuid());
-        int i = 0;
         Element archive = new Element("archive", "urn:xmpp:pie:0#mam");
         writer.write(archive.startTag().toString());
         while (cursor != null && cursor.moveToNext()) {
             try {
                 final var conversationMode = cursor.getInt(cursor.getColumnIndexOrThrow(Conversation.MODE));
-					 if (conversationMode != mode) break;
-					 if (context != null && !context.equals(cursor.getString(cursor.getColumnIndex(Conversation.CONTACTJID)))) break;
                 final var mType = cursor.getInt(cursor.getColumnIndex(Message.TYPE));
                 final var mStatus = cursor.getInt(cursor.getColumnIndex(Message.STATUS));
                 final var serverMsgId = cursor.getString(cursor.getColumnIndex(Message.SERVER_MSG_ID));
@@ -196,18 +193,18 @@ public class ExportBackupService extends Worker {
 
                 var message = new Element("message", "jabber:client").setAttribute("type", conversationMode == Conversation.MODE_MULTI && mType != Message.TYPE_PRIVATE && mType != Message.TYPE_PRIVATE_FILE ? "groupchat" : "chat");
                 String outerId = null;
-					 if (conversationMode == Conversation.MODE_MULTI) {
-						  message.setAttribute("from", counterpart);
-						  outerId = cursor.getString(cursor.getColumnIndex(Message.REMOTE_MSG_ID));
-					 } else {
-						  if (mStatus <= Message.STATUS_RECEIVED) {
-								message.setAttribute("to", accountJid).setAttribute("from", counterpart);
-								outerId = cursor.getString(cursor.getColumnIndex(Message.REMOTE_MSG_ID));
-						  } else {
-								message.setAttribute("from", accountJid).setAttribute("to", counterpart);
-								outerId = cursor.getString(cursor.getColumnIndex(Message.UUID));
-						  }
-					 }
+                     if (conversationMode == Conversation.MODE_MULTI) {
+                          message.setAttribute("from", counterpart);
+                          outerId = cursor.getString(cursor.getColumnIndex(Message.REMOTE_MSG_ID));
+                     } else {
+                          if (mStatus <= Message.STATUS_RECEIVED) {
+                                message.setAttribute("to", accountJid).setAttribute("from", counterpart);
+                                outerId = cursor.getString(cursor.getColumnIndex(Message.REMOTE_MSG_ID));
+                          } else {
+                                message.setAttribute("from", accountJid).setAttribute("to", counterpart);
+                                outerId = cursor.getString(cursor.getColumnIndex(Message.UUID));
+                          }
+                     }
                 if (outerId != null) message.setAttribute("id", outerId);
                 if (rawBody != null) message.addChild(new Element("body").setContent(rawBody));
                 if (subject != null) message.addChild(new Element("subject").setContent(subject));
@@ -262,17 +259,133 @@ public class ExportBackupService extends Worker {
             } catch (final Exception e) {
                 Log.e(Config.LOGTAG, "message export error: " + e);
             }
-            i++;
-				if (i % 100 == 0) {
-					final int p = i * 100 / size;
-					Log.d(Config.LOGTAG, "Message export progress: " + p + " (" + i + ")");
-					notificationManager.notify(NOTIFICATION_ID, progress.build(p));
-				}
+            exported++;
+            if (exported % 100 == 0 && total > 0) {
+                final int p = exported * 100 / total;
+                Log.d(Config.LOGTAG, "Message export progress: " + p + " (" + exported + ")");
+                notificationManager.notify(NOTIFICATION_ID, progress.build(p));
+            }
         }
-		  // TODO: need to separate webxdc updates per MUC etc like we do messages
+        // TODO: need to separate webxdc updates per MUC etc like we do messages
         // messageExportCheogram(db, account, writer, progress);
         writer.write(archive.endTag().toString());
-		  return cursor;
+        return exported;
+    }
+
+    private int messageCount(final SQLiteDatabase db, final Account account) {
+        try (final Cursor cursor =
+                db.rawQuery(
+                        "select count(*) from messages join conversations on "
+                                + "conversations.uuid=messages.conversationUuid "
+                                + "where conversations.accountUuid=?",
+                        new String[] {account.getUuid()})) {
+            return cursor.moveToFirst() ? cursor.getInt(0) : 0;
+        }
+    }
+
+    private int directMessageExport(
+            final SQLiteDatabase db,
+            final Account account,
+            final PrintWriter writer,
+            final Progress progress,
+            final int total,
+            final int exported) {
+        try (final Cursor cursor =
+                db.rawQuery(
+                        "select "
+                                + MESSAGE_EXPORT_COLUMNS
+                                + " from messages left join cheogram.messages cheogram_messages "
+                                + "using (uuid) "
+                                + "join conversations on conversations.uuid=messages.conversationUuid "
+                                + "where conversations.accountUuid=? and conversations.mode=? "
+                                + "order by messages.timeSent",
+                        new String[] {
+                            account.getUuid(), String.valueOf(Conversation.MODE_SINGLE)
+                        })) {
+            return messageExport(cursor, account, writer, progress, total, exported);
+        }
+    }
+
+    private int mucMessageExport(
+            final SQLiteDatabase db,
+            final Account account,
+            final PrintWriter writer,
+            final Progress progress,
+            final int total,
+            int exported) {
+        Element component = null;
+        Element user = null;
+        try (final Cursor conversations =
+                db.rawQuery(
+                        "select conversations.uuid, conversations.contactJid from conversations "
+                                + "where conversations.accountUuid=? and conversations.mode=? "
+                                + "and exists (select 1 from messages where "
+                                + "messages.conversationUuid=conversations.uuid) "
+                                + "order by CASE WHEN mode<>0 THEN "
+                                + "SUBSTR(contactJid, INSTR(contactJid, '@') + 1) END, "
+                                + "CASE WHEN mode<>0 THEN contactJid END",
+                        new String[] {
+                            account.getUuid(), String.valueOf(Conversation.MODE_MULTI)
+                        })) {
+            while (conversations.moveToNext()) {
+                final String conversationUuid =
+                        conversations.getString(
+                                conversations.getColumnIndexOrThrow(Conversation.UUID));
+                final var jid =
+                        Jid.ofOrInvalid(
+                                conversations.getString(
+                                        conversations.getColumnIndexOrThrow(
+                                                Conversation.CONTACTJID)));
+                Log.d(Config.LOGTAG, "Export MUC chunk: " + jid);
+                final var domain = jid.getDomain().toString();
+                if (component == null || !component.getAttribute("jid").equals(domain)) {
+                    if (user != null) {
+                        writer.write("\n");
+                        writer.write(user.endTag().toString());
+                        user = null;
+                    }
+                    if (component != null) {
+                        writer.write("\n");
+                        writer.write(component.endTag().toString());
+                    }
+                    component =
+                            new Element("component")
+                                    .setAttribute("jid", domain)
+                                    .setAttribute("type", "muc");
+                    writer.write("\n");
+                    writer.write(component.startTag().toString());
+                }
+                if (user != null) {
+                    writer.write("\n");
+                    writer.write(user.endTag().toString());
+                }
+                user = new Element("user").setAttribute("name", jid.getLocal());
+                writer.write("\n");
+                writer.write(user.startTag().toString());
+                try (final Cursor messages =
+                        db.rawQuery(
+                                "select "
+                                        + MESSAGE_EXPORT_COLUMNS
+                                        + " from messages left join cheogram.messages "
+                                        + "cheogram_messages using (uuid) "
+                                        + "join conversations on "
+                                        + "conversations.uuid=messages.conversationUuid "
+                                        + "where messages.conversationUuid=? "
+                                        + "order by messages.timeSent",
+                                new String[] {conversationUuid})) {
+                    exported = messageExport(messages, account, writer, progress, total, exported);
+                }
+            }
+        } finally {
+            writer.write("\n");
+            if (user != null) {
+                writer.write(user.endTag().toString());
+            }
+            if (component != null) {
+                writer.write(component.endTag().toString());
+            }
+        }
+        return exported;
     }
 
     private void messageExportCheogram(SQLiteDatabase db, Account account, PrintWriter writer, Progress progress) {
@@ -378,20 +491,20 @@ public class ExportBackupService extends Worker {
 
             Element roster = new Element("query", "jabber:iq:roster");
             if (!"".equals(account.getRosterVersion())) roster.setAttribute("ver", account.getRosterVersion());
-				for (final var contact : database.readRoster(account).values()) {
-					 roster.addChild(contact.asElement(true));
-				}
+                for (final var contact : database.readRoster(account).values()) {
+                     roster.addChild(contact.asElement(true));
+                }
             writer.write(roster.toString());
 
             final var bookmarks = new Element("pubsub", "http://jabber.org/protocol/pubsub#owner");
             final var bookmarksItems = new Element("items").setAttribute("node", "urn:xmpp:bookmarks:1");
-				for (final var bookmark : account.getBookmarks()) {
-					 bookmark.setAttribute("xmlns", "urn:xmpp:bookmarks:1");
-					 final var item = new Element("item").setAttribute("id", bookmark.getJid().toString());
-					 item.addChild(bookmark);
-					 bookmarksItems.addChild(item);
-				}
-				bookmarks.addChild(bookmarksItems);
+                for (final var bookmark : account.getBookmarks()) {
+                     bookmark.setAttribute("xmlns", "urn:xmpp:bookmarks:1");
+                     final var item = new Element("item").setAttribute("id", bookmark.getJid().toString());
+                     item.addChild(bookmark);
+                     bookmarksItems.addChild(item);
+                }
+                bookmarks.addChild(bookmarksItems);
             writer.write(bookmarks.toString());
 
             if (account.getDisplayName() != null && !"".equals(account.getDisplayName())) {
@@ -435,43 +548,20 @@ public class ExportBackupService extends Worker {
             }
 
             SQLiteDatabase db = database.getReadableDatabase();
-            final String uuid = account.getUuid();
-            final var messageCursor = messageExport(db, account, writer, progress);
+            final int totalMessages = messageCount(db, account);
+            Log.d(
+                    Config.LOGTAG,
+                    "exporting " + totalMessages + " messages for account " + account.getUuid());
+            final int exportedMessages =
+                    directMessageExport(db, account, writer, progress, totalMessages, 0);
 
             writer.write("\n");
             writer.write(user.endTag().toString());
             writer.write(host.endTag().toString());
 
-				Element component = null;
-				Element cuser = null;
-				while (!messageCursor.isAfterLast()) {
-					 final var jid = Jid.ofOrInvalid(messageCursor.getString(messageCursor.getColumnIndex(Conversation.CONTACTJID)));
-					 Log.d(Config.LOGTAG, "Export new chunk: " + jid);
-					 final var domain = jid.getDomain().toString();
-					 if (cuser == null || !cuser.getAttribute("name").equals(jid.getLocal())) {
-						  if (cuser != null) {
-								writer.write("\n");
-								writer.write(cuser.endTag().toString());
-						  }
-						  cuser = new Element("user").setAttribute("name", jid.getLocal());
-						  writer.write("\n");
-						  writer.write(cuser.startTag().toString());
-					 }
-					 if (component == null || !component.getAttribute("jid").equals(domain)) {
-						  if (component != null) {
-								writer.write("\n");
-								writer.write(component.endTag().toString());
-						  }
-						  component = new Element("component").setAttribute("jid", domain).setAttribute("type", "muc");
-						  writer.write("\n");
-						  writer.write(component.startTag().toString());
-					 }
-					 messageExport(messageCursor, account, writer, progress);
-				}
+            mucMessageExport(db, account, writer, progress, totalMessages, exportedMessages);
 
             writer.write("\n");
-				if (cuser != null) writer.write(cuser.endTag().toString());
-				if (component != null) writer.write(component.endTag().toString());
             writer.write(serverData.endTag().toString());
 
             writer.flush();
