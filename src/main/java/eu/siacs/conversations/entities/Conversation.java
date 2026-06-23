@@ -97,13 +97,14 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.ref.WeakReference;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1868,6 +1869,116 @@ public class Conversation extends AbstractEntity
         }
     }
 
+    static Float steppedSliderStep(final Element field) {
+        final Element validate = field.findChild("validate", "http://jabber.org/protocol/xdata-validate");
+        final String datatype = validate == null ? null : validate.getAttribute("datatype");
+        if (!isNumericDatatype(datatype)) return null;
+
+        final Element range = validate.findChild("range", "http://jabber.org/protocol/xdata-validate");
+        final Float min = rangeFloat(range, "min");
+        final Float max = rangeFloat(range, "max");
+        if (min == null || max == null || min >= max) return null;
+
+        final String value = firstValue(field);
+        final Float parsedValue;
+        if (value == null || value.equals("")) {
+            parsedValue = null;
+        } else {
+            parsedValue = parseFloat(value);
+            if (parsedValue == null || parsedValue < min || parsedValue > max) return null;
+        }
+
+        final List<Float> options = optionValues(field);
+        if (options == null) return null;
+
+        final Float step;
+        if (options.size() < 2) {
+            step = isIntegerDatatype(datatype) ? 1f : 0f;
+        } else {
+            step = uniformStep(options);
+            if (step == null) return null;
+            for (final float option : options) {
+                if (!landsOnStep(option, min, step)) return null;
+            }
+        }
+        if (step == null || (step > 0f && !landsOnStep(max, min, step))) return null;
+        return parsedValue == null || step == 0f || landsOnStep(parsedValue, min, step) ? step : null;
+    }
+
+    static String formatSliderValue(final float value, final String datatype) {
+        final BigDecimal decimal = new BigDecimal(Float.toString(value));
+        if (isIntegerDatatype(datatype)) {
+            return decimal.setScale(0, RoundingMode.HALF_UP).toPlainString();
+        }
+        if ("xs:decimal".equals(datatype)) {
+            return decimal.stripTrailingZeros().toPlainString();
+        }
+        return Float.toString(value);
+    }
+
+    private static Float uniformStep(final List<Float> options) {
+        final List<Float> sortedOptions = new ArrayList<>(options);
+        Collections.sort(sortedOptions);
+        final float step = sortedOptions.get(1) - sortedOptions.get(0);
+        if (step <= 0f) return null;
+        for (int i = 2; i < sortedOptions.size(); i++) {
+            if (!(Math.abs(step - (sortedOptions.get(i) - sortedOptions.get(i - 1))) < 0.0001f)) return null;
+        }
+        return step;
+    }
+
+    private static List<Float> optionValues(final Element field) {
+        final List<Float> values = new ArrayList<>();
+        for (final Option option : Option.forField(field)) {
+            final Float value = parseFloat(option.getValue());
+            if (value == null) return null;
+            values.add(value);
+        }
+        return values;
+    }
+
+    private static Float rangeFloat(final Element range, final String name) {
+        return range == null ? null : parseFloat(range.getAttribute(name));
+    }
+
+    private static Float parseFloat(final String value) {
+        if (value == null || value.equals("")) return null;
+        try {
+            final float parsed = Float.parseFloat(value);
+            return Float.isFinite(parsed) ? parsed : null;
+        } catch (final NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static String firstValue(final Element field) {
+        for (final Element child : field.getChildren()) {
+            if ("value".equals(child.getName()) && "jabber:x:data".equals(child.getNamespace())) {
+                return child.getContent();
+            }
+        }
+        return null;
+    }
+
+    private static boolean landsOnStep(final float value, final float min, final float step) {
+        final double multiple = ((double) value - (double) min) / (double) step;
+        return Math.abs(Math.rint(multiple) - multiple) < 0.0001f;
+    }
+
+    private static boolean isIntegerDatatype(final String datatype) {
+        return "xs:integer".equals(datatype)
+                || "xs:int".equals(datatype)
+                || "xs:long".equals(datatype)
+                || "xs:short".equals(datatype)
+                || "xs:byte".equals(datatype);
+    }
+
+    private static boolean isNumericDatatype(final String datatype) {
+        return isIntegerDatatype(datatype)
+                || "xs:decimal".equals(datatype)
+                || "xs:double".equals(datatype);
+    }
+
     public class ConversationPagerAdapter extends PagerAdapter {
         protected WeakReference<ViewPager> mPager = new WeakReference<>(null);
         protected WeakReference<TabLayout> mTabs = new WeakReference<>(null);
@@ -2229,7 +2340,7 @@ public class Conversation extends AbstractEntity
                     String datatype = validate.getAttribute("datatype");
                     if (datatype == null) return;
 
-                    if (datatype.equals("xs:integer") || datatype.equals("xs:int") || datatype.equals("xs:long") || datatype.equals("xs:short") || datatype.equals("xs:byte")) {
+                    if (isIntegerDatatype(datatype)) {
                         textinput.setInputType(flags | InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
                     }
 
@@ -2919,63 +3030,32 @@ public class Conversation extends AbstractEntity
                 @Override
                 public void bind(Item item) {
                     field = (Field) item;
+                    binding.slider.clearOnChangeListeners();
                     setTextOrHide(binding.label, field.getLabel());
                     setTextOrHide(binding.desc, field.getDesc());
                     final Element validate = field.el.findChild("validate", "http://jabber.org/protocol/xdata-validate");
                     final String datatype = validate == null ? null : validate.getAttribute("datatype");
                     final Element range = validate == null ? null : validate.findChild("range", "http://jabber.org/protocol/xdata-validate");
-                    // NOTE: range also implies open, so we don't have to be bound by the options strictly
-                    // Also, we don't have anywhere to put labels so we show only values, which might sometimes be bad...
-                    Float min = null;
-                    try { min = range.getAttribute("min") == null ? null : Float.valueOf(range.getAttribute("min")); } catch (NumberFormatException e) { }
-                    Float max = null;
-                    try { max = range.getAttribute("max") == null ? null : Float.valueOf(range.getAttribute("max"));  } catch (NumberFormatException e) { }
+                    final Float step = steppedSliderStep(field.el);
+                    if (step == null) return;
+                    final Float min = rangeFloat(range, "min");
+                    final Float max = rangeFloat(range, "max");
+                    if (min == null || max == null) return;
 
-                    List<Float> options = field.getOptions().stream().map(o -> Float.valueOf(o.getValue())).collect(Collectors.toList());
-                    Collections.sort(options);
-                    if (options.size() > 0) {
-                        // min/max should be on the range, but if you have options and didn't put them on the range we can imply
-                        if (min == null) min = options.get(0);
-                        if (max == null) max = options.get(options.size()-1);
+                    float value = min;
+                    final Float parsedValue = parseFloat(firstValue(field.el));
+                    if (parsedValue != null && parsedValue >= min && parsedValue <= max) {
+                        value = parsedValue;
                     }
+                    binding.slider.setStepSize(0);
+                    binding.slider.setValueFrom(min);
+                    binding.slider.setValueTo(max);
+                    binding.slider.setValue(value);
+                    binding.slider.setStepSize(step);
 
-                    if (field.getValues().size() > 0) {
-                        final var val = Float.valueOf(field.getValue().getContent());
-                        if ((min == null || val >= min) && (max == null || val <= max)) {
-                            binding.slider.setValue(Float.valueOf(field.getValue().getContent()));
-                        } else {
-                            binding.slider.setValue(min == null ? Float.MIN_VALUE : min);
-                        }
-                    } else {
-                        binding.slider.setValue(min == null ? Float.MIN_VALUE : min);
-                    }
-                    binding.slider.setValueFrom(min == null ? Float.MIN_VALUE : min);
-                    binding.slider.setValueTo(max == null ? Float.MAX_VALUE : max);
-                    if ("xs:integer".equals(datatype) || "xs:int".equals(datatype) || "xs:long".equals(datatype) || "xs:short".equals(datatype) || "xs:byte".equals(datatype)) {
-                        binding.slider.setStepSize(1);
-                    } else {
-                        binding.slider.setStepSize(0);
-                    }
-
-                    if (options.size() > 0) {
-                        float step = -1;
-                        Float prev = null;
-                        for (final Float option : options) {
-                            if (prev != null) {
-                                float nextStep = option - prev;
-                                if (step > 0 && step != nextStep) {
-                                    step = -1;
-                                    break;
-                                }
-                                step = nextStep;
-                            }
-                            prev = option;
-                        }
-                        if (step > 0) binding.slider.setStepSize(step);
-                    }
-
-                    binding.slider.addOnChangeListener((slider, value, fromUser) -> {
-                        field.setValues(List.of(new DecimalFormat().format(value)));
+                    binding.slider.addOnChangeListener((slider, sliderValue, fromUser) -> {
+                        if (!fromUser) return;
+                        field.setValues(List.of(formatSliderValue(sliderValue, datatype)));
                     });
                 }
             }
@@ -3164,13 +3244,10 @@ public class Conversation extends AbstractEntity
                                 viewType = TYPE_CHECKBOX_FIELD;
                             }
                         } else if (
-                            range != null && range.getAttribute("min") != null && range.getAttribute("max") != null && (
-                                "xs:integer".equals(datatype) || "xs:int".equals(datatype) || "xs:long".equals(datatype) || "xs:short".equals(datatype) || "xs:byte".equals(datatype) ||
-                                "xs:decimal".equals(datatype) || "xs:double".equals(datatype)
-                            )
+                            range != null && range.getAttribute("min") != null && range.getAttribute("max") != null && isNumericDatatype(datatype)
                         ) {
-                            // has a range and is numeric, use a slider
-                            viewType = TYPE_SLIDER_FIELD;
+                            // has a range and is numeric, use a slider if it can represent every valid value
+                            viewType = steppedSliderStep(el) == null ? TYPE_TEXT_FIELD : TYPE_SLIDER_FIELD;
                         } else if (fieldType.equals("list-single")) {
                             if (fillableFieldCount == 1 && actionsAdapter.countProceed() < 1 && Option.forField(el).size() < 50) {
                                 viewType = TYPE_BUTTON_GRID_FIELD;

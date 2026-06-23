@@ -19,6 +19,8 @@ import org.robolectric.annotation.ConscryptMode;
 
 import android.os.Build;
 import android.os.Looper;
+import android.view.ContextThemeWrapper;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
@@ -26,6 +28,9 @@ import androidx.viewpager.widget.ViewPager;
 import com.google.android.material.tabs.TabLayout;
 import eu.siacs.conversations.Conversations;
 import eu.siacs.conversations.R;
+import eu.siacs.conversations.databinding.CommandSliderFieldBinding;
+import eu.siacs.conversations.services.XmppConnectionService;
+import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import im.conversations.android.xmpp.model.disco.info.Feature;
@@ -172,5 +177,138 @@ public class ConversationTest {
             "Tab indicator must stay in sync with the selected page",
             1,
             tabs.getSelectedTabPosition());
+    }
+
+    @Test
+    public void steppedSliderStepRejectsInRangeValueMissingFromOptionLattice() {
+        final var field = sliderField("xs:integer", "0", "68", "7", "0", "34", "68");
+
+        Assert.assertNull(
+                "A value the option-derived slider cannot represent should fall back to text input",
+                Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepAcceptsCompatibleOptionLattice() {
+        final var field = sliderField("xs:integer", "0", "70", "35", "0", "35", "70");
+
+        Assert.assertEquals(Float.valueOf(35f), Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepUsesIntegerStepWithoutOptions() {
+        final var field = sliderField("xs:integer", "0", "10", "7");
+
+        Assert.assertEquals(Float.valueOf(1f), Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepUsesContinuousStepWithoutOptionsForDecimal() {
+        final var field = sliderField("xs:decimal", "0", "1", "0.000001");
+
+        Assert.assertEquals(Float.valueOf(0f), Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void formatSliderValueDoesNotClampLargeIntegerDatatypesToInt() {
+        Assert.assertEquals("3000000000", Conversation.formatSliderValue(3_000_000_000f, "xs:long"));
+    }
+
+    @Test
+    public void formatSliderValueUsesPlainDecimalLexicalFormForDecimalDatatype() {
+        Assert.assertEquals("0.000001", Conversation.formatSliderValue(0.000001f, "xs:decimal"));
+    }
+
+    @Test
+    public void steppedSliderStepRejectsIncompatibleBounds() {
+        final var field = sliderField("xs:integer", "0", "70", "34", "0", "34", "68");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepRejectsMalformedOptions() {
+        final var field = sliderField("xs:integer", "0", "70", "35", "0", "not-a-number", "70");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepRejectsValuesOutsideRange() {
+        final var below = sliderField("xs:integer", "0", "70", "-5", "0", "35", "70");
+        final var above = sliderField("xs:integer", "0", "70", "999", "0", "35", "70");
+
+        Assert.assertNull(Conversation.steppedSliderStep(below));
+        Assert.assertNull(Conversation.steppedSliderStep(above));
+    }
+
+    @Test
+    public void steppedSliderStepRejectsDuplicateOptions() {
+        final var field = sliderField("xs:integer", "0", "70", "35", "0", "35", "35", "70");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void rangedListSingleWithCustomValueFallsBackToTextInputWhenSliderCannotRepresentIt() {
+        final var session = withOccupantId.pagerAdapter.new CommandSession(
+                "test", "node", mock(XmppConnectionService.class));
+        try {
+            session.responseElement = new Element("x", Namespace.DATA);
+            session.responseElement.setAttribute("type", "form");
+            final var field = sliderField("xs:integer", "0", "68", "7", "0", "34", "68");
+            field.setAttribute("type", "list-single");
+
+            Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(field).viewType);
+        } finally {
+            session.loadingTimer.cancel();
+        }
+    }
+
+    @Test
+    public void sliderFieldViewHolderBindsEmptyValueWithoutCrashing() {
+        final var context = new ContextThemeWrapper(
+                RuntimeEnvironment.getApplication(),
+                com.google.android.material.R.style.Theme_MaterialComponents_DayNight_NoActionBar);
+        final var session = withOccupantId.pagerAdapter.new CommandSession(
+                "test", "node", mock(XmppConnectionService.class));
+        try {
+            final var binding = CommandSliderFieldBinding.inflate(LayoutInflater.from(context));
+            final var holder = session.new SliderFieldViewHolder(binding);
+            final var field = sliderField("xs:integer", "0", "70", "", "0", "35", "70");
+            final var item = session.new Field(
+                    eu.siacs.conversations.xmpp.forms.Field.parse(field),
+                    session.TYPE_SLIDER_FIELD);
+
+            holder.bind(item);
+
+            Assert.assertEquals(0f, binding.slider.getValue(), 0.0001f);
+        } finally {
+            session.loadingTimer.cancel();
+        }
+    }
+
+    private static Element sliderField(
+            final String datatype,
+            final String min,
+            final String max,
+            final String value,
+            final String... options) {
+        final var field = new Element("field", Namespace.DATA);
+        field.setAttribute("type", "text-single");
+        final var validate = field.addChild("validate", "http://jabber.org/protocol/xdata-validate");
+        validate.setAttribute("datatype", datatype);
+        final var range = validate.addChild("range", "http://jabber.org/protocol/xdata-validate");
+        range.setAttribute("min", min);
+        range.setAttribute("max", max);
+        if (value != null) {
+            field.addChild("value", Namespace.DATA).setContent(value);
+        }
+        for (final String option : options) {
+            field.addChild("option", Namespace.DATA)
+                    .addChild("value", Namespace.DATA)
+                    .setContent(option);
+        }
+        return field;
     }
 }
