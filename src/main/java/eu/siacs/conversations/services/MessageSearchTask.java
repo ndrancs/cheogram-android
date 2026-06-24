@@ -53,6 +53,7 @@ import eu.siacs.conversations.xmpp.Jid;
 public class MessageSearchTask implements Runnable, Cancellable {
 
 	private static final ReplacingSerialSingleThreadExecutor EXECUTOR = new ReplacingSerialSingleThreadExecutor(MessageSearchTask.class.getName());
+	private static java.util.Timer timer = null;
 
 	private final XmppConnectionService xmppConnectionService;
 	private final List<String> term;
@@ -69,7 +70,20 @@ public class MessageSearchTask implements Runnable, Cancellable {
 	}
 
 	public static void search(XmppConnectionService xmppConnectionService, List<String> term, final String uuid, OnSearchResultsAvailable onSearchResultsAvailable) {
-		new MessageSearchTask(xmppConnectionService, term, uuid, onSearchResultsAvailable).executeInBackground();
+		 if (timer != null) {
+			  timer.cancel();
+			  timer = null;
+		 }
+		 if (term == null) {
+			 cancelRunningTasks();
+		} else {
+			timer = new java.util.Timer();
+			timer.schedule(new java.util.TimerTask() {
+				public void run() {
+					new MessageSearchTask(xmppConnectionService, term, uuid, onSearchResultsAvailable).executeInBackground();
+				}
+			}, 300);
+		}
 	}
 
 	public static void cancelRunningTasks() {
@@ -88,6 +102,10 @@ public class MessageSearchTask implements Runnable, Cancellable {
 		try {
 			final HashMap<String, Conversational> conversationCache = new HashMap<>();
 			final List<Message> result = new ArrayList<>();
+			if (isCancelled) {
+				Log.d(Config.LOGTAG, "canceled search task");
+				return;
+			}
 			cursor = xmppConnectionService.databaseBackend.getMessageSearchCursor(term, uuid);
 			long dbTimer = SystemClock.elapsedRealtime();
 			if (isCancelled) {

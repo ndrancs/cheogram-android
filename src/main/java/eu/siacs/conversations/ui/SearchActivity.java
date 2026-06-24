@@ -29,6 +29,7 @@
 
 package eu.siacs.conversations.ui;
 
+import android.util.Log;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
@@ -53,6 +54,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import eu.siacs.conversations.R;
+import eu.siacs.conversations.Config;
 import eu.siacs.conversations.databinding.ActivitySearchBinding;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
@@ -248,15 +250,19 @@ public class SearchActivity extends XmppActivity implements TextWatcher, OnSearc
 	public void afterTextChanged(Editable s) {
 		final List<String> term = FtsUtils.parse(s.toString().trim());
 		if (!currentSearch.watch(term)) {
+			Log.d(Config.LOGTAG, "Already searching for " + term);
 			return;
 		}
-		if (term.isEmpty()) {
+		if (term.isEmpty() || s.toString().length() < 2) {
 			MessageSearchTask.cancelRunningTasks();
 			this.messages.clear();
 			messageListAdapter.setHighlightedTerm(null);
 			messageListAdapter.notifyDataSetChanged();
 			changeBackground(false, false);
+			xmppConnectionService.search(null, uuid,this);
+			Log.d(Config.LOGTAG, "No search term");
 		} else {
+			Log.d(Config.LOGTAG, "Go search for " + term);
 			xmppConnectionService.search(term, uuid,this);
 		}
 	}
