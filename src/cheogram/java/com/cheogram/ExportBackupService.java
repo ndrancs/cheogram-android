@@ -491,20 +491,20 @@ public class ExportBackupService extends Worker {
 
             Element roster = new Element("query", "jabber:iq:roster");
             if (!"".equals(account.getRosterVersion())) roster.setAttribute("ver", account.getRosterVersion());
-                for (final var contact : database.readRoster(account).values()) {
-                     roster.addChild(contact.asElement(true));
-                }
+            for (final var contact : database.readRoster(account).values()) {
+                 if (contact.showInContactList()) roster.addChild(contact.asElement(true));
+            }
             writer.write(roster.toString());
 
             final var bookmarks = new Element("pubsub", "http://jabber.org/protocol/pubsub#owner");
             final var bookmarksItems = new Element("items").setAttribute("node", "urn:xmpp:bookmarks:1");
-                for (final var bookmark : account.getBookmarks()) {
-                     bookmark.setAttribute("xmlns", "urn:xmpp:bookmarks:1");
-                     final var item = new Element("item").setAttribute("id", bookmark.getJid().toString());
-                     item.addChild(bookmark);
-                     bookmarksItems.addChild(item);
-                }
-                bookmarks.addChild(bookmarksItems);
+            for (final var bookmark : account.getBookmarks()) {
+                 bookmark.setAttribute("xmlns", "urn:xmpp:bookmarks:1");
+                 final var item = new Element("item").setAttribute("id", bookmark.getJid().toString());
+                 item.addChild(bookmark);
+                 bookmarksItems.addChild(item);
+            }
+            bookmarks.addChild(bookmarksItems);
             writer.write(bookmarks.toString());
 
             if (account.getDisplayName() != null && !"".equals(account.getDisplayName())) {
