@@ -3029,25 +3029,27 @@ public class Conversation extends AbstractEntity
 
                 @Override
                 public void bind(Item item) {
-                    field = (Field) item;
-                    binding.slider.clearOnChangeListeners();
-                    setTextOrHide(binding.label, field.getLabel());
-                    setTextOrHide(binding.desc, field.getDesc());
-                    final Element validate = field.el.findChild("validate", "http://jabber.org/protocol/xdata-validate");
+                    final Field boundField = (Field) item;
+                    final Element validate = boundField.el.findChild("validate", "http://jabber.org/protocol/xdata-validate");
                     final String datatype = validate == null ? null : validate.getAttribute("datatype");
                     final Element range = validate == null ? null : validate.findChild("range", "http://jabber.org/protocol/xdata-validate");
-                    final Float step = steppedSliderStep(field.el);
-                    if (step == null) return;
+                    final Float step = steppedSliderStep(boundField.el);
                     final Float min = rangeFloat(range, "min");
                     final Float max = rangeFloat(range, "max");
-                    if (min == null || max == null) return;
+                    if (step == null || min == null || max == null) {
+                        throw new IllegalStateException("Invalid slider field bound to slider view holder");
+                    }
 
                     float value = min;
-                    final Float parsedValue = parseFloat(firstValue(field.el));
+                    final Float parsedValue = parseFloat(firstValue(boundField.el));
                     if (parsedValue != null && parsedValue >= min && parsedValue <= max) {
                         value = parsedValue;
                     }
-                    binding.slider.setStepSize(0);
+
+                    field = boundField;
+                    binding.slider.clearOnChangeListeners();
+                    setTextOrHide(binding.label, field.getLabel());
+                    setTextOrHide(binding.desc, field.getDesc());
                     binding.slider.setValueFrom(min);
                     binding.slider.setValueTo(max);
                     binding.slider.setValue(value);

@@ -17,6 +17,8 @@ import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.ConscryptMode;
 
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.os.Build;
 import android.os.Looper;
 import android.view.ContextThemeWrapper;
@@ -283,6 +285,70 @@ public class ConversationTest {
             holder.bind(item);
 
             Assert.assertEquals(0f, binding.slider.getValue(), 0.0001f);
+        } finally {
+            session.loadingTimer.cancel();
+        }
+    }
+
+    @Test
+    public void sliderFieldViewHolderRebindsDifferentStepSizesWithoutCrashing() {
+        final var context = new ContextThemeWrapper(
+                RuntimeEnvironment.getApplication(),
+                com.google.android.material.R.style.Theme_MaterialComponents_DayNight_NoActionBar);
+        final var session = withOccupantId.pagerAdapter.new CommandSession(
+                "test", "node", mock(XmppConnectionService.class));
+        try {
+            final var binding = CommandSliderFieldBinding.inflate(LayoutInflater.from(context));
+            final var holder = session.new SliderFieldViewHolder(binding);
+            final var steppedField = sliderField("xs:integer", "0", "70", "35", "0", "35", "70");
+            holder.bind(session.new Field(
+                    eu.siacs.conversations.xmpp.forms.Field.parse(steppedField),
+                    session.TYPE_SLIDER_FIELD));
+
+            final var integerField = sliderField("xs:integer", "0", "10", "7");
+            holder.bind(session.new Field(
+                    eu.siacs.conversations.xmpp.forms.Field.parse(integerField),
+                    session.TYPE_SLIDER_FIELD));
+
+            Assert.assertEquals(0f, binding.slider.getValueFrom(), 0.0001f);
+            Assert.assertEquals(10f, binding.slider.getValueTo(), 0.0001f);
+            Assert.assertEquals(7f, binding.slider.getValue(), 0.0001f);
+            Assert.assertEquals(1f, binding.slider.getStepSize(), 0.0001f);
+        } finally {
+            session.loadingTimer.cancel();
+        }
+    }
+
+    @Test
+    public void sliderFieldViewHolderRebindsFromLargeDiscreteToSmallDiscreteRangeWithoutCrashing() {
+        final var context = new ContextThemeWrapper(
+                RuntimeEnvironment.getApplication(),
+                com.google.android.material.R.style.Theme_MaterialComponents_DayNight_NoActionBar);
+        final var session = withOccupantId.pagerAdapter.new CommandSession(
+                "test", "node", mock(XmppConnectionService.class));
+        try {
+            final var binding = CommandSliderFieldBinding.inflate(LayoutInflater.from(context));
+            final var holder = session.new SliderFieldViewHolder(binding);
+            final var discreteField = sliderField("xs:integer", "0", "100", "50", "0", "10", "20");
+            holder.bind(session.new Field(
+                    eu.siacs.conversations.xmpp.forms.Field.parse(discreteField),
+                    session.TYPE_SLIDER_FIELD));
+
+            final var continuousField = sliderField(
+                    "xs:decimal", "0", "1", "0.5", "0", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1");
+            holder.bind(session.new Field(
+                    eu.siacs.conversations.xmpp.forms.Field.parse(continuousField),
+                    session.TYPE_SLIDER_FIELD));
+
+            Assert.assertEquals(0f, binding.slider.getValueFrom(), 0.0001f);
+            Assert.assertEquals(1f, binding.slider.getValueTo(), 0.0001f);
+            Assert.assertEquals(0.5f, binding.slider.getValue(), 0.0001f);
+            Assert.assertEquals(0.1f, binding.slider.getStepSize(), 0.0001f);
+            binding.slider.measure(
+                    View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY));
+            binding.slider.layout(0, 0, 100, 100);
+            binding.slider.draw(new Canvas(Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)));
         } finally {
             session.loadingTimer.cancel();
         }
