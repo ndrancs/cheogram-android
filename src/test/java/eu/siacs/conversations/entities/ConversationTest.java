@@ -212,6 +212,15 @@ public class ConversationTest {
     }
 
     @Test
+    public void steppedSliderStepRejectsMissingOrMalformedRangeBounds() {
+        final var missingMin = sliderField("xs:integer", null, "10", "5");
+        final var malformedMax = sliderField("xs:integer", "0", "not-a-number", "5");
+
+        Assert.assertNull(Conversation.steppedSliderStep(missingMin));
+        Assert.assertNull(Conversation.steppedSliderStep(malformedMax));
+    }
+
+    @Test
     public void formatSliderValueDoesNotClampLargeIntegerDatatypesToInt() {
         Assert.assertEquals("3000000000", Conversation.formatSliderValue(3_000_000_000f, "xs:long"));
     }
@@ -268,23 +277,34 @@ public class ConversationTest {
     }
 
     @Test
-    public void sliderFieldViewHolderBindsEmptyValueWithoutCrashing() {
-        final var context = new ContextThemeWrapper(
-                RuntimeEnvironment.getApplication(),
-                com.google.android.material.R.style.Theme_MaterialComponents_DayNight_NoActionBar);
+    public void rangedNumericFieldWithBadBoundsFallsBackToTextInput() {
         final var session = withOccupantId.pagerAdapter.new CommandSession(
                 "test", "node", mock(XmppConnectionService.class));
         try {
-            final var binding = CommandSliderFieldBinding.inflate(LayoutInflater.from(context));
-            final var holder = session.new SliderFieldViewHolder(binding);
-            final var field = sliderField("xs:integer", "0", "70", "", "0", "35", "70");
-            final var item = session.new Field(
-                    eu.siacs.conversations.xmpp.forms.Field.parse(field),
-                    session.TYPE_SLIDER_FIELD);
+            session.responseElement = new Element("x", Namespace.DATA);
+            session.responseElement.setAttribute("type", "form");
+            final var missingMin = sliderField("xs:integer", null, "10", "5");
+            final var malformedMax = sliderField("xs:integer", "0", "not-a-number", "5");
 
-            holder.bind(item);
+            Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(missingMin).viewType);
+            Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(malformedMax).viewType);
+        } finally {
+            session.loadingTimer.cancel();
+        }
+    }
 
-            Assert.assertEquals(0f, binding.slider.getValue(), 0.0001f);
+    @Test
+    public void rangedNumericFieldWithEmptyValueFallsBackToTextInput() {
+        final var session = withOccupantId.pagerAdapter.new CommandSession(
+                "test", "node", mock(XmppConnectionService.class));
+        try {
+            session.responseElement = new Element("x", Namespace.DATA);
+            session.responseElement.setAttribute("type", "form");
+            final var emptyValue = sliderField("xs:integer", "0", "70", "", "0", "35", "70");
+            final var missingValue = sliderField("xs:integer", "0", "70", null, "0", "35", "70");
+
+            Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(emptyValue).viewType);
+            Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(missingValue).viewType);
         } finally {
             session.loadingTimer.cancel();
         }

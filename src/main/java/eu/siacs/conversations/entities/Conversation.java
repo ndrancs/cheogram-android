@@ -1880,13 +1880,9 @@ public class Conversation extends AbstractEntity
         if (min == null || max == null || min >= max) return null;
 
         final String value = firstValue(field);
-        final Float parsedValue;
-        if (value == null || value.equals("")) {
-            parsedValue = null;
-        } else {
-            parsedValue = parseFloat(value);
-            if (parsedValue == null || parsedValue < min || parsedValue > max) return null;
-        }
+        if (value == null || value.equals("")) return null;
+        final Float parsedValue = parseFloat(value);
+        if (parsedValue == null || parsedValue < min || parsedValue > max) return null;
 
         final List<Float> options = optionValues(field);
         if (options == null) return null;
@@ -1902,7 +1898,7 @@ public class Conversation extends AbstractEntity
             }
         }
         if (step == null || (step > 0f && !landsOnStep(max, min, step))) return null;
-        return parsedValue == null || step == 0f || landsOnStep(parsedValue, min, step) ? step : null;
+        return step == 0f || landsOnStep(parsedValue, min, step) ? step : null;
     }
 
     static String formatSliderValue(final float value, final String datatype) {
