@@ -314,7 +314,7 @@ public class ExportBackupService extends Worker {
             final int total,
             int exported) {
         Element component = null;
-        Element user = null;
+        Element item = null;
         try (final Cursor conversations =
                 db.rawQuery(
                         "select conversations.uuid, conversations.contactJid from conversations "
@@ -339,10 +339,10 @@ public class ExportBackupService extends Worker {
                 Log.d(Config.LOGTAG, "Export MUC chunk: " + jid);
                 final var domain = jid.getDomain().toString();
                 if (component == null || !component.getAttribute("jid").equals(domain)) {
-                    if (user != null) {
+                    if (item != null) {
                         writer.write("\n");
-                        writer.write(user.endTag().toString());
-                        user = null;
+                        writer.write(item.endTag().toString());
+                        item = null;
                     }
                     if (component != null) {
                         writer.write("\n");
@@ -350,18 +350,19 @@ public class ExportBackupService extends Worker {
                     }
                     component =
                             new Element("component")
+                                    .setAttribute("xmlns", "urn:xmpp:pie:0#component")
                                     .setAttribute("jid", domain)
                                     .setAttribute("type", "muc");
                     writer.write("\n");
                     writer.write(component.startTag().toString());
                 }
-                if (user != null) {
+                if (item != null) {
                     writer.write("\n");
-                    writer.write(user.endTag().toString());
+                    writer.write(item.endTag().toString());
                 }
-                user = new Element("user").setAttribute("name", jid.getLocal());
+                item = new Element("item").setAttribute("name", jid.getLocal());
                 writer.write("\n");
-                writer.write(user.startTag().toString());
+                writer.write(item.startTag().toString());
                 try (final Cursor messages =
                         db.rawQuery(
                                 "select "
@@ -378,8 +379,8 @@ public class ExportBackupService extends Worker {
             }
         } finally {
             writer.write("\n");
-            if (user != null) {
-                writer.write(user.endTag().toString());
+            if (item != null) {
+                writer.write(item.endTag().toString());
             }
             if (component != null) {
                 writer.write(component.endTag().toString());
