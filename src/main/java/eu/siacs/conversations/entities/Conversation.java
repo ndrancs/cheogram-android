@@ -1878,14 +1878,14 @@ public class Conversation extends AbstractEntity
         final String minValue = range == null ? null : range.getAttribute("min");
         final String maxValue = range == null ? null : range.getAttribute("max");
         final boolean integerDatatype = isIntegerDatatype(datatype);
-        if (integerDatatype && (!isIntegerLexicalValue(minValue) || !isIntegerLexicalValue(maxValue))) return null;
+        if (integerDatatype && (!isExactIntegerSliderValue(minValue) || !isExactIntegerSliderValue(maxValue))) return null;
         final Float min = parseFloat(minValue);
         final Float max = parseFloat(maxValue);
         if (min == null || max == null || min >= max) return null;
 
         final String value = firstValue(field);
         if (value == null || value.equals("")) return null;
-        if (integerDatatype && !isIntegerLexicalValue(value)) return null;
+        if (integerDatatype && !isExactIntegerSliderValue(value)) return null;
         final Float parsedValue = parseFloat(value);
         if (parsedValue == null || parsedValue < min || parsedValue > max) return null;
 
@@ -1894,6 +1894,7 @@ public class Conversation extends AbstractEntity
 
         final Float step;
         if (options.size() < 2) {
+            if (integerDatatype && !isExactIntegerUnitRange(minValue, maxValue)) return null;
             step = integerDatatype ? 1f : 0f;
         } else {
             step = uniformStep(options);
@@ -1932,7 +1933,7 @@ public class Conversation extends AbstractEntity
         final List<Float> values = new ArrayList<>();
         for (final Option option : Option.forField(field)) {
             final String optionValue = option.getValue();
-            if (integerDatatype && !isIntegerLexicalValue(optionValue)) return null;
+            if (integerDatatype && !isExactIntegerSliderValue(optionValue)) return null;
             final Float value = parseFloat(optionValue);
             if (value == null) return null;
             values.add(value);
@@ -1966,6 +1967,21 @@ public class Conversation extends AbstractEntity
     private static boolean landsOnStep(final float value, final float min, final float step) {
         final double multiple = ((double) value - (double) min) / (double) step;
         return Math.abs(Math.rint(multiple) - multiple) < 0.0001f;
+    }
+
+    private static boolean isExactIntegerSliderValue(final String value) {
+        if (!isIntegerLexicalValue(value)) return false;
+        final Float parsed = parseFloat(value);
+        return parsed != null
+                && new BigDecimal(Float.toString(parsed)).compareTo(new BigDecimal(value)) == 0;
+    }
+
+    private static boolean isExactIntegerUnitRange(final String minValue, final String maxValue) {
+        final BigDecimal min = new BigDecimal(minValue);
+        final BigDecimal max = new BigDecimal(maxValue);
+        final BigDecimal maxConsecutiveInteger = new BigDecimal("16777216");
+        return min.compareTo(maxConsecutiveInteger.negate()) >= 0
+                && max.compareTo(maxConsecutiveInteger) <= 0;
     }
 
     private static boolean isIntegerLexicalValue(final String value) {

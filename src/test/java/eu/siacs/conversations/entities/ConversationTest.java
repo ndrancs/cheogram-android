@@ -242,6 +242,27 @@ public class ConversationTest {
     }
 
     @Test
+    public void steppedSliderStepRejectsFractionalIntegerValueAtFloatPrecisionBoundary() {
+        final var field = sliderField("xs:integer", "16777216", "16777218", "16777216.5");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepRejectsIntegerValueRoundedByFloatParsing() {
+        final var field = sliderField("xs:integer", "16777216", "16777218", "16777217");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepRejectsIntegerRangeWithUnrepresentableIntermediateValue() {
+        final var field = sliderField("xs:integer", "16777216", "16777218", "16777216");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
     public void formatSliderValueDoesNotClampLargeIntegerDatatypesToInt() {
         Assert.assertEquals("3000000000", Conversation.formatSliderValue(3_000_000_000f, "xs:long"));
     }
