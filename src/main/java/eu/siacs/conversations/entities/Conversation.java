@@ -1875,21 +1875,26 @@ public class Conversation extends AbstractEntity
         if (!isNumericDatatype(datatype)) return null;
 
         final Element range = validate.findChild("range", "http://jabber.org/protocol/xdata-validate");
-        final Float min = rangeFloat(range, "min");
-        final Float max = rangeFloat(range, "max");
+        final String minValue = range == null ? null : range.getAttribute("min");
+        final String maxValue = range == null ? null : range.getAttribute("max");
+        final boolean integerDatatype = isIntegerDatatype(datatype);
+        if (integerDatatype && (!isIntegerLexicalValue(minValue) || !isIntegerLexicalValue(maxValue))) return null;
+        final Float min = parseFloat(minValue);
+        final Float max = parseFloat(maxValue);
         if (min == null || max == null || min >= max) return null;
 
         final String value = firstValue(field);
         if (value == null || value.equals("")) return null;
+        if (integerDatatype && !isIntegerLexicalValue(value)) return null;
         final Float parsedValue = parseFloat(value);
         if (parsedValue == null || parsedValue < min || parsedValue > max) return null;
 
-        final List<Float> options = optionValues(field);
+        final List<Float> options = optionValues(field, integerDatatype);
         if (options == null) return null;
 
         final Float step;
         if (options.size() < 2) {
-            step = isIntegerDatatype(datatype) ? 1f : 0f;
+            step = integerDatatype ? 1f : 0f;
         } else {
             step = uniformStep(options);
             if (step == null) return null;
@@ -1923,10 +1928,12 @@ public class Conversation extends AbstractEntity
         return step;
     }
 
-    private static List<Float> optionValues(final Element field) {
+    private static List<Float> optionValues(final Element field, final boolean integerDatatype) {
         final List<Float> values = new ArrayList<>();
         for (final Option option : Option.forField(field)) {
-            final Float value = parseFloat(option.getValue());
+            final String optionValue = option.getValue();
+            if (integerDatatype && !isIntegerLexicalValue(optionValue)) return null;
+            final Float value = parseFloat(optionValue);
             if (value == null) return null;
             values.add(value);
         }
@@ -1959,6 +1966,16 @@ public class Conversation extends AbstractEntity
     private static boolean landsOnStep(final float value, final float min, final float step) {
         final double multiple = ((double) value - (double) min) / (double) step;
         return Math.abs(Math.rint(multiple) - multiple) < 0.0001f;
+    }
+
+    private static boolean isIntegerLexicalValue(final String value) {
+        if (value == null || value.equals("")) return false;
+        final int start = value.charAt(0) == '+' || value.charAt(0) == '-' ? 1 : 0;
+        if (start == value.length()) return false;
+        for (int i = start; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) return false;
+        }
+        return true;
     }
 
     private static boolean isIntegerDatatype(final String datatype) {

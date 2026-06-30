@@ -221,6 +221,27 @@ public class ConversationTest {
     }
 
     @Test
+    public void steppedSliderStepRejectsIntegerValueThatCannotLandOnStep() {
+        final var field = sliderField("xs:integer", "0", "10", "0.5");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepRejectsFractionalIntegerBounds() {
+        final var field = sliderField("xs:integer", "0.5", "10.5", "1.5");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
+    public void steppedSliderStepRejectsFractionalIntegerOptions() {
+        final var field = sliderField("xs:integer", "0", "1", "0", "0", "0.5", "1");
+
+        Assert.assertNull(Conversation.steppedSliderStep(field));
+    }
+
+    @Test
     public void formatSliderValueDoesNotClampLargeIntegerDatatypesToInt() {
         Assert.assertEquals("3000000000", Conversation.formatSliderValue(3_000_000_000f, "xs:long"));
     }
@@ -305,6 +326,23 @@ public class ConversationTest {
 
             Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(emptyValue).viewType);
             Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(missingValue).viewType);
+        } finally {
+            session.loadingTimer.cancel();
+        }
+    }
+
+    @Test
+    public void rangedIntegerFieldWithFractionalValuesFallsBackToTextInput() {
+        final var session = withOccupantId.pagerAdapter.new CommandSession(
+                "test", "node", mock(XmppConnectionService.class));
+        try {
+            session.responseElement = new Element("x", Namespace.DATA);
+            session.responseElement.setAttribute("type", "form");
+            final var fractionalBounds = sliderField("xs:integer", "0.5", "10.5", "1.5");
+            final var fractionalOptions = sliderField("xs:integer", "0", "1", "0", "0", "0.5", "1");
+
+            Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(fractionalBounds).viewType);
+            Assert.assertEquals(session.TYPE_TEXT_FIELD, session.mkField(fractionalOptions).viewType);
         } finally {
             session.loadingTimer.cancel();
         }
