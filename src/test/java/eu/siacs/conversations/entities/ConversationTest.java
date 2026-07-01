@@ -182,84 +182,82 @@ public class ConversationTest {
     }
 
     @Test
-    public void steppedSliderStepRejectsInRangeValueMissingFromOptionLattice() {
+    public void sliderSpecRejectsInRangeValueMissingFromOptionLattice() {
         final var field = sliderField("xs:integer", "0", "68", "7", "0", "34", "68");
 
-        Assert.assertNull(
-                "A value the option-derived slider cannot represent should fall back to text input",
-                Conversation.steppedSliderStep(field));
+        assertNotSlider("A value the option-derived slider cannot represent should fall back to text input", field);
     }
 
     @Test
-    public void steppedSliderStepAcceptsCompatibleOptionLattice() {
+    public void sliderSpecAcceptsCompatibleOptionLattice() {
         final var field = sliderField("xs:integer", "0", "70", "35", "0", "35", "70");
 
-        Assert.assertEquals(Float.valueOf(35f), Conversation.steppedSliderStep(field));
+        assertSliderStep(field, 35f);
     }
 
     @Test
-    public void steppedSliderStepUsesIntegerStepWithoutOptions() {
+    public void sliderSpecUsesIntegerStepWithoutOptions() {
         final var field = sliderField("xs:integer", "0", "10", "7");
 
-        Assert.assertEquals(Float.valueOf(1f), Conversation.steppedSliderStep(field));
+        assertSliderStep(field, 1f);
     }
 
     @Test
-    public void steppedSliderStepUsesContinuousStepWithoutOptionsForDecimal() {
+    public void sliderSpecUsesContinuousStepWithoutOptionsForDecimal() {
         final var field = sliderField("xs:decimal", "0", "1", "0.000001");
 
-        Assert.assertEquals(Float.valueOf(0f), Conversation.steppedSliderStep(field));
+        assertSliderStep(field, 0f);
     }
 
     @Test
-    public void steppedSliderStepRejectsMissingOrMalformedRangeBounds() {
+    public void sliderSpecRejectsMissingOrMalformedRangeBounds() {
         final var missingMin = sliderField("xs:integer", null, "10", "5");
         final var malformedMax = sliderField("xs:integer", "0", "not-a-number", "5");
 
-        Assert.assertNull(Conversation.steppedSliderStep(missingMin));
-        Assert.assertNull(Conversation.steppedSliderStep(malformedMax));
+        assertNotSlider(missingMin);
+        assertNotSlider(malformedMax);
     }
 
     @Test
-    public void steppedSliderStepRejectsIntegerValueThatCannotLandOnStep() {
+    public void sliderSpecRejectsIntegerValueThatCannotLandOnStep() {
         final var field = sliderField("xs:integer", "0", "10", "0.5");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
-    public void steppedSliderStepRejectsFractionalIntegerBounds() {
+    public void sliderSpecRejectsFractionalIntegerBounds() {
         final var field = sliderField("xs:integer", "0.5", "10.5", "1.5");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
-    public void steppedSliderStepRejectsFractionalIntegerOptions() {
+    public void sliderSpecRejectsFractionalIntegerOptions() {
         final var field = sliderField("xs:integer", "0", "1", "0", "0", "0.5", "1");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
-    public void steppedSliderStepRejectsFractionalIntegerValueAtFloatPrecisionBoundary() {
+    public void sliderSpecRejectsFractionalIntegerValueAtFloatPrecisionBoundary() {
         final var field = sliderField("xs:integer", "16777216", "16777218", "16777216.5");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
-    public void steppedSliderStepRejectsIntegerValueRoundedByFloatParsing() {
+    public void sliderSpecRejectsIntegerValueRoundedByFloatParsing() {
         final var field = sliderField("xs:integer", "16777216", "16777218", "16777217");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
-    public void steppedSliderStepRejectsIntegerRangeWithUnrepresentableIntermediateValue() {
+    public void sliderSpecRejectsIntegerRangeWithUnrepresentableIntermediateValue() {
         final var field = sliderField("xs:integer", "16777216", "16777218", "16777216");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
@@ -273,33 +271,33 @@ public class ConversationTest {
     }
 
     @Test
-    public void steppedSliderStepRejectsIncompatibleBounds() {
+    public void sliderSpecRejectsIncompatibleBounds() {
         final var field = sliderField("xs:integer", "0", "70", "34", "0", "34", "68");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
-    public void steppedSliderStepRejectsMalformedOptions() {
+    public void sliderSpecRejectsMalformedOptions() {
         final var field = sliderField("xs:integer", "0", "70", "35", "0", "not-a-number", "70");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
-    public void steppedSliderStepRejectsValuesOutsideRange() {
+    public void sliderSpecRejectsValuesOutsideRange() {
         final var below = sliderField("xs:integer", "0", "70", "-5", "0", "35", "70");
         final var above = sliderField("xs:integer", "0", "70", "999", "0", "35", "70");
 
-        Assert.assertNull(Conversation.steppedSliderStep(below));
-        Assert.assertNull(Conversation.steppedSliderStep(above));
+        assertNotSlider(below);
+        assertNotSlider(above);
     }
 
     @Test
-    public void steppedSliderStepRejectsDuplicateOptions() {
+    public void sliderSpecRejectsDuplicateOptions() {
         final var field = sliderField("xs:integer", "0", "70", "35", "0", "35", "35", "70");
 
-        Assert.assertNull(Conversation.steppedSliderStep(field));
+        assertNotSlider(field);
     }
 
     @Test
@@ -431,6 +429,20 @@ public class ConversationTest {
         } finally {
             session.loadingTimer.cancel();
         }
+    }
+
+    private static void assertSliderStep(final Element field, final float step) {
+        final var spec = Conversation.sliderSpec(field);
+        Assert.assertNotNull("Field should be usable as a slider", spec);
+        Assert.assertEquals(step, spec.step(), 0.0001f);
+    }
+
+    private static void assertNotSlider(final Element field) {
+        Assert.assertNull(Conversation.sliderSpec(field));
+    }
+
+    private static void assertNotSlider(final String message, final Element field) {
+        Assert.assertNull(message, Conversation.sliderSpec(field));
     }
 
     private static Element sliderField(

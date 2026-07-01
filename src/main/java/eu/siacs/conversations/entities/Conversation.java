@@ -1869,7 +1869,9 @@ public class Conversation extends AbstractEntity
         }
     }
 
-    static Float steppedSliderStep(final Element field) {
+    record SliderSpec(String datatype, float min, float max, float value, float step) {}
+
+    static SliderSpec sliderSpec(final Element field) {
         final Element validate = field.findChild("validate", "http://jabber.org/protocol/xdata-validate");
         final String datatype = validate == null ? null : validate.getAttribute("datatype");
         if (!isNumericDatatype(datatype)) return null;
@@ -1904,7 +1906,9 @@ public class Conversation extends AbstractEntity
             }
         }
         if (step == null || (step > 0f && !landsOnStep(max, min, step))) return null;
-        return step == 0f || landsOnStep(parsedValue, min, step) ? step : null;
+        return step == 0f || landsOnStep(parsedValue, min, step)
+                ? new SliderSpec(datatype, min, max, parsedValue, step)
+                : null;
     }
 
     static String formatSliderValue(final float value, final String datatype) {
@@ -1939,10 +1943,6 @@ public class Conversation extends AbstractEntity
             values.add(value);
         }
         return values;
-    }
-
-    private static Float rangeFloat(final Element range, final String name) {
-        return range == null ? null : parseFloat(range.getAttribute(name));
     }
 
     private static Float parseFloat(final String value) {
@@ -3059,34 +3059,23 @@ public class Conversation extends AbstractEntity
                 @Override
                 public void bind(Item item) {
                     final Field boundField = (Field) item;
-                    final Element validate = boundField.el.findChild("validate", "http://jabber.org/protocol/xdata-validate");
-                    final String datatype = validate == null ? null : validate.getAttribute("datatype");
-                    final Element range = validate == null ? null : validate.findChild("range", "http://jabber.org/protocol/xdata-validate");
-                    final Float step = steppedSliderStep(boundField.el);
-                    final Float min = rangeFloat(range, "min");
-                    final Float max = rangeFloat(range, "max");
-                    if (step == null || min == null || max == null) {
+                    final SliderSpec spec = sliderSpec(boundField.el);
+                    if (spec == null) {
                         throw new IllegalStateException("Invalid slider field bound to slider view holder");
-                    }
-
-                    float value = min;
-                    final Float parsedValue = parseFloat(firstValue(boundField.el));
-                    if (parsedValue != null && parsedValue >= min && parsedValue <= max) {
-                        value = parsedValue;
                     }
 
                     field = boundField;
                     binding.slider.clearOnChangeListeners();
                     setTextOrHide(binding.label, field.getLabel());
                     setTextOrHide(binding.desc, field.getDesc());
-                    binding.slider.setValueFrom(min);
-                    binding.slider.setValueTo(max);
-                    binding.slider.setValue(value);
-                    binding.slider.setStepSize(step);
+                    binding.slider.setValueFrom(spec.min());
+                    binding.slider.setValueTo(spec.max());
+                    binding.slider.setValue(spec.value());
+                    binding.slider.setStepSize(spec.step());
 
                     binding.slider.addOnChangeListener((slider, sliderValue, fromUser) -> {
                         if (!fromUser) return;
-                        field.setValues(List.of(formatSliderValue(sliderValue, datatype)));
+                        field.setValues(List.of(formatSliderValue(sliderValue, spec.datatype())));
                     });
                 }
             }
@@ -3278,7 +3267,7 @@ public class Conversation extends AbstractEntity
                             range != null && range.getAttribute("min") != null && range.getAttribute("max") != null && isNumericDatatype(datatype)
                         ) {
                             // has a range and is numeric, use a slider if it can represent every valid value
-                            viewType = steppedSliderStep(el) == null ? TYPE_TEXT_FIELD : TYPE_SLIDER_FIELD;
+                            viewType = sliderSpec(el) == null ? TYPE_TEXT_FIELD : TYPE_SLIDER_FIELD;
                         } else if (fieldType.equals("list-single")) {
                             if (fillableFieldCount == 1 && actionsAdapter.countProceed() < 1 && Option.forField(el).size() < 50) {
                                 viewType = TYPE_BUTTON_GRID_FIELD;
