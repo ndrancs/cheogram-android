@@ -51,7 +51,8 @@ public class AppSettings {
     public static final String COLORFUL_CHAT_BUBBLES = "use_green_background";
     public static final String LARGE_FONT = "large_font";
     public static final String SHOW_LINK_PREVIEWS = "show_link_previews";
-    public static final String SHOW_AVATARS = "show_avatars";
+    public static final String SHOW_AVATARS_11 = "show_avatars";
+    public static final String SHOW_AVATARS_ACCOUNTS = "show_avatars_accounts";
     public static final String CALL_INTEGRATION = "call_integration";
     public static final String ALIGN_START = "align_start";
     public static final String BACKUP_LOCATION = "backup_location";
@@ -127,8 +128,12 @@ public class AppSettings {
         return getBooleanPreference(SHOW_LINK_PREVIEWS, R.bool.show_link_previews);
     }
 
-    public boolean isShowAvatars() {
-        return getBooleanPreference(SHOW_AVATARS, R.bool.show_avatars);
+    public boolean isShowAvatars11() {
+        return getBooleanPreference(SHOW_AVATARS_11, R.bool.show_avatars);
+    }
+
+    public boolean isShowAvatarsAccounts() {
+        return getBooleanPreference(SHOW_AVATARS_ACCOUNTS, R.bool.show_avatars_accounts);
     }
 
     public boolean isCallIntegration() {
