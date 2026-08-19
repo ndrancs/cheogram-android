@@ -209,6 +209,8 @@ public class StylingHelper {
             return new StyleSpan(((StyleSpan) span).getStyle());
         } else if (span instanceof StrikethroughSpan) {
             return new StrikethroughSpan();
+        } else if (span instanceof RelativeSizeSpan) {
+            return new RelativeSizeSpan(((RelativeSizeSpan) span).getSizeChange());
         } else {
             throw new AssertionError("Unknown Span");
         }
