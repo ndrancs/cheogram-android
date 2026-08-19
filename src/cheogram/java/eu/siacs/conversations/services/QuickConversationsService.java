@@ -77,7 +77,7 @@ public class QuickConversationsService extends AbstractQuickConversationsService
     }
 
     protected static String getNumber(final Set<String> gateways, final Contact contact) {
-        final Jid jid = contact.getJid();
+        final Jid jid = contact.getAddress();
         if (jid.getLocal() != null && ("quicksy.im".equals(jid.getDomain()) || gateways.contains(jid.getDomain()))) {
             return jid.getLocal();
         }
@@ -124,7 +124,7 @@ public class QuickConversationsService extends AbstractQuickConversationsService
         return Stream.concat(
             account.getGateways("pstn").stream(),
             account.getGateways("sms").stream()
-        ).map(a -> a.getJid().asBareJid().toString()).collect(Collectors.toSet());
+        ).map(c -> c.getAddress().asBareJid().toString()).collect(Collectors.toSet());
     }
 
     protected boolean considerSync(final Account account, final Set<String> gateways, final Map<String, PhoneNumberContact> contacts, final boolean forced) {

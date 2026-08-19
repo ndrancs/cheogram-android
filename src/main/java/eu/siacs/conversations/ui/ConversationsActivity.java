@@ -272,7 +272,7 @@ public class ConversationsActivity extends XmppActivity
             for (final var c : conversations) {
                 if (selectedAccount == null || selectedAccount.getUuid().equals(c.getAccount().getUuid())) {
                     final var unread = c.unreadCount(xmppConnectionService);
-                    for (final var tag : c.getTags(this)) {
+                    for (final var tag : c.getTags()) {
                         if ("Channel".equals(tag.getName())) continue;
                         var count = tags.get(tag);
                         if (count == null) count = 0;
@@ -708,7 +708,7 @@ public class ConversationsActivity extends XmppActivity
 				retained.remove(c);
 				removed.add(c);
 			} else if (!selectedTag.isEmpty()) {
-				final var tags = new HashSet<>(c.getTags(this));
+				final var tags = new HashSet<>(c.getTags());
 				tags.retainAll(selectedTag);
 				if (tags.isEmpty()) {
 					retained.remove(c);
@@ -927,7 +927,7 @@ public class ConversationsActivity extends XmppActivity
 
         Set<String> pstnGateways = xmppConnectionService.getAccounts().stream()
             .flatMap(a -> a.getGateways("pstn").stream())
-            .map(a -> a.getJid().asBareJid().toString()).collect(Collectors.toSet());
+            .map(c -> c.getAddress().asBareJid().toString()).collect(Collectors.toSet());
 
         if (pstnGateways.size() < 1) return false;
         Set<String> fromPrefs = getPreferences().getStringSet("pstn_gateways", Set.of("UPGRADE"));
@@ -1284,7 +1284,7 @@ public class ConversationsActivity extends XmppActivity
                 account.getGateways("pstn").stream(),
                 account.getGateways("sms").stream()
             )
-        ).map(a -> a.getJid().asBareJid().toString()).collect(Collectors.toSet());
+        ).map(c -> c.getAddress().asBareJid().toString()).collect(Collectors.toSet());
 
         for (String gateway : gateways) {
             if (onXmppUriClicked(Uri.parse("xmpp:" + tel + "@" + gateway))) return true;
@@ -1484,7 +1484,7 @@ public class ConversationsActivity extends XmppActivity
             final Conversation conversation = conversationFragment.getConversation();
             if (conversation != null) {
                 actionBar.setTitle(conversation.getName());
-                actionBar.setDisplayHomeAsUpEnabled(!xmppConnectionService.isOnboarding() || !conversation.getJid().equals(Jid.of("cheogram.com")));
+                actionBar.setDisplayHomeAsUpEnabled(!xmppConnectionService.isOnboarding() || !conversation.getAddress().equals(Jid.of("cheogram.com")));
                 ToolbarUtils.setActionBarOnClickListener(
                         binding.toolbar,
                         (v) -> { if(!xmppConnectionService.isOnboarding()) openConversationDetails(conversation); }
@@ -1601,7 +1601,7 @@ public class ConversationsActivity extends XmppActivity
     public void onRosterUpdate(final XmppConnectionService.UpdateRosterReason reason, final Contact contact) {
         if (reason != XmppConnectionService.UpdateRosterReason.AVATAR) {
             refreshForNewCaps = true;
-            if (contact != null) newCapsJids.add(contact.getJid().asBareJid());
+            if (contact != null) newCapsJids.add(contact.getAddress().asBareJid());
         }
         this.refreshUi();
     }

@@ -413,7 +413,7 @@ public class CallIntegrationConnectionService extends ConnectionService {
         }*/
 
         for (Contact contact : id.account.getRoster().getContacts()) {
-            if (!contact.getJid().getDomain().equals(id.with.getDomain())) {
+            if (!contact.getAddress().getDomain().equals(id.with.getDomain())) {
                 continue;
             }
 

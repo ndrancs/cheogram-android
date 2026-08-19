@@ -195,7 +195,7 @@ public class UIHelper {
             final XmppConnectionService context, final Message message, @ColorInt int textColor) {
         final Transferable d = message.getTransferable();
         final boolean moderated = message.getModerated() != null;
-        final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && message.getConversation().getMode() == Conversation.MODE_MULTI && context.isMucUserMuted(new MucOptions.User(null, message.getConversation().getJid(), message.getOccupantId(), null, null));
+        final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && message.getConversation().getMode() == Conversation.MODE_MULTI && context.isMucUserMuted(new MucOptions.User(null, message.getConversation().getAddress(), message.getOccupantId(), null, null));
         if (muted) {
             return new Pair<>("Muted", false);
         } else if (d != null && !moderated) {
@@ -288,7 +288,7 @@ public class UIHelper {
                 if (textColor != 0 && processMarkup) {
                     StylingHelper.format(styledBody, 0, styledBody.length() - 1, textColor, false);
                 }
-                Linkify.addLinks(styledBody, message.getConversation().getAccount(), message.getConversation().getJid());
+                Linkify.addLinks(styledBody, message.getConversation().getAccount(), message.getConversation().getAddress());
 
                 for (final android.text.style.QuoteSpan quote : Lists.reverse(Lists.newArrayList(styledBody.getSpans(0, styledBody.length(), android.text.style.QuoteSpan.class)))) {
                     int start = styledBody.getSpanStart(quote);

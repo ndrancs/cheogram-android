@@ -74,6 +74,7 @@ import eu.siacs.conversations.utils.BackupFileHeader;
 import eu.siacs.conversations.utils.Compatibility;
 import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 
 public class ExportBackupService extends Worker {
 
@@ -403,7 +404,7 @@ public class ExportBackupService extends Worker {
             Element message = new Element("message", "jabber:client").setAttribute("type", conversation.getMode() == Conversation.MODE_MULTI ? "groupchat" : "chat");
             final var sender = cursor.getString(cursor.getColumnIndex("sender"));
             message.setAttribute("from", sender);
-            message.setAttribute("to", !account.getJid().toString().equals(sender) && conversation.getMode() != Conversation.MODE_MULTI ? account.getJid() : conversation.getJid());
+            message.setAttribute("to", !account.getJid().toString().equals(sender) && conversation.getMode() != Conversation.MODE_MULTI ? account.getJid() : conversation.getAddress());
             final var info = cursor.getString(cursor.getColumnIndex("info"));
             if (info != null) message.addChild(new Element("body").setContent(info));
             final var thread = cursor.getString(cursor.getColumnIndex("thread"));
@@ -499,10 +500,11 @@ public class ExportBackupService extends Worker {
 
             final var bookmarks = new Element("pubsub", "http://jabber.org/protocol/pubsub#owner");
             final var bookmarksItems = new Element("items").setAttribute("node", "urn:xmpp:bookmarks:1");
-            for (final var bookmark : account.getBookmarks()) {
-                 bookmark.setAttribute("xmlns", "urn:xmpp:bookmarks:1");
-                 final var item = new Element("item").setAttribute("id", bookmark.getJid().toString());
-                 item.addChild(bookmark);
+            final var accountBookmarks = account.getXmppConnection().getManager(BookmarkManager.class);
+            for (final var bookmark : accountBookmarks.getBookmarks()) {
+                 final var bitem = eu.siacs.conversations.xmpp.manager.NativeBookmarkManager.bookmarkToItem(bookmark);
+                 final var item = new Element("item").setAttribute("id", bookmark.getAddress().toString());
+                 item.addChild(bitem);
                  bookmarksItems.addChild(item);
             }
             bookmarks.addChild(bookmarksItems);

@@ -1578,7 +1578,7 @@ public class NotificationService {
             builder.setName(UIHelper.getMessageDisplayName(message));
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            final Jid jid = contact == null ? message.getCounterpart() : contact.getJid();
+            final Jid jid = contact == null ? message.getCounterpart() : contact.getAddress();
             builder.setKey(jid.toString());
             final Conversation c = mXmppConnectionService.find(message.getConversation().getAccount(), jid);
             if (c != null) {
@@ -1605,7 +1605,7 @@ public class NotificationService {
             builder.setUri(uri.toString());
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            final Jid jid = contact.getJid();
+            final Jid jid = contact.getAddress();
             builder.setKey(jid.toString());
             final Conversation c = mXmppConnectionService.find(contact.getAccount(), jid);
             if (c != null) {
@@ -1938,7 +1938,7 @@ public class NotificationService {
         if (message.getConversation() instanceof Conversation) {
             Conversation conversation = (Conversation) message.getConversation();
             final MucOptions.User sender = conversation.getMucOptions().findUserByFullJid(message.getCounterpart());
-            final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && mXmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getJid(), message.getOccupantId(), null, null));
+            final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && mXmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getAddress(), message.getOccupantId(), null, null));
             if (muted) return false;
             if (sender != null && sender.ranks(Affiliation.MEMBER) && message.isAttention()) {
                 return true;

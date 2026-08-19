@@ -70,11 +70,9 @@ import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.databinding.ActivityStartConversationBinding;
 import eu.siacs.conversations.entities.Account;
-import eu.siacs.conversations.entities.Bookmark;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.ListItem;
-import eu.siacs.conversations.entities.MucOptions;
 import eu.siacs.conversations.services.QuickConversationsService;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.services.XmppConnectionService.OnRosterUpdate;
@@ -96,6 +94,9 @@ import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
 import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.forms.Data;
 
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
+import im.conversations.android.model.Bookmark;
+import im.conversations.android.model.ImmutableBookmark;
 import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -538,7 +539,7 @@ public class StartConversationActivity extends XmppActivity
     protected void openConversationForContact(Contact contact) {
         Conversation conversation =
                 xmppConnectionService.findOrCreateConversation(
-                        contact.getAccount(), contact.getJid(), false, true);
+                        contact.getAccount(), contact.getAddress(), false, true);
         SoftKeyboardUtils.hideSoftKeyboard(this);
         switchToConversation(conversation);
     }
@@ -549,12 +550,12 @@ public class StartConversationActivity extends XmppActivity
     }
 
     protected void shareBookmarkUri() {
-        shareAsChannel(this, contextItem.getJid().asBareJid().toString());
+        shareAsChannel(this, contextItem.getAddress().asBareJid().toString());
     }
 
     protected void shareBookmarkUri(int position) {
         Bookmark bookmark = (Bookmark) conferences.get(position);
-        shareAsChannel(this, bookmark.getJid().asBareJid().toString());
+        shareAsChannel(this, bookmark.getAddress().asBareJid().toString());
     }
 
     public static void shareAsChannel(final Context context, final String address) {
@@ -571,18 +572,18 @@ public class StartConversationActivity extends XmppActivity
         }
     }
 
-    protected void openConversationsForBookmark(final Bookmark bookmark) {
-        final Jid jid = bookmark.getFullJid();
+    protected void openConversationsForBookmark(final Bookmark existing) {
+        final var account = existing.getAccount();
+        final Jid jid = existing.getFullAddress();
         if (jid == null) {
             Toast.makeText(this, R.string.invalid_jid, Toast.LENGTH_SHORT).show();
             return;
         }
         final Conversation conversation =
-                xmppConnectionService.findOrCreateConversation(
-                        bookmark.getAccount(), jid, true, true, true);
-        bookmark.setConversation(conversation);
-        if (!bookmark.autojoin()) {
-            bookmark.setAutojoin(true);
+                xmppConnectionService.findOrCreateConversation(account, jid, true, true, true);
+        if (!existing.isAutoJoin()) {
+            final var bookmark =
+                    ImmutableBookmark.builder().from(existing).isAutoJoin(true).build();
             xmppConnectionService.createBookmark(bookmark.getAccount(), bookmark);
         }
         SoftKeyboardUtils.hideSoftKeyboard(this);
@@ -594,7 +595,7 @@ public class StartConversationActivity extends XmppActivity
     }
 
     protected void showQrForContact() {
-        showQrCode("xmpp:" + contextItem.getJid().asBareJid().toString());
+        showQrCode("xmpp:" + Uri.encode(contextItem.getAddress().asBareJid().toString(), "@/+"));
     }
 
     protected void toggleContactBlock() {
@@ -607,7 +608,8 @@ public class StartConversationActivity extends XmppActivity
         builder.setNegativeButton(R.string.cancel, null);
         builder.setTitle(R.string.action_delete_contact);
         builder.setMessage(
-                JidDialog.style(this, R.string.remove_contact_text, contact.getJid().toString()));
+                JidDialog.style(
+                        this, R.string.remove_contact_text, contact.getAddress().toString()));
         builder.setPositiveButton(
                 R.string.delete,
                 (dialog, which) -> {
@@ -619,7 +621,7 @@ public class StartConversationActivity extends XmppActivity
 
     protected void deleteConference() {
         final Bookmark bookmark = (Bookmark) contextItem;
-        final var conversation = bookmark.getConversation();
+        final var conversation = xmppConnectionService.find(bookmark);
         final boolean hasConversation = conversation != null;
         final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
         builder.setNegativeButton(R.string.cancel, null);
@@ -629,15 +631,15 @@ public class StartConversationActivity extends XmppActivity
                     JidDialog.style(
                             this,
                             R.string.remove_bookmark_and_close,
-                            bookmark.getJid().toString()));
+                            bookmark.getAddress().toString()));
         } else {
             builder.setMessage(
-                    JidDialog.style(this, R.string.remove_bookmark, bookmark.getJid().toString()));
+                    JidDialog.style(
+                            this, R.string.remove_bookmark, bookmark.getAddress().toString()));
         }
         builder.setPositiveButton(
                 hasConversation ? R.string.delete_and_close : R.string.delete,
                 (dialog, which) -> {
-                    bookmark.setConversation(null);
                     final Account account = bookmark.getAccount();
                     xmppConnectionService.deleteBookmark(account, bookmark);
                     if (conversation != null) {
@@ -692,20 +694,22 @@ public class StartConversationActivity extends XmppActivity
                 runOnUiThread(() -> {
                     if (isMuc) {
                         if (save) {
-                            Bookmark bookmark = account.getBookmark(contactJid);
-                            if (bookmark != null) {
-                                openConversationsForBookmark(bookmark);
+                            final var existingBookmark = account.getXmppConnection().getManager(BookmarkManager.class).getBookmark(contactJid);
+                            if (existingBookmark != null) {
+                                openConversationsForBookmark(existingBookmark);
                             } else {
-                                bookmark = new Bookmark(account, contactJid.asBareJid());
-                                bookmark.setAutojoin(getBooleanPreference("autojoin", R.bool.autojoin));
-                                final String nick = contactJid.getResource();
-                                if (nick != null && !nick.isEmpty() && !nick.equals(MucOptions.defaultNick(account))) {
-                                    bookmark.setNick(nick);
-                                }
+                                final String nick = Bookmark.nickOfAddress(account, contactJid);
+                                final var bookmark =
+                                        ImmutableBookmark.builder()
+                                                .account(account)
+                                                .address(contactJid.asBareJid())
+                                                .nick(nick)
+                                                .isAutoJoin(getBooleanPreference("autojoin", R.bool.autojoin))
+                                                .build();
                                 xmppConnectionService.createBookmark(account, bookmark);
-                                final Conversation conversation = xmppConnectionService
-                                        .findOrCreateConversation(account, contactJid, true, true, true);
-                                bookmark.setConversation(conversation);
+                                final Conversation conversation =
+                                        xmppConnectionService.findOrCreateConversation(
+                                                account, contactJid, true, true, true);
                                 switchToConversationDoNotAppend(conversation, invite == null ? null : invite.getBody());
                             }
                         } else {
@@ -796,7 +800,7 @@ public class StartConversationActivity extends XmppActivity
     protected void switchToConversation(Contact contact) {
         Conversation conversation =
                 xmppConnectionService.findOrCreateConversation(
-                        contact.getAccount(), contact.getJid(), false, true);
+                        contact.getAccount(), contact.getAddress(), false, true);
         switchToConversation(conversation);
     }
 
@@ -807,7 +811,7 @@ public class StartConversationActivity extends XmppActivity
     protected void switchToConversationDoNotAppend(Contact contact, String body, String postInit) {
         Conversation conversation =
                 xmppConnectionService.findOrCreateConversation(
-                        contact.getAccount(), contact.getJid(), false, true);
+                        contact.getAccount(), contact.getAddress(), false, true);
         switchToConversation(conversation, body, false, null, false, true, postInit);
     }
 
@@ -1297,7 +1301,7 @@ public class StartConversationActivity extends XmppActivity
                 JidDialog.style(
                         this,
                         R.string.verifying_omemo_keys_trusted_source,
-                        contact.getJid().asBareJid().toString(),
+                        contact.getAddress().asBareJid().toString(),
                         contact.getDisplayName()));
         builder.setView(view);
         builder.setPositiveButton(
@@ -1337,28 +1341,28 @@ public class StartConversationActivity extends XmppActivity
             for (Contact contact : account.getRoster().getContacts()) {
                 final var s = contact.getShownStatus();
                 if (contact.showInContactList()
-                    && contact.match(this, needle)
+                    && contact.match(needle)
                     && (!this.mHideOfflineContacts
                         || (needle != null && !needle.trim().isEmpty())
                         || s.compareTo(Presence.Availability.OFFLINE) < 0)) {
                     this.contacts.add(contact);
-                    tags.addAll(contact.getTags(this));
+                    tags.addAll(contact.getTags());
                 }
             }
 
             final Contact self = new Contact(account.getSelfContact());
             self.setSystemName("Note to Self");
-            if (self.match(this, needle)) {
+            if (self.match(needle)) {
                 this.contacts.add(self);
             }
 
-            for (Bookmark bookmark : account.getBookmarks()) {
-                if (bookmark.match(this, needle)) {
-                    if (bookmark.getJid().toString().equals("discuss@conference.soprani.ca")) {
+            for (Bookmark bookmark : account.getXmppConnection().getManager(BookmarkManager.class).getBookmarks()) {
+                if (bookmark.match(needle)) {
+                    if (bookmark.getAddress().toString().equals("discuss@conference.soprani.ca")) {
                         foundSopranica = true;
                     }
                     this.contacts.add(bookmark);
-                    tags.addAll(bookmark.getTags(this));
+                    tags.addAll(bookmark.getTags());
                 }
             }
         }
@@ -1378,12 +1382,11 @@ public class StartConversationActivity extends XmppActivity
         final boolean sopranicaDeleted = getPreferences().getBoolean("cheogram_sopranica_bookmark_deleted", false);
 
         if (!sopranicaDeleted && !foundSopranica && (needle == null || needle.equals("")) && xmppConnectionService.getAccounts().size() > 0) {
-            Bookmark bookmark = new Bookmark(
-                xmppConnectionService.getAccounts().get(0),
-                Jid.of("discuss@conference.soprani.ca")
-            );
-            bookmark.setBookmarkName("Soprani.ca / Cheogram Discussion");
-            bookmark.addChild("group").setContent("support");
+            final var bookmark = ImmutableBookmark.builder()
+                                                  .account(xmppConnectionService.getAccounts().get(0))
+                                                  .address(Jid.of("discuss@conference.soprani.ca"))
+                                                  .name("Soprani.ca / Cheogram Discussion")
+                                                  .build().withTags(List.of("support"));
             this.contacts.add(0, bookmark);
         }
 
@@ -1394,8 +1397,11 @@ public class StartConversationActivity extends XmppActivity
         this.conferences.clear();
         for (final Account account : xmppConnectionService.getAccounts()) {
             if (account.isEnabled()) {
-                for (final Bookmark bookmark : account.getBookmarks()) {
-                    if (bookmark.match(this, needle)) {
+                for (final Bookmark bookmark :
+                        account.getXmppConnection()
+                                .getManager(BookmarkManager.class)
+                                .getBookmarks()) {
+                    if (bookmark.match(needle)) {
                         this.conferences.add(bookmark);
                     }
                 }
@@ -1490,21 +1496,25 @@ public class StartConversationActivity extends XmppActivity
                 return;
             }
         }
-        final var existingBookmark = account.getBookmark(conferenceJid);
+        final var existingBookmark =
+                account.getXmppConnection()
+                        .getManager(BookmarkManager.class)
+                        .getBookmark(conferenceJid);
         if (existingBookmark != null) {
             openConversationsForBookmark(existingBookmark);
         } else {
-            final var bookmark = new Bookmark(account, conferenceJid.asBareJid());
-            bookmark.setAutojoin(true);
-            final String nick = conferenceJid.getResource();
-            if (nick != null && !nick.isEmpty() && !nick.equals(MucOptions.defaultNick(account))) {
-                bookmark.setNick(nick);
-            }
+            final String nick = Bookmark.nickOfAddress(account, conferenceJid);
+            final var bookmark =
+                    ImmutableBookmark.builder()
+                            .account(account)
+                            .address(conferenceJid.asBareJid())
+                            .nick(nick)
+                            .isAutoJoin(true)
+                            .build();
             xmppConnectionService.createBookmark(account, bookmark);
             final Conversation conversation =
                     xmppConnectionService.findOrCreateConversation(
                             account, conferenceJid, true, true, null, true, password);
-            bookmark.setConversation(conversation);
             switchToConversation(conversation);
         }
         dialog.dismiss();
@@ -1611,7 +1621,7 @@ public class StartConversationActivity extends XmppActivity
             if (activity.contextItem instanceof Bookmark) {
                 activity.getMenuInflater().inflate(R.menu.conference_context, menu);
                 final Bookmark bookmark = (Bookmark) activity.contextItem;
-                final Conversation conversation = bookmark.getConversation();
+                final var conversation = activity.xmppConnectionService.find(bookmark);
                 final MenuItem share = menu.findItem(R.id.context_share_uri);
                 final MenuItem delete = menu.findItem(R.id.context_delete_conference);
                 if (conversation != null) {

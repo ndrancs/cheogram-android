@@ -147,11 +147,11 @@ public class Presences {
         final Set<Jid> jids = new HashSet<>();
         synchronized (this.presences) {
             for (var resource : this.presences.keySet()) {
-                final var jid = Strings.isNullOrEmpty(resource) ? contact.getJid().asBareJid() : contact.getJid().withResource(resource);
+                final var jid = Strings.isNullOrEmpty(resource) ? contact.getAddress().asBareJid() : contact.getAddress().withResource(resource);
                 jids.add(jid);
             }
         }
-        jids.add(contact.getJid().asBareJid());
+        jids.add(contact.getAddress().asBareJid());
         return jids;
     }
 
@@ -167,8 +167,8 @@ public class Presences {
                                 .getManager(DiscoManager.class)
                                 .get(
                                         Strings.isNullOrEmpty(resource)
-                                                ? contact.getJid().asBareJid()
-                                                : contact.getJid().withResource(resource));
+                                                ? contact.getAddress().asBareJid()
+                                                : contact.getAddress().withResource(resource));
                 if (disco == null || !disco.getFeatureStrings().contains(namespace)) {
                     return false;
                 }
@@ -237,8 +237,8 @@ public class Presences {
                                 .getManager(DiscoManager.class)
                                 .get(
                                         Strings.isNullOrEmpty(resource)
-                                                ? contact.getJid().asBareJid()
-                                                : contact.getJid().withResource(resource));
+                                                ? contact.getAddress().asBareJid()
+                                                : contact.getAddress().withResource(resource));
                 if (serviceDiscoveryResult != null
                         && !serviceDiscoveryResult.getIdentities().isEmpty()) {
                     final Identity identity =

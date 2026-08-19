@@ -141,8 +141,8 @@ public abstract class AbstractParser extends XmppConnection.Delegate {
     }
 
     public static MucOptions.User parseItem(final Conversation conference, Element item, Jid fullJid, final Element occupantId, final String nicknameIn, final Element hatsEl) {
-        final String local = conference.getJid().getLocal();
-        final String domain = conference.getJid().getDomain().toString();
+        final String local = conference.getAddress().getLocal();
+        final String domain = conference.getAddress().getDomain().toString();
         String affiliation = item.getAttribute("affiliation");
         String role = item.getAttribute("role");
         String nick = item.getAttribute("nick");

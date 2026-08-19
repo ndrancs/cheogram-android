@@ -1,7 +1,5 @@
 package eu.siacs.conversations.entities;
 
-import static eu.siacs.conversations.entities.Bookmark.printableValue;
-
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -92,6 +90,26 @@ import io.ipfs.cid.Cid;
 
 import io.michaelrocks.libphonenumber.android.NumberParseException;
 
+import eu.siacs.conversations.Config;
+import eu.siacs.conversations.crypto.OmemoSetting;
+import eu.siacs.conversations.crypto.PgpDecryptionService;
+import eu.siacs.conversations.persistance.DatabaseBackend;
+import eu.siacs.conversations.services.AvatarService;
+import eu.siacs.conversations.services.QuickConversationsService;
+import eu.siacs.conversations.utils.JidHelper;
+import eu.siacs.conversations.utils.MessageUtils;
+import eu.siacs.conversations.utils.UIHelper;
+import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.chatstate.ChatState;
+import eu.siacs.conversations.xmpp.mam.MamReference;
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
+import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
+import im.conversations.android.model.Bookmark;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -174,7 +192,7 @@ import eu.siacs.conversations.xmpp.mam.MamReference;
 import im.conversations.android.xmpp.model.stanza.Iq;
 
 public class Conversation extends AbstractEntity
-        implements Blockable, Comparable<Conversation>, Conversational, AvatarService.Avatarable {
+        implements Blockable, Comparable<Conversation>, Conversational, AvatarService.Avatar {
 
     public static final String TAG = "eu.siacs.conversations.entities.Conversation";
     public static final String TABLENAME = "conversations";
@@ -239,7 +257,6 @@ public class Conversation extends AbstractEntity
     private int mode;
     private final JSONObject attributes;
     private Jid nextCounterpart;
-    private final transient AtomicReference<MucOptions> mucOptions = new AtomicReference<>();
     private transient ConcurrentMap<
         MucOptions.User.OccupantId, MucOptions.User.CacheEntry
     > mucOccupantCache = new ConcurrentHashMap<>();
@@ -333,13 +350,13 @@ public class Conversation extends AbstractEntity
     }
 
     private static boolean suitableForOmemoByDefault(final Conversation conversation) {
-        if (conversation.getJid().asBareJid().equals(Config.BUG_REPORTS)) {
+        if (conversation.getAddress().asBareJid().equals(Config.BUG_REPORTS)) {
             return false;
         }
         if (conversation.getContact().isOwnServer()) {
             return false;
         }
-        final String contact = conversation.getJid().getDomain().toString();
+        final String contact = conversation.getAddress().getDomain().toString();
         final String account = conversation.getAccount().getServer();
         if (Config.OMEMO_EXCEPTIONS.matchesContactDomain(contact)
                 || Config.OMEMO_EXCEPTIONS.ACCOUNT_DOMAINS.contains(account)) {
@@ -903,8 +920,8 @@ public class Conversation extends AbstractEntity
 
     @Override
     @NonNull
-    public Jid getBlockedJid() {
-        return getContact().getBlockedJid();
+    public Jid getBlockedAddress() {
+        return getContact().getBlockedAddress();
     }
 
     public int countMessages() {
@@ -935,7 +952,7 @@ public class Conversation extends AbstractEntity
 
     public List<Jid> getAcceptedCryptoTargets() {
         if (mode == MODE_SINGLE) {
-            return Collections.singletonList(getJid().asBareJid());
+            return Collections.singletonList(getAddress().asBareJid());
         } else {
             return getJidListAttribute(ATTRIBUTE_CRYPTO_TARGETS);
         }
@@ -1052,6 +1069,12 @@ public class Conversation extends AbstractEntity
 
     public Message getLatestMessage() {
         synchronized (this.messages) {
+            if (this.messages.isEmpty()) {
+                Message message = new Message(this, "", Message.ENCRYPTION_NONE);
+                message.setType(Message.TYPE_STATUS);
+                message.setTime(Math.max(getCreated(), getLastClearHistory().getTimestamp()));
+                return message;
+            }
             for (int i = messages.size() - 1; i >= 0; --i) {
                 final Message message = messages.get(i);
                 if (message.getSubject() != null && !message.isOOb() && (message.getRawBody() == null || message.getRawBody().length() == 0)) continue;
@@ -1070,24 +1093,7 @@ public class Conversation extends AbstractEntity
 
     public @NonNull CharSequence getName() {
         if (getMode() == MODE_MULTI) {
-            final String roomName = getMucOptions().getName();
-            final String subject = getMucOptions().getSubject();
-            final Bookmark bookmark = getBookmark();
-            final String bookmarkName = bookmark != null ? bookmark.getBookmarkName() : null;
-            if (printableValue(roomName)) {
-                return roomName;
-            } else if (printableValue(subject)) {
-                return subject;
-            } else if (printableValue(bookmarkName, false)) {
-                return bookmarkName;
-            } else {
-                final String generatedName = getMucOptions().createNameFromParticipants();
-                if (printableValue(generatedName)) {
-                    return generatedName;
-                } else {
-                    return contactJid.getLocal() != null ? contactJid.getLocal() : contactJid;
-                }
-            }
+            return getName(getMucOptions(), getBookmark());
         } else if ((QuickConversationsService.isConversations()
                         || !Config.QUICKSY_DOMAIN.equals(contactJid.getDomain()))
                 && isWithStranger()) {
@@ -1097,12 +1103,37 @@ public class Conversation extends AbstractEntity
         }
     }
 
-    public List<Tag> getTags(final Context ctx) {
+    public static String getName(final MucOptions mucOptions, @Nullable final Bookmark bookmark) {
+        final String roomName = mucOptions.getName();
+        final String subject = mucOptions.getSubject();
+        final String bookmarkName = bookmark != null ? bookmark.getName() : null;
+        if (Bookmark.printableValue(roomName)) {
+            return roomName;
+        } else if (Bookmark.printableValue(subject)) {
+            return subject;
+        } else if (Bookmark.printableValue(bookmarkName)) {
+            return bookmarkName;
+        } else {
+            final String generatedName = mucOptions.createNameFromParticipants();
+            if (Bookmark.printableValue(generatedName)) {
+                return generatedName;
+            } else {
+                final var address = mucOptions.getConversation().getAddress();
+                if (address.isDomainJid()) {
+                    return address.toString();
+                } else {
+                    return address.getLocal();
+                }
+            }
+        }
+    }
+
+    public Collection<Tag> getTags() {
         if (getMode() == MODE_MULTI) {
             if (getBookmark() == null) return new ArrayList<>();
-            return getBookmark().getTags(ctx);
+            return getBookmark().getTags();
         } else {
-            return getContact().getTags(ctx);
+            return getContact().getTags();
         }
     }
 
@@ -1123,7 +1154,7 @@ public class Conversation extends AbstractEntity
     }
 
     @Override
-    public Jid getJid() {
+    public Jid getAddress() {
         return this.contactJid;
     }
 
@@ -1172,16 +1203,11 @@ public class Conversation extends AbstractEntity
         return getMucOptions().isPrivateAndNonAnonymous();
     }
 
-    public @NonNull MucOptions getMucOptions() {
-        return this.mucOptions.updateAndGet(
-            existing -> existing != null ? existing : new MucOptions(this)
-        );
-    }
-
-    public @NonNull MucOptions resetMucOptions() {
-        return this.mucOptions.updateAndGet(
-            ignoredExisting -> new MucOptions(this)
-        );
+    public synchronized MucOptions getMucOptions() {
+        return getAccount()
+                .getXmppConnection()
+                .getManager(MultiUserChatManager.class)
+                .getOrCreateState(this);
     }
 
     public void setContactJid(final Jid jid) {
@@ -1324,7 +1350,10 @@ public class Conversation extends AbstractEntity
     }
 
     public Bookmark getBookmark() {
-        return this.account.getBookmark(this.contactJid);
+        return this.account
+                .getXmppConnection()
+                .getManager(BookmarkManager.class)
+                .getBookmark(this.contactJid);
     }
 
     public Message findDuplicateMessage(Message message) {
@@ -1689,7 +1718,7 @@ public class Conversation extends AbstractEntity
                 if (message.getSubject() != null && !message.isOOb() && (message.getRawBody() == null || message.getRawBody().length() == 0)) continue;
                 if (asReaction(message) != null) continue;
                 if ((message.getRawBody() == null || "".equals(message.getRawBody()) || " ".equals(message.getRawBody())) && message.getReply() != null && message.edited() && message.getHtml() != null) continue;
-                final boolean muted = xmppConnectionService != null && message.getStatus() == Message.STATUS_RECEIVED && getMode() == Conversation.MODE_MULTI && xmppConnectionService.isMucUserMuted(new MucOptions.User(null, getJid(), message.getOccupantId(), null, null));
+                final boolean muted = xmppConnectionService != null && message.getStatus() == Message.STATUS_RECEIVED && getMode() == Conversation.MODE_MULTI && xmppConnectionService.isMucUserMuted(new MucOptions.User(null, getAddress(), message.getOccupantId(), null, null));
                 if (muted) continue;
                 if (message.isRead()) {
                     if (message.getType() == Message.TYPE_RTP_SESSION) {
@@ -1749,7 +1778,8 @@ public class Conversation extends AbstractEntity
                 && !contact.isOwnServer()
                 && !contact.showInContactList()
                 && !contact.isSelf()
-                && !(contact.getJid().isDomainJid() && JidHelper.isQuicksyDomain(contact.getJid()))
+                && !(contact.getAddress().isDomainJid()
+                        && JidHelper.isQuicksyDomain(contact.getAddress()))
                 && sentMessagesCount() == 0;
     }
 
@@ -2168,7 +2198,7 @@ public class Conversation extends AbstractEntity
         public void startMucConfig(XmppConnectionService xmppConnectionService) {
             MucConfigSession session = new MucConfigSession(xmppConnectionService);
             final var packet = new Iq(Iq.Type.GET);
-            packet.setTo(Conversation.this.getJid().asBareJid());
+            packet.setTo(Conversation.this.getAddress().asBareJid());
             packet.addChild("query", "http://jabber.org/protocol/muc#owner");
 
             final TimerTask task = new TimerTask() {

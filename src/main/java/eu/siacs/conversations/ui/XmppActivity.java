@@ -870,7 +870,7 @@ public abstract class XmppActivity extends ActionBarActivity {
         Intent intent = new Intent(this, ContactDetailsActivity.class);
         intent.setAction(ContactDetailsActivity.ACTION_VIEW_CONTACT);
         intent.putExtra(EXTRA_ACCOUNT, contact.getAccount().getJid().asBareJid().toString());
-        intent.putExtra("contact", contact.getJid().toString());
+        intent.putExtra("contact", contact.getAddress().toString());
         intent.putExtra("fingerprint", messageFingerprint);
         startActivity(intent);
     }
@@ -1028,7 +1028,7 @@ public abstract class XmppActivity extends ActionBarActivity {
 
     protected void showAddToRosterDialog(final Contact contact) {
         final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
-        builder.setTitle(contact.getJid().toString());
+        builder.setTitle(contact.getAddress().toString());
         builder.setMessage(getString(R.string.not_in_roster));
         builder.setNegativeButton(getString(R.string.cancel), null);
         builder.setPositiveButton(getString(R.string.add_contact), (dialog, which) -> {
@@ -1040,7 +1040,7 @@ public abstract class XmppActivity extends ActionBarActivity {
 
     private void showAskForPresenceDialog(final Contact contact) {
         final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
-        builder.setTitle(contact.getJid().toString());
+        builder.setTitle(contact.getAddress().toString());
         builder.setMessage(R.string.request_presence_updates);
         builder.setNegativeButton(R.string.cancel, null);
         builder.setPositiveButton(
@@ -1049,7 +1049,7 @@ public abstract class XmppActivity extends ActionBarActivity {
                     final var connection = contact.getAccount().getXmppConnection();
                     connection
                             .getManager(PresenceManager.class)
-                            .subscribe(contact.getJid().asBareJid());
+                            .subscribe(contact.getAddress().asBareJid());
                 });
         builder.create().show();
     }
@@ -1406,7 +1406,7 @@ public abstract class XmppActivity extends ActionBarActivity {
                 }
                 return false;
             } else {
-                jids.add(conversation.getJid().asBareJid());
+                jids.add(conversation.getAddress().asBareJid());
                 return service.createAdhocConference(
                         conversation.getAccount(), null, jids, activity.adhocCallback);
             }

@@ -194,7 +194,7 @@ public class MucOptions {
                     !identities.isEmpty()
                             ? Iterables.getFirst(identities, null).getIdentityName()
                             : null;
-            final Jid jid = conversation.getJid();
+            final Jid jid = conversation.getAddress();
             if (identityName != null && !identityName.equals(jid == null ? null : jid.getLocal())) {
                 return identityName;
             } else {
@@ -211,7 +211,7 @@ public class MucOptions {
     }
 
     public String getAvatar() {
-        return account.getRoster().getContact(conversation.getJid()).getAvatar();
+        return account.getRoster().getContact(conversation.getAddress()).getAvatar();
     }
 
     public boolean hasFeature(String feature) {
@@ -497,7 +497,7 @@ public class MucOptions {
     }
 
     public boolean isContactInRoom(Contact contact) {
-        return contact != null && isUserInRoom(findUserByRealJid(contact.getJid().asBareJid()));
+        return contact != null && isUserInRoom(findUserByRealJid(contact.getAddress().asBareJid()));
     }
 
     public boolean isUserInRoom(Jid jid) {
@@ -609,12 +609,12 @@ public class MucOptions {
     }
 
     private String getProposedNick(final String mucNick) {
-        final Bookmark bookmark = this.conversation.getBookmark();
+        final var bookmark = this.conversation.getBookmark();
         if (bookmark != null) {
             // if we already have a bookmark we consider this the source of truth
             return getProposedNickPure();
         }
-        final var storedJid = conversation.getJid();
+        final var storedJid = conversation.getAddress();
         if (mucNick != null) {
             return mucNick;
         } else if (storedJid.isBareJid()) {
@@ -625,7 +625,7 @@ public class MucOptions {
     }
 
     public String getProposedNickPure() {
-        final Bookmark bookmark = this.conversation.getBookmark();
+        final var bookmark = this.conversation.getBookmark();
         final String bookmarkedNick =
                 normalize(account.getJid(), bookmark == null ? null : bookmark.getNick());
         if (bookmarkedNick != null) {
@@ -687,14 +687,6 @@ public class MucOptions {
 
     public void setOnRenameListener(OnRenameListener listener) {
         this.onRenameListener = listener;
-    }
-
-    public void setOffline() {
-        synchronized (users) {
-            this.users.clear();
-        }
-        this.error = Error.NO_RESPONSE;
-        this.isOnline = false;
     }
 
     public User getSelf() {
@@ -795,7 +787,7 @@ public class MucOptions {
 
     private Jid createJoinJid(String nick, boolean tryFix) {
         try {
-            return conversation.getJid().withResource(nick);
+            return conversation.getAddress().withResource(nick);
         } catch (final IllegalArgumentException e) {
             try {
                 return tryFix ? createJoinJid(gnu.inet.encoding.Punycode.encode(nick), false) : null;
@@ -824,12 +816,8 @@ public class MucOptions {
         }
     }
 
-    public void setPassword(String password) {
-        if (conversation.getBookmark() != null) {
-            conversation.getBookmark().setPassword(password);
-        } else {
-            this.password = password;
-        }
+    public void setPassword(final String password) {
+        this.password = password;
         conversation.setAttribute(Conversation.ATTRIBUTE_MUC_PASSWORD, password);
     }
 
@@ -914,7 +902,7 @@ public class MucOptions {
         }
     }
 
-    public static class User implements Comparable<User>, AvatarService.Avatarable {
+    public static class User implements Comparable<User>, AvatarService.Avatar {
         public record CacheEntry(String avatar, String nick) {
             public static final String TABLENAME = "muc_user";
             public static final String AVATAR = "avatar";
@@ -966,7 +954,7 @@ public class MucOptions {
         }
 
         public Jid getMuc() {
-            return fullJid == null ? (options.getConversation().getJid().asBareJid()) : fullJid.asBareJid();
+            return fullJid == null ? (options.getConversation().getAddress().asBareJid()) : fullJid.asBareJid();
         }
 
         public String getNick() {

@@ -201,7 +201,7 @@ public class HttpUploadConnection
                             finish();
                             if (!message.isPrivateMessage()) {
                                 message.setCounterpart(
-                                        message.getConversation().getJid().asBareJid());
+                                        message.getConversation().getAddress().asBareJid());
                             }
                             mXmppConnectionService.resendMessage(message, delayed, cb);
                         } else {

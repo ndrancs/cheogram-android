@@ -23,7 +23,6 @@ import androidx.core.content.res.ResourcesCompat;
 import com.google.common.base.Strings;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.entities.Account;
-import eu.siacs.conversations.entities.Bookmark;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Conversational;
@@ -35,6 +34,8 @@ import eu.siacs.conversations.entities.Room;
 import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
+import im.conversations.android.model.Bookmark;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -69,7 +70,7 @@ public class AvatarService {
 		return (int) (SYSTEM_UI_AVATAR_SIZE * context.getResources().getDisplayMetrics().density);
 	}
 
-	public Drawable get(final Avatarable avatarable, final int size, final boolean cachedOnly) {
+	public Drawable get(final Avatar avatarable, final int size, final boolean cachedOnly) {
 		if (avatarable instanceof Account) {
 			return get((Account) avatarable,size,cachedOnly);
 		} else if (avatarable instanceof Conversation) {
@@ -115,7 +116,7 @@ public class AvatarService {
 			avatar = mXmppConnectionService.getFileBackend().getAvatar(contact.getAvatar(), size);
 		}
 		if (avatar == null) {
-			avatar = get(contact.getDisplayName(), contact.getJid().asBareJid().toString(), size, cachedOnly);
+			avatar = get(contact.getDisplayName(), contact.getAddress().asBareJid().toString(), size, cachedOnly);
 		}
 		if (avatar != null) this.mXmppConnectionService.getDrawableCache().put(KEY, avatar);
 		return avatar;
@@ -237,7 +238,7 @@ public class AvatarService {
 			}
 		}
 		for (Conversation conversation : mXmppConnectionService.findAllConferencesWith(contact)) {
-			MucOptions.User user = conversation.getMucOptions().findUserByRealJid(contact.getJid().asBareJid());
+			MucOptions.User user = conversation.getMucOptions().findUserByRealJid(contact.getAddress().asBareJid());
 			if (user != null) {
 				clear(user);
 			}
@@ -253,7 +254,7 @@ public class AvatarService {
 				'\0' +
 				contact.getAccount().getJid().asBareJid() +
 				'\0' +
-				emptyOnNull(contact.getJid()) +
+				emptyOnNull(contact.getAddress()) +
 				'\0' +
 				size;
 	}
@@ -281,15 +282,16 @@ public class AvatarService {
 
 	public Drawable get(ListItem item, int size, boolean cachedOnly) {
 		if (item instanceof RawBlockable) {
-			return get(item.getDisplayName(), item.getJid().toString(), size, cachedOnly);
+			return get(item.getDisplayName(), item.getAddress().toString(), size, cachedOnly);
 		} else if (item instanceof Contact) {
 			return get((Contact) item, size, cachedOnly);
 		} else if (item instanceof Bookmark) {
 			Bookmark bookmark = (Bookmark) item;
-			if (bookmark.getConversation() != null) {
-				return get(bookmark.getConversation(), size, cachedOnly);
+			final var conversation = mXmppConnectionService.find(bookmark);
+			if (conversation != null) {
+				return get(conversation, size, cachedOnly);
 			} else {
-				Jid jid = bookmark.getJid();
+				Jid jid = bookmark.getAddress();
 				Account account = bookmark.getAccount();
 				Contact contact = jid == null ? null : account.getRoster().getContact(jid);
 				if (contact != null && contact.getAvatar() != null) {
@@ -299,7 +301,7 @@ public class AvatarService {
 				return get(bookmark.getDisplayName(), seed, size, cachedOnly);
 			}
 		} else {
-			String seed = item.getJid() != null ? item.getJid().asBareJid().toString() : null;
+			String seed = item.getAddress() != null ? item.getAddress().asBareJid().toString() : null;
 			return get(item.getDisplayName(), seed, size, cachedOnly);
 		}
 	}
@@ -349,12 +351,12 @@ public class AvatarService {
 			if (mucOptions.isPrivateAndNonAnonymous()) {
 				final List<MucOptions.User> users = mucOptions.getUsersRelevantForNameAndAvatar();
 				if (users.size() == 0) {
-					bitmap = getImpl(c.getName().toString(), c.getJid().asBareJid().toString(), size);
+					bitmap = getImpl(c.getName().toString(), c.getAddress().asBareJid().toString(), size);
 				} else {
 					bitmap = getImpl(users, size);
 				}
 			} else {
-				bitmap = getImpl(CHANNEL_SYMBOL, c.getJid().asBareJid().toString(), size);
+				bitmap = getImpl(CHANNEL_SYMBOL, c.getAddress().asBareJid().toString(), size);
 			}
 		}
 
@@ -602,7 +604,7 @@ public class AvatarService {
 			}
 		}
 		if (contact != null) {
-			String seed = contact.getJid().asBareJid().toString();
+			String seed = contact.getAddress().asBareJid().toString();
 			drawTile(canvas, contact.getDisplayName(), seed, left, top, right, bottom);
 		} else {
 			String seed = user.getRealJid() == null ? null : user.getRealJid().asBareJid().toString();
@@ -666,7 +668,7 @@ public class AvatarService {
 		return value == null ? "" : value.toString();
 	}
 
-	public interface Avatarable {
+	public interface Avatar {
 		@ColorInt int getAvatarBackgroundColor();
 		String getAvatarName();
 	}

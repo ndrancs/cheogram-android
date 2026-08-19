@@ -45,6 +45,7 @@ import eu.siacs.conversations.entities.ListItem;
 import eu.siacs.conversations.utils.StylingHelper;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
@@ -117,7 +118,7 @@ public class Linkify {
                     } else if (jid.asBareJid().equals(context) && xmppUri.parameterString().length() > 0) {
                         display = xmppUri.parameterString();
                     } else {
-                        ListItem item = account.getBookmark(jid);
+                        ListItem item = account.getXmppConnection().getManager(BookmarkManager.class).getBookmark(jid);
                         if (item == null) item = roster.getContact(jid);
                         display = item.getDisplayName() + xmppUri.displayParameterString();
                     }
@@ -143,7 +144,7 @@ public class Linkify {
         return builder.build();
     }
 
-	public static List<String> extractLinks(final Editable body) {
+    public static List<String> extractLinks(final Editable body) {
         addLinks(body);
         final var spans =
                 Arrays.asList(body.getSpans(0, body.length() - 1, URLSpan.class));

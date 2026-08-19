@@ -91,7 +91,7 @@
     <string name="send_message">Сообщение</string>
     <string name="send_message_to_x">Сообщение для %s</string>
     <string name="send_omemo_x509_message">Зашифрованное v\\OMEMO сообщение</string>
-    <string name="your_nick_has_been_changed">Используется новое имя</string>
+    <string name="your_nick_has_been_changed">Ваше имя изменено</string>
     <string name="send_unencrypted">Отправить в незашифрованном виде</string>
     <string name="decryption_failed">Расшифровка невозможна. Вероятно, у вас нет надлежащего ключа.</string>
     <string name="openkeychain_required">Установите OpenKeychain</string>
@@ -355,7 +355,7 @@
     <string name="no_application_found_to_open_link">Не найдено приложения, способного открыть эту ссылку</string>
     <string name="no_application_found_to_view_contact">Не найдено приложения для просмотра контакта</string>
     <string name="pref_show_dynamic_tags">Динамические теги</string>
-    <string name="pref_show_dynamic_tags_summary">Отображать теги только для чтения под контактами</string>
+    <string name="pref_show_dynamic_tags_summary">Показывать теги только для чтения под контактами</string>
     <string name="enable_notifications">Включить уведомления</string>
     <string name="no_conference_server_found">Сервер конференции не найден</string>
     <string name="conference_creation_failed">Невозможно создать конференцию</string>
@@ -1085,7 +1085,7 @@
     <string name="appearance">Внешний вид</string>
     <string name="pref_title_interface">Интерфейс</string>
     <string name="pref_light_dark_mode">Светлая/тёмная тема</string>
-    <string name="pref_allow_screenshots_summary">Отображать содержимое экрана приложения в переключателе и разрешить делать снимки экрана</string>
+    <string name="pref_allow_screenshots_summary">Показывать содержимое экрана приложения в переключателе и разрешить делать снимки экрана</string>
     <string name="pref_category_e2ee">Сквозное шифрование</string>
     <string name="pref_title_trust_system_ca_store">Удостоверяющие центры</string>
     <string name="pref_category_operating_system">Операционная система</string>
@@ -1140,17 +1140,15 @@
     <string name="could_not_modify_call">Невозможно изменить звонок</string>
     <string name="clients_may_not_support_av">XMPP-клиент вашего контакта может не поддерживать аудио- и видеозвонки.</string>
     <string name="pref_chat_bubbles_summary">Цвет фона, размер текста, аватары</string>
-    <string name="pref_show_avatars">Показывать аватары</string>
     <string name="pref_title_bubbles">Сообщения в пузырях</string>
     <string name="pref_chat_bubbles">Пузыри сообщений</string>
-    <string name="pref_show_avatars_summary">Показывать аватары в своих сообщениях и приватных беседах в дополнение к конференциям</string>
     <string name="pref_call_integration">Интеграция звонков</string>
     <string name="pref_align_start">Выравнивать сообщения слева</string>
     <string name="pref_align_start_summary">Показывать все сообщения, включая отправленные, выровненными по левому краю для единообразия вида беседы</string>
     <string name="custom_notifications">Настраиваемые уведомления</string>
     <string name="pref_call_integration_summary">Звонки из этого приложения взаимодействуют с обычными телефонными звонками, например, завершение одного звонка при начале другого</string>
     <string name="custom_notifications_enable">Использовать индивидуальные настройки уведомлений (важность, звук, вибрация) для этой беседы?</string>
-    <string name="delete_avatar_message">Хотите удалить свой аватар? Некоторые клиенты могут продолжать отображать кэшированную копию вашего аватара.</string>
+    <string name="delete_avatar_message">Хотите удалить свой аватар? Некоторые клиенты могут продолжать показывать кэшированную копию вашего аватара.</string>
     <string name="show_to_contacts_only">Показывать только контактам</string>
     <string name="account_status_connection_timeout">Истекло время ожидания подключения</string>
     <string name="retry_with_p2p">Повторить через P2P</string>
@@ -1173,4 +1171,10 @@
     <string name="no_contacts_permission">%1$s требуется доступ к вашим контактам</string>
     <string name="save_to_contact">Сохранить в контакты</string>
     <string name="show_in_contacts">Показать в контактах</string>
+    <string name="pref_account_avatar">Аккаунты</string>
+    <string name="pref_account_avatar_summary">Показывать аватары аккаунтов в исходящих сообщениях для упрощения идентификации и управления</string>
+    <string name="pref_category_avatars">Аватары</string>
+    <string name="pref_show_11_chats">Беседы 1:1</string>
+    <string name="pref_show_11_chats_summary">Показывать аватары в беседах 1:1 (в конференциях аватары отображаются всегда)</string>
+    <string name="pref_show_11_sender_chats_summary">Показывать аватары у входящих сообщений в беседах 1:1 (в конференциях аватары отображаются всегда)</string>
 </resources>

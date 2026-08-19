@@ -127,7 +127,6 @@ import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
 import eu.siacs.conversations.crypto.axolotl.XmppAxolotlMessage;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Blockable;
-import eu.siacs.conversations.entities.Bookmark;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Conversational;
@@ -205,6 +204,8 @@ import eu.siacs.conversations.xmpp.manager.VCardManager;
 import eu.siacs.conversations.xmpp.pep.Avatar;
 import im.conversations.android.xmpp.Entity;
 import im.conversations.android.xmpp.model.disco.info.InfoQuery;
+import im.conversations.android.model.Bookmark;
+import im.conversations.android.model.ImmutableBookmark;
 import im.conversations.android.xmpp.model.muc.Affiliation;
 import im.conversations.android.xmpp.model.muc.Role;
 import im.conversations.android.xmpp.model.stanza.Iq;
@@ -729,7 +730,7 @@ public class XmppConnectionService extends Service {
     }
 
     public Conversation find(Bookmark bookmark) {
-        return find(bookmark.getAccount(), bookmark.getJid());
+        return find(bookmark.getAccount(), bookmark.getAddress());
     }
 
     public Conversation find(final Account account, final Jid jid) {
@@ -1956,7 +1957,7 @@ public class XmppConnectionService extends Service {
                         Config.LOGTAG,
                         account.getJid().asBareJid()
                                 + ": adding "
-                                + contact.getJid()
+                                + contact.getAddress()
                                 + " on sending message");
                 createContact(contact);
             }
@@ -1982,7 +1983,7 @@ public class XmppConnectionService extends Service {
                         .isJoinInProgress(conversation);
 
         if (message.getCounterpart() == null && !message.isPrivateMessage()) {
-            message.setCounterpart(message.getConversation().getJid().asBareJid());
+            message.setCounterpart(message.getConversation().getAddress().asBareJid());
         }
 
         boolean waitForPreview = false;
@@ -2286,54 +2287,6 @@ public class XmppConnectionService extends Service {
         return getAccounts().size() == 1 && getAccounts().get(0).getJid().getDomain().equals(Config.ONBOARDING_DOMAIN);
     }
 
-    public void requestEasyOnboardingInvite(
-            final Account account, final EasyOnboardingInvite.OnInviteRequested callback) {
-        final var connection = account.getXmppConnection();
-        final var discoManager = connection.getManager(DiscoManager.class);
-        final var address = discoManager.getAddressForCommand(Namespace.EASY_ONBOARDING_INVITE);
-        if (address == null) {
-            callback.inviteRequestFailed(
-                    getString(R.string.server_does_not_support_easy_onboarding_invites));
-            return;
-        }
-        final Iq request = new Iq(Iq.Type.SET);
-        request.setTo(address);
-        final Element command = request.addChild("command", Namespace.COMMANDS);
-        command.setAttribute("node", Namespace.EASY_ONBOARDING_INVITE);
-        command.setAttribute("action", "execute");
-        sendIqPacket(
-                account,
-                request,
-                (response) -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        final Element resultCommand =
-                                response.findChild("command", Namespace.COMMANDS);
-                        final Element x =
-                                resultCommand == null
-                                        ? null
-                                        : resultCommand.findChild("x", Namespace.DATA);
-                        if (x != null) {
-                            final Data data = Data.parse(x);
-                            final String uri = data.getValue("uri");
-                            final String landingUrl = data.getValue("landing-url");
-                            if (uri != null) {
-                                final EasyOnboardingInvite invite =
-                                        new EasyOnboardingInvite(
-                                                address.getDomain().toString(), uri, landingUrl);
-                                callback.inviteRequested(invite);
-                                return;
-                            }
-                        }
-                        callback.inviteRequestFailed(getString(R.string.unable_to_parse_invite));
-                        Log.d(Config.LOGTAG, response.toString());
-                    } else if (response.getType() == Iq.Type.ERROR) {
-                        callback.inviteRequestFailed(IqParser.errorMessage(response));
-                    } else {
-                        callback.inviteRequestFailed(getString(R.string.remote_server_timeout));
-                    }
-                });
-    }
-
     public void markReadUpToStanzaId(final Conversation conversation, final String stanzaId) {
         final Message message = conversation.findMessageWithServerMsgId(stanzaId);
         if (message == null) { // do we want to check if isRead?
@@ -2349,7 +2302,7 @@ public class XmppConnectionService extends Service {
                 Config.LOGTAG,
                 conversation.getAccount().getJid().asBareJid()
                         + ": mark "
-                        + conversation.getJid().asBareJid()
+                        + conversation.getAddress().asBareJid()
                         + " as read up to "
                         + uuid);
         markRead(conversation, uuid, isDismissNotification);
@@ -2371,7 +2324,7 @@ public class XmppConnectionService extends Service {
     }
 
     public void deleteBookmark(final Account account, final Bookmark bookmark) {
-        if (bookmark.getJid().toString().equals("discuss@conference.soprani.ca")) {
+        if (bookmark.getAddress().toString().equals("discuss@conference.soprani.ca")) {
             getPreferences().edit().putBoolean("cheogram_sopranica_bookmark_deleted", true).apply();
         }
         account.getXmppConnection().getManager(BookmarkManager.class).delete(bookmark);
@@ -2392,7 +2345,9 @@ public class XmppConnectionService extends Service {
                 if (account != null) {
                     conversation.setAccount(account);
                 } else {
-                    Log.e(Config.LOGTAG, "unable to restore Conversations with " + conversation.getJid());
+                    Log.e(
+                            Config.LOGTAG,
+                            "unable to restore Conversations with " + conversation.getAddress());
                     conversations.remove(conversation);
                 }
             }
@@ -2696,7 +2651,7 @@ public class XmppConnectionService extends Service {
                 continue;
             }
             final MucOptions mucOptions = c.getMucOptions();
-            if (c.getJid().asBareJid().equals(contact.getJid().asBareJid())
+            if (c.getAddress().asBareJid().equals(contact.getAddress().asBareJid())
                     || (mucOptions != null && mucOptions.isContactInRoom(contact))) {
                 results.add(c);
             }
@@ -2720,7 +2675,7 @@ public class XmppConnectionService extends Service {
         }
         for (final Conversation conversation : haystack) {
             if ((account == null || conversation.getAccount() == account)
-                    && (conversation.getJid().asBareJid().equals(jid.asBareJid()))) {
+                    && (conversation.getAddress().asBareJid().equals(jid.asBareJid()))) {
                 return conversation;
             }
         }
@@ -2750,7 +2705,7 @@ public class XmppConnectionService extends Service {
         final var register = new Iq(Iq.Type.GET);
         final var query0 = register.addChild("query");
         query0.setAttribute("xmlns", Namespace.REGISTER);
-        register.setTo(c.getJid().asBareJid());
+        register.setTo(c.getAddress().asBareJid());
         sendIqPacket(c.getAccount(), register, (response) -> {
             if (response.getType() == Iq.Type.RESULT) {
                 final Element query = response.addChild("query");
@@ -2759,14 +2714,14 @@ public class XmppConnectionService extends Service {
                 if (username == null) username = query.findChildContent("nick", Namespace.REGISTER);
                 if (username != null && username.equals(nick)) {
                     // Already registered with this nick, done
-                    Log.d(Config.LOGTAG, "Already registered with " + c.getJid().asBareJid() + " as " + username);
+                    Log.d(Config.LOGTAG, "Already registered with " + c.getAddress().asBareJid() + " as " + username);
                     return;
                 }
                 Data form = Data.parse(query.findChild("x", Namespace.DATA));
                 if (form != null) {
                     final var field = form.getFieldByName("muc#register_roomnick");
                     if (field != null && nick.equals(field.getValue())) {
-                        Log.d(Config.LOGTAG, "Already registered with " + c.getJid().asBareJid() + " as " + field.getValue());
+                        Log.d(Config.LOGTAG, "Already registered with " + c.getAddress().asBareJid() + " as " + field.getValue());
                         return;
                     }
                 }
@@ -2782,21 +2737,21 @@ public class XmppConnectionService extends Service {
                     final var query2 = finish.addChild("query");
                     query2.setAttribute("xmlns", Namespace.REGISTER);
                     query2.addChild(form);
-                    finish.setTo(c.getJid().asBareJid());
+                    finish.setTo(c.getAddress().asBareJid());
                     sendIqPacket(c.getAccount(), finish, (response2) -> {
                         if (response.getType() == Iq.Type.RESULT) {
-                            Log.w(Config.LOGTAG, "Success registering with channel " + c.getJid().asBareJid() + "/" + nick);
+                            Log.w(Config.LOGTAG, "Success registering with channel " + c.getAddress().asBareJid() + "/" + nick);
                         } else {
                             Log.w(Config.LOGTAG, "Error registering with channel: " + response2);
                         }
                     });
                 } else {
                     // TODO: offer registration form to user
-                    Log.d(Config.LOGTAG, "Complex registration form for " + c.getJid().asBareJid() + ": " + response);
+                    Log.d(Config.LOGTAG, "Complex registration form for " + c.getAddress().asBareJid() + ": " + response);
                 }
             } else {
                 // We said maybe. Guess not
-                Log.d(Config.LOGTAG, "Could not register with " + c.getJid().asBareJid() + ": " + response);
+                Log.d(Config.LOGTAG, "Could not register with " + c.getAddress().asBareJid() + ": " + response);
             }
         });
     }
@@ -2806,12 +2761,12 @@ public class XmppConnectionService extends Service {
         final var query = register.addChild("query");
         query.setAttribute("xmlns", Namespace.REGISTER);
         query.addChild("remove");
-        register.setTo(c.getJid().asBareJid());
+        register.setTo(c.getAddress().asBareJid());
         sendIqPacket(c.getAccount(), register, (response) -> {
             if (response.getType() == Iq.Type.RESULT) {
-                Log.d(Config.LOGTAG, "deregistered with " + c.getJid().asBareJid());
+                Log.d(Config.LOGTAG, "deregistered with " + c.getAddress().asBareJid());
             } else {
-                Log.w(Config.LOGTAG, "Could not deregister with " + c.getJid().asBareJid() + ": " + response);
+                Log.w(Config.LOGTAG, "Could not deregister with " + c.getAddress().asBareJid() + ": " + response);
             }
         });
     }
@@ -2901,7 +2856,7 @@ public class XmppConnectionService extends Service {
         if (existing == null) {
             return null;
         }
-        Log.d(Config.LOGTAG, "restoring conversation with " + existing.getJid() + " from DB");
+        Log.d(Config.LOGTAG, "restoring conversation with " + existing.getAddress() + " from DB");
         final Map<String, Account> accounts =
                 ImmutableMap.copyOf(Maps.uniqueIndex(this.accounts, Account::getUuid));
         final var account = accounts.get(existing.getAccountUuid());
@@ -2994,13 +2949,16 @@ public class XmppConnectionService extends Service {
                 // TODO always clean up bookmarks no matter if we are currently connected
                 // TODO always delete reference to conversation in bookmark
                 if (conversation.getAccount().getStatus() == Account.State.ONLINE) {
-                    final Bookmark bookmark = conversation.getBookmark();
-                    if (maySynchronizeWithBookmarks && bookmark != null) {
+                    final Bookmark existing = conversation.getBookmark();
+                    if (maySynchronizeWithBookmarks && existing != null) {
                         if (conversation.getMucOptions().getError() == MucOptions.Error.DESTROYED) {
-                            bookmark.setConversation(null);
-                            deleteBookmark(account, bookmark);
-                        } else if (bookmark.autojoin()) {
-                            bookmark.setAutojoin(false);
+                            deleteBookmark(account, existing);
+                        } else if (existing.isAutoJoin()) {
+                            final var bookmark =
+                                    ImmutableBookmark.builder()
+                                            .from(existing)
+                                            .isAutoJoin(false)
+                                            .build();
                             createBookmark(bookmark.getAccount(), bookmark);
                         }
                     }
@@ -3021,12 +2979,12 @@ public class XmppConnectionService extends Service {
     }
 
     public void stopPresenceUpdatesTo(final Contact contact) {
-        Log.d(Config.LOGTAG, "Canceling presence request from " + contact.getJid().toString());
+        Log.d(Config.LOGTAG, "Canceling presence request from " + contact.getAddress().toString());
         contact.resetOption(Contact.Options.PENDING_SUBSCRIPTION_REQUEST);
         contact.getAccount()
                 .getXmppConnection()
                 .getManager(PresenceManager.class)
-                .unsubscribed(contact.getJid().asBareJid());
+                .unsubscribed(contact.getAddress().asBareJid());
     }
 
     public void createAccount(final Account account) {
@@ -3654,7 +3612,10 @@ public class XmppConnectionService extends Service {
     public void getAttachments(
             final Conversation conversation, int limit, final OnMediaLoaded onMediaLoaded) {
         getAttachments(
-                conversation.getAccount(), conversation.getJid().asBareJid(), limit, onMediaLoaded);
+                conversation.getAccount(),
+                conversation.getAddress().asBareJid(),
+                limit,
+                onMediaLoaded);
     }
 
     public void getAttachments(
@@ -3683,29 +3644,33 @@ public class XmppConnectionService extends Service {
         final Conversation conversation = self.getConversation();
         final Account account = conversation.getAccount();
         final Jid full = self.getFullJid();
-        if (!full.equals(conversation.getJid())) {
+        if (!full.equals(conversation.getAddress())) {
             Log.d(Config.LOGTAG, account.getJid().asBareJid() + ": persisting full jid " + full);
             conversation.setContactJid(full);
             databaseBackend.updateConversation(conversation);
         }
 
         final String nick = self.getNick();
-        final Bookmark bookmark = conversation.getBookmark();
-        if (bookmark == null || !modified) {
+        final Bookmark existing = conversation.getBookmark();
+        if (existing == null || !modified) {
             return;
         }
         final String defaultNick = MucOptions.defaultNick(account);
-        if (nick.equals(defaultNick) || nick.equals(bookmark.getNick())) {
+        if (nick.equals(defaultNick) || nick.equals(existing.getNick())) {
             return;
         }
+
+        // TODO should we just call Bookmark.nickOfAddress and use that; meaning we would remove a
+        // bookmark if it is there
+
         Log.d(
                 Config.LOGTAG,
                 account.getJid().asBareJid()
                         + ": persist nick '"
                         + full.getResource()
                         + "' into bookmark for "
-                        + conversation.getJid().asBareJid());
-        bookmark.setNick(nick);
+                        + conversation.getAddress().asBareJid());
+        final var bookmark = ImmutableBookmark.builder().from(existing).nick(nick).build();
         createBookmark(bookmark.getAccount(), bookmark);
     }
 
@@ -3931,7 +3896,7 @@ public class XmppConnectionService extends Service {
         final var account = conference.getAccount();
         account.getXmppConnection()
                 .getManager(MultiUserChatManager.class)
-                .setRole(conference.getJid().asBareJid(), role, nick);
+                .setRole(conference.getAddress().asBareJid(), role, nick);
     }
 
     public void moderateMessage(final Account account, final Message m, final String reason) {
@@ -3948,7 +3913,7 @@ public class XmppConnectionService extends Service {
         final var account = conversation.getAccount();
         return account.getXmppConnection()
                 .getManager(MultiUserChatManager.class)
-                .destroy(conversation.getJid().asBareJid());
+                .destroy(conversation.getAddress().asBareJid());
     }
 
     private void disconnect(final Account account, boolean force) {
@@ -4034,7 +3999,7 @@ public class XmppConnectionService extends Service {
         final var future =
                 connection
                         .getManager(AvatarManager.class)
-                        .publishVCard(conversation.getJid().asBareJid(), image);
+                        .publishVCard(conversation.getAddress().asBareJid(), image);
         Futures.addCallback(
                 future,
                 new FutureCallback<>() {
@@ -4108,7 +4073,7 @@ public class XmppConnectionService extends Service {
     }
 
     public void fetchVcard4(Account account, final Contact contact, final Consumer<Element> callback) {
-        final var packet = this.mIqGenerator.retrieveVcard4(contact.getJid());
+        final var packet = this.mIqGenerator.retrieveVcard4(contact.getAddress());
         sendIqPacket(account, packet, (result) -> {
             if (result.getType() == Iq.Type.RESULT) {
                 final Element item = IqParser.getItem(result);
@@ -4213,7 +4178,7 @@ public class XmppConnectionService extends Service {
             return null;
         }
         for (Conversation conversation : getConversations()) {
-            if (conversation.getJid().asBareJid().equals(recipient)
+            if (conversation.getAddress().asBareJid().equals(recipient)
                     && conversation.getAccount() == account) {
                 final Message message = conversation.findSentMessageWithUuidOrRemoteId(uuid);
                 if (message != null) {
@@ -4473,7 +4438,7 @@ public class XmppConnectionService extends Service {
         List<Conversation> findings = new ArrayList<>();
         for (Conversation c : getConversations()) {
             if (c.getAccount().isEnabled()
-                    && c.getJid().asBareJid().equals(xmppUri.getJid().asBareJid())
+                    && c.getAddress().asBareJid().equals(xmppUri.getJid().asBareJid())
                     && ((c.getMode() == Conversational.MODE_MULTI)
                             == xmppUri.isAction(XmppUri.ACTION_JOIN))) {
                 findings.add(c);
@@ -4614,7 +4579,7 @@ public class XmppConnectionService extends Service {
         if (message.isPrivateMessage()) {
             itemId = message.getCounterpart();
         } else {
-            itemId = conversation.getJid().asBareJid();
+            itemId = conversation.getAddress().asBareJid();
         }
         Log.d(Config.LOGTAG, "publishing mds for " + itemId + "/" + stanzaId);
         final var displayed =
@@ -4657,7 +4622,7 @@ public class XmppConnectionService extends Service {
                     Log.d(Config.LOGTAG, "modified reactions to existing variants");
                 }
                 reactToId = message.getServerMsgId();
-                reactTo = conversation.getJid().asBareJid();
+                reactTo = conversation.getAddress().asBareJid();
                 typeGroupChat = true;
                 combinedReactions =
                         Reaction.withMine(
@@ -4678,7 +4643,7 @@ public class XmppConnectionService extends Service {
                 if (isPrivateMessage) {
                     reactTo = message.getCounterpart();
                 } else {
-                    reactTo = conversation.getJid().asBareJid();
+                    reactTo = conversation.getAddress().asBareJid();
                 }
                 combinedReactions =
                         Reaction.withFrom(
@@ -4789,8 +4754,8 @@ public class XmppConnectionService extends Service {
         for (final Account account : accounts) {
             final var connection = account.getXmppConnection();
             builder.addAll(connection.getManager(MultiUserChatManager.class).getServices());
-            for (final var bookmark : account.getBookmarks()) {
-                final Jid jid = bookmark.getJid();
+            for (final var bookmark : connection.getManager(BookmarkManager.class).getBookmarks()) {
+                final Jid jid = bookmark.getAddress();
                 final Jid domain = jid == null ? null : jid.getDomain();
                 if (domain == null) {
                     continue;
@@ -4904,7 +4869,7 @@ public class XmppConnectionService extends Service {
         for (Conversation conversation : getConversations()) {
             if ((conversation.getAccount().isEnabled() || accountJid != null)
                     && (accountJid == null || accountJid.equals(conversation.getAccount().getJid().asBareJid().toString()))
-                    && conversation.getJid().asBareJid().equals(jid.asBareJid()) && conversation.getMode() == Conversation.MODE_MULTI) {
+                    && conversation.getAddress().asBareJid().equals(jid.asBareJid()) && conversation.getMode() == Conversation.MODE_MULTI) {
                 return conversation;
             }
         }
@@ -4969,8 +4934,8 @@ public class XmppConnectionService extends Service {
                         (domainJid
                                         && blockedJid
                                                 .getDomain()
-                                                .equals(conversation.getJid().getDomain()))
-                                || blockedJid.equals(conversation.getJid().asBareJid());
+                                                .equals(conversation.getAddress().getDomain()))
+                                || blockedJid.equals(conversation.getAddress().asBareJid());
                 if (conversation.getAccount() == account
                         && conversation.getMode() == Conversation.MODE_SINGLE
                         && jidMatches) {
@@ -4982,7 +4947,7 @@ public class XmppConnectionService extends Service {
                             Config.LOGTAG,
                             account.getJid().asBareJid()
                                     + ": archiving conversation "
-                                    + conversation.getJid().asBareJid()
+                                    + conversation.getAddress().asBareJid()
                                     + " because jid was blocked");
                     updateConversation(conversation);
                     removed = true;

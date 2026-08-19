@@ -17,10 +17,10 @@ import eu.siacs.conversations.ui.XmppActivity;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.RejectedExecutionException;
 
-public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, Drawable> {
+public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatar, Void, Drawable> {
     private final WeakReference<ImageView> imageViewReference;
     private final WeakReference<XmppActivity> activityReference;
-    private AvatarService.Avatarable avatarable = null;
+    private AvatarService.Avatar avatarable = null;
     private @DimenRes final int size;
 
     public AvatarWorkerTask(ImageView imageView, @DimenRes int size) {
@@ -37,7 +37,7 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
     }
 
     @Override
-    protected Drawable doInBackground(AvatarService.Avatarable... params) {
+    protected Drawable doInBackground(AvatarService.Avatar... params) {
         this.avatarable = params[0];
         final XmppActivity activity = activityReference == null ? XmppActivity.find(imageViewReference) : activityReference.get();
         if (activity == null) {
@@ -67,13 +67,12 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
         }
     }
 
-    public static boolean cancelPotentialWork(
-            AvatarService.Avatarable avatarable, ImageView imageView) {
+    public static boolean cancelPotentialWork(AvatarService.Avatar avatar, ImageView imageView) {
         final AvatarWorkerTask workerTask = getBitmapWorkerTask(imageView);
 
         if (workerTask != null) {
-            final AvatarService.Avatarable old = workerTask.avatarable;
-            if (old == null || avatarable != old) {
+            final AvatarService.Avatar old = workerTask.avatarable;
+            if (old == null || avatar != old) {
                 workerTask.cancel(true);
             } else {
                 return false;
@@ -93,32 +92,32 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
     }
 
     public static void loadAvatar(
-            final AvatarService.Avatarable avatarable,
+            final AvatarService.Avatar avatar,
             final ImageView imageView,
             final @DimenRes int size) {
-        if (cancelPotentialWork(avatarable, imageView)) {
+        if (cancelPotentialWork(avatar, imageView)) {
             final XmppActivity activity = XmppActivity.find(imageView);
             if (activity == null) {
                 return;
             }
-            final Drawable bm = activity.avatarService().get(avatarable, (int) activity.getResources().getDimension(size), true);
-            setContentDescription(avatarable, imageView);
+            final Drawable bm = activity.avatarService().get(avatar, (int) activity.getResources().getDimension(size), true);
+            setContentDescription(avatar, imageView);
             if (bm != null) {
-                cancelPotentialWork(avatarable, imageView);
+                cancelPotentialWork(avatar, imageView);
                 imageView.setImageDrawable(bm);
                 imageView.setBackgroundColor(0x00000000);
                 if (Build.VERSION.SDK_INT >= 28 && bm instanceof AnimatedImageDrawable) {
                     ((AnimatedImageDrawable) bm).start();
                 }
             } else {
-                imageView.setBackgroundColor(avatarable.getAvatarBackgroundColor());
+                imageView.setBackgroundColor(avatar.getAvatarBackgroundColor());
                 imageView.setImageDrawable(null);
                 final AvatarWorkerTask task = new AvatarWorkerTask(imageView, size);
                 final AsyncDrawable asyncDrawable =
                         new AsyncDrawable(activity.getResources(), null, task);
                 imageView.setImageDrawable(asyncDrawable);
                 try {
-                    task.execute(avatarable);
+                    task.execute(avatar);
                 } catch (final RejectedExecutionException ignored) {
                 }
             }
@@ -126,13 +125,13 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatarable, Void, 
     }
 
     private static void setContentDescription(
-            final AvatarService.Avatarable avatarable, final ImageView imageView) {
+            final AvatarService.Avatar avatar, final ImageView imageView) {
         final Context context = imageView.getContext();
-        if (avatarable instanceof Account) {
+        if (avatar instanceof Account) {
             imageView.setContentDescription(context.getString(R.string.your_avatar));
         } else {
             imageView.setContentDescription(
-                    context.getString(R.string.avatar_for_x, avatarable.getAvatarName()));
+                    context.getString(R.string.avatar_for_x, avatar.getAvatarName()));
         }
     }
 

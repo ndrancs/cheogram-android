@@ -70,7 +70,7 @@ public class ChooseContactActivity extends AbstractSearchableListItemActivity
                 }
             }
         } else {
-            contacts.add(conversation.getJid().asBareJid().toString());
+            contacts.add(conversation.getAddress().asBareJid().toString());
         }
         intent.putExtra(EXTRA_FILTERED_CONTACTS, contacts.toArray(new String[0]));
         intent.putExtra(EXTRA_CONVERSATION, conversation.getUuid());
@@ -224,9 +224,9 @@ public class ChooseContactActivity extends AbstractSearchableListItemActivity
         getListItemAdapter().notifyDataSetChanged();
         Contact item = (Contact) getListItems().get(position);
         if (checked) {
-            selected.add(item.getJid().toString());
+            selected.add(item.getAddress().toString());
         } else {
-            selected.remove(item.getJid().toString());
+            selected.remove(item.getAddress().toString());
         }
     }
 
@@ -299,30 +299,30 @@ public class ChooseContactActivity extends AbstractSearchableListItemActivity
             if (mActivatedAccounts.contains(account.getJid().asBareJid().toString())) accounts.add(account);
         }
         for (final var contact : extraContacts) {
-            if (!filterContacts.contains(contact.getJid().asBareJid().toString())
-                    && contact.match(this, needle)) {
+            if (!filterContacts.contains(contact.getAddress().asBareJid().toString())
+                    && contact.match(needle)) {
                 getListItems().add(contact);
             }
         }
         for (final Account account : accounts) {
             for (final Contact contact : account.getRoster().getContacts()) {
                 if (contact.showInContactList() &&
-                        !filterContacts.contains(contact.getJid().asBareJid().toString())
-                        && contact.match(this, needle)) {
+                        !filterContacts.contains(contact.getAddress().asBareJid().toString())
+                        && contact.match(needle)) {
                     getListItems().add(contact);
                 }
             }
 
             final Contact self = new Contact(account.getSelfContact());
             self.setSystemName("Note to Self");
-            if (self.match(this, needle)) {
+            if (self.match(needle)) {
                 getListItems().add(self);
             }
         }
         Collections.sort(getListItems());
         getListItemAdapter().notifyDataSetChanged();
         for (int i = 0; i < getListItemAdapter().getCount(); i++) {
-            getListView().setItemChecked(i, selected.contains(getListItemAdapter().getItem(i).getJid().toString()));
+            getListView().setItemChecked(i, selected.contains(getListItemAdapter().getItem(i).getAddress().toString()));
         }
     }
 
@@ -446,9 +446,9 @@ public class ChooseContactActivity extends AbstractSearchableListItemActivity
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
         if (multiple) {
             if (getListView().isItemChecked(position)) {
-                selected.add(getListItemAdapter().getItem(position).getJid().toString());
+                selected.add(getListItemAdapter().getItem(position).getAddress().toString());
             } else {
-                selected.remove(getListItemAdapter().getItem(position).getJid().toString());
+                selected.remove(getListItemAdapter().getItem(position).getAddress().toString());
             }
 
             if (selected.isEmpty()) {
@@ -476,7 +476,7 @@ public class ChooseContactActivity extends AbstractSearchableListItemActivity
     private void onListItemClicked(ListItem item) {
         final Intent request = getIntent();
         final Intent data = new Intent();
-        data.putExtra("contact", item.getJid().toString());
+        data.putExtra("contact", item.getAddress().toString());
         String account = request.getStringExtra(EXTRA_ACCOUNT);
         if (account == null && item instanceof Contact) {
             account = ((Contact) item).getAccount().getJid().asBareJid().toString();

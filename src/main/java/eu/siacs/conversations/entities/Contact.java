@@ -35,7 +35,6 @@ import im.conversations.android.xmpp.model.stanza.Presence;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -54,6 +53,7 @@ import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.jingle.RtpCapability;
+import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import eu.siacs.conversations.xmpp.pep.Avatar;
 
 public class Contact implements ListItem, Blockable {
@@ -192,7 +192,7 @@ public class Contact implements ListItem, Blockable {
             return this.serverName;
         }
 
-        ListItem bookmark = account.getBookmark(jid);
+        final var bookmark = account.getXmppConnection().getManager(BookmarkManager.class).getBookmark(jid);
         if (bookmark != null) {
             return bookmark.getDisplayName();
         } else if (!TextUtils.isEmpty(this.presenceName) && mutualPresenceSubscription()) {
@@ -220,11 +220,11 @@ public class Contact implements ListItem, Blockable {
         return this.photoUri;
     }
 
-    public Jid getJid() {
+    public Jid getAddress() {
         return jid;
     }
 
-    public List<Tag> getGroupTags() {
+    public Collection<Tag> getGroupTags() {
         final ArrayList<Tag> tags = new ArrayList<>();
         for (final String group : getGroups(true)) {
             tags.add(new Tag(group));
@@ -233,7 +233,7 @@ public class Contact implements ListItem, Blockable {
     }
 
     @Override
-    public List<Tag> getTags(Context context) {
+    public Collection<Tag> getTags() {
         final HashSet<Tag> tags = new HashSet<>();
         tags.addAll(getGroupTags());
         for (final String tag : getSystemTags(true)) {
@@ -246,7 +246,7 @@ public class Contact implements ListItem, Blockable {
         return new ArrayList<>(tags);
     }
 
-    public boolean match(Context context, String needle) {
+    public boolean match(String needle) {
         if (TextUtils.isEmpty(needle)) {
             return true;
         }
@@ -254,7 +254,7 @@ public class Contact implements ListItem, Blockable {
         String[] parts = needle.split("[,\\s]+");
         if (parts.length > 1) {
             for (String part : parts) {
-                if (!match(context, part)) {
+                if (!match(part)) {
                     return false;
                 }
             }
@@ -262,17 +262,17 @@ public class Contact implements ListItem, Blockable {
         } else if(parts.length > 0) {
             return jid.toString().contains(parts[0]) ||
                     getDisplayName().toLowerCase(Locale.US).contains(parts[0]) ||
-                    matchInTag(context, parts[0]);
+                    matchInTag(parts[0]);
         } else {
             return jid.toString().contains(needle)
                     || getDisplayName().toLowerCase(Locale.US).contains(needle)
-                    || matchInTag(context, needle);
+                    || matchInTag(needle);
         }
     }
 
-    private boolean matchInTag(Context context, String needle) {
+    private boolean matchInTag(String needle) {
         needle = needle.toLowerCase(Locale.US);
-        for (Tag tag : getTags(context)) {
+        for (Tag tag : getTags()) {
             if (tag.getName().toLowerCase(Locale.US).contains(needle)) {
                 return true;
             }
@@ -338,13 +338,13 @@ public class Contact implements ListItem, Blockable {
         final String resource = getPresences().firstWhichSupport(namespace);
         if (resource == null) return null;
 
-        return resource.equals("") ? getJid() : getJid().withResource(resource);
+        return resource.equals("") ? getAddress() : getAddress().withResource(resource);
     }
 
     public boolean isApp() {
         if (getPresences().isEmpty()) {
             // No caps so let's guess that domains are apps
-            return getJid().isDomainJid();
+            return getAddress().isDomainJid();
         }
 
         final var hasCommands = resourceWhichSupport(Namespace.COMMANDS) != null;
@@ -357,7 +357,7 @@ public class Contact implements ListItem, Blockable {
 
         final var conference = getPresences().anyIdentity("conference", null);
         // A MUC component is an app
-        if (conference && getJid().isDomainJid()) return hasCommands;
+        if (conference && getAddress().isDomainJid()) return hasCommands;
 
         // If it's not a client or conference, guess it's an app
         return !client && !conference && hasCommands;
@@ -405,8 +405,12 @@ public class Contact implements ListItem, Blockable {
         this.systemAccount = lookupUri;
     }
 
-    public void setGroups(List<String> groups) {
+    public void setGroups(Collection<String> groups) {
         this.groups = new JSONArray(groups);
+    }
+
+    public Collection<String> getGroups() {
+        return getGroups(false);
     }
 
     public Collection<String> getGroups(final boolean unique) {
@@ -574,9 +578,9 @@ public class Contact implements ListItem, Blockable {
 
     @Override
     public int compareTo(@NonNull final ListItem another) {
-        if (getJid().isDomainJid() && !another.getJid().isDomainJid()) {
+        if (getAddress().isDomainJid() && !another.getAddress().isDomainJid()) {
             return -1;
-        } else if (!getJid().isDomainJid() && another.getJid().isDomainJid()) {
+        } else if (!getAddress().isDomainJid() && another.getAddress().isDomainJid()) {
             return 1;
         }
 
@@ -585,14 +589,14 @@ public class Contact implements ListItem, Blockable {
         final var displayNameScore = getDisplayName().compareToIgnoreCase(anotherName);
 
         if (displayNameScore == 0) {
-            return getJid().compareTo(another.getJid());
+            return getAddress().compareTo(another.getAddress());
         }
 
         return displayNameScore;
     }
 
     public String getServer() {
-        return getJid().getDomain().toString();
+        return getAddress().getDomain().toString();
     }
 
     public boolean setAvatar(final String avatar) {
@@ -618,16 +622,16 @@ public class Contact implements ListItem, Blockable {
 
     @Override
     public boolean isDomainBlocked() {
-        return getAccount().isBlocked(this.getJid().getDomain());
+        return getAccount().isBlocked(this.getAddress().getDomain());
     }
 
     @Override
     @NonNull
-    public Jid getBlockedJid() {
+    public Jid getBlockedAddress() {
         if (isDomainBlocked()) {
-            return getJid().getDomain();
+            return getAddress().getDomain();
         } else {
-            return getJid();
+            return getAddress();
         }
     }
 
@@ -701,7 +705,7 @@ public class Contact implements ListItem, Blockable {
 
     protected String phoneAccountLabel() {
         return account.getJid().asBareJid().toString() +
-            "/" + getJid().asBareJid().toString();
+            "/" + getAddress().asBareJid().toString();
     }
 
     public PhoneAccountHandle phoneAccountHandle() {
@@ -733,7 +737,7 @@ public class Contact implements ListItem, Blockable {
         ).setHighlightColor(
             0x7401CF
         ).setShortDescription(
-            getJid().asBareJid().toString()
+            getAddress().asBareJid().toString()
         ).setCapabilities(
             PhoneAccount.CAPABILITY_CALL_PROVIDER
         ).build();
@@ -759,7 +763,7 @@ public class Contact implements ListItem, Blockable {
         try {
             telecomManager.unregisterPhoneAccount(phoneAccountHandle());
         } catch (final SecurityException e) {
-            Log.w(Config.LOGTAG, "Could not unregister " + getJid() + " as phone account: " + e);
+            Log.w(Config.LOGTAG, "Could not unregister " + getAddress() + " as phone account: " + e);
         }
     }
 

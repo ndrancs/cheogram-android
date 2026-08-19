@@ -39,7 +39,6 @@ import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.entities.Account;
-import eu.siacs.conversations.entities.Bookmark;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.DownloadableFile;
 import eu.siacs.conversations.entities.Message;
@@ -216,7 +215,7 @@ public class IqGenerator extends AbstractGenerator {
 
     public Iq moderateMessage(Account account, Message m, String reason) {
         final var packet = new Iq(Iq.Type.SET);
-        packet.setTo(m.getConversation().getJid().asBareJid());
+        packet.setTo(m.getConversation().getAddress().asBareJid());
         packet.setFrom(account.getJid());
         final var moderate =
             packet.addChild("apply-to", "urn:xmpp:fasten:0")

@@ -603,7 +603,7 @@ public class ConversationFragment extends XmppFragment
                         final var connection = contact.getAccount().getXmppConnection();
                         connection
                                 .getManager(PresenceManager.class)
-                                .subscribed(contact.getJid().asBareJid());
+                                .subscribed(contact.getAddress().asBareJid());
                         hideSnackbar();
                     }
                 }
@@ -1577,7 +1577,7 @@ public class ConversationFragment extends XmppFragment
             setupReply(null);
         });
         binding.requestVoice.setOnClickListener((v) -> {
-            activity.xmppConnectionService.requestVoice(conversation.getAccount(), conversation.getJid());
+            activity.xmppConnectionService.requestVoice(conversation.getAccount(), conversation.getAddress());
             binding.requestVoice.setVisibility(View.GONE);
             Toast.makeText(activity, "Your request has been sent to the moderators", Toast.LENGTH_SHORT).show();
         });
@@ -2575,7 +2575,7 @@ public class ConversationFragment extends XmppFragment
         var jids = conversation.getContact().getPresences().getFullJids();
         if (jids.isEmpty()) {
             jids = new HashSet<>();
-            jids.add(conversation.getContact().getJid());
+            jids.add(conversation.getContact().getAddress());
         }
         for (final var jid : jids) {
             Futures.addCallback(
@@ -2668,7 +2668,7 @@ public class ConversationFragment extends XmppFragment
         }
         final Contact contact = conversation.getContact();
         if (Config.USE_JINGLE_MESSAGE_INIT && RtpCapability.jmiSupport(contact)) {
-            triggerRtpSession(contact.getAccount(), contact.getJid().asBareJid(), action);
+            triggerRtpSession(contact.getAccount(), contact.getAddress().asBareJid(), action);
         } else {
             final RtpCapability.Capability capability;
             if (action.equals(RtpSessionActivity.ACTION_MAKE_VIDEO_CALL)) {
@@ -2750,7 +2750,7 @@ public class ConversationFragment extends XmppFragment
                         Config.LOGTAG,
                         AxolotlService.getLogprefix(conversation.getAccount())
                                 + "Enabled axolotl for Contact "
-                                + conversation.getContact().getJid());
+                                + conversation.getContact().getAddress());
                 updated = conversation.setNextEncryption(Message.ENCRYPTION_AXOLOTL);
                 item.setChecked(true);
                 break;
@@ -3742,7 +3742,7 @@ public class ConversationFragment extends XmppFragment
 
     @Override
     public void refreshForNewCaps(final Set<Jid> newCapsJids) {
-        if (newCapsJids.isEmpty() || (conversation != null && newCapsJids.contains(conversation.getJid().asBareJid()))) {
+        if (newCapsJids.isEmpty() || (conversation != null && newCapsJids.contains(conversation.getAddress().asBareJid()))) {
             refreshCommands(true);
         }
     }
@@ -3757,10 +3757,10 @@ public class ConversationFragment extends XmppFragment
 
         Jid commandJid = conversation.getContact().resourceWhichSupport(Namespace.COMMANDS);
         if (commandJid == null && conversation.getMode() == Conversation.MODE_MULTI && conversation.getMucOptions().hasFeature(Namespace.COMMANDS)) {
-            commandJid = conversation.getJid().asBareJid();
+            commandJid = conversation.getAddress().asBareJid();
         }
-        if (commandJid == null && conversation.getJid().isDomainJid()) {
-            commandJid = conversation.getJid();
+        if (commandJid == null && conversation.getAddress().isDomainJid()) {
+            commandJid = conversation.getAddress();
         }
         if (commandJid == null) {
             binding.commandsViewProgressbar.setVisibility(View.GONE);
@@ -3888,7 +3888,7 @@ public class ConversationFragment extends XmppFragment
         }
         if (nick != null) {
             if (pm) {
-                Jid jid = conversation.getJid();
+                Jid jid = conversation.getAddress();
                 try {
                     Jid next = Jid.of(jid.getLocal(), jid.getDomain(), nick);
                     privateMessageWith(next);
@@ -3965,7 +3965,7 @@ public class ConversationFragment extends XmppFragment
         if (message != null) {
             startDownloadable(message);
         }
-        if (activity.xmppConnectionService.isOnboarding() && conversation.getJid().equals(Jid.of("cheogram.com"))) {
+        if (activity.xmppConnectionService.isOnboarding() && conversation.getAddress().equals(Jid.of("cheogram.com"))) {
             if (!conversation.switchToSession("jabber:iq:register")) {
                 conversation.startCommand(commandFor(Jid.of("cheogram.com/CHEOGRAM%jabber:iq:register"), "jabber:iq:register"), activity.xmppConnectionService);
             }
@@ -4027,7 +4027,7 @@ public class ConversationFragment extends XmppFragment
     }
 
     private boolean showBlockSubmenu(View view) {
-        final Jid jid = conversation.getJid();
+        final Jid jid = conversation.getAddress();
         final int mode = conversation.getMode();
         final var contact = mode == Conversation.MODE_SINGLE ? conversation.getContact() : null;
         final boolean showReject = contact.getOption(Contact.Options.PENDING_SUBSCRIPTION_REQUEST);
@@ -4066,7 +4066,7 @@ public class ConversationFragment extends XmppFragment
     }
 
     private boolean showBlockMucSubmenu(View view) {
-        final var jid = conversation.getJid();
+        final var jid = conversation.getAddress();
         final var popupMenu = new PopupMenu(getActivity(), view);
         popupMenu.inflate(R.menu.block_muc);
         popupMenu.getMenu().findItem(R.id.block_contact).setVisible(jid.getLocal() != null);
@@ -5032,7 +5032,7 @@ public class ConversationFragment extends XmppFragment
                                     activity.showQrCode(
                                             "xmpp:"
                                                     + message.getContact()
-                                                            .getJid()
+                                                            .getAddress()
                                                             .asBareJid()
                                                             .toString());
                                     break;

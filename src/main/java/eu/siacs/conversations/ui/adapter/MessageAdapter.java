@@ -641,7 +641,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             body.append("…");
         }
         if (processMarkup) StylingHelper.format(body, viewHolder.messageBody().getCurrentTextColor());
-        Linkify.addLinks(body, message.getConversation().getAccount(), message.getConversation().getJid());
+        Linkify.addLinks(body, message.getConversation().getAccount(), message.getConversation().getAddress());
         FixedURLSpan.fix(body);
         boolean startsWithQuote = processMarkup ? handleTextQuotes(viewHolder.messageBody(), body, bubbleColor, true) : false;
         for (final android.text.style.QuoteSpan quote : body.getSpans(0, body.length(), android.text.style.QuoteSpan.class)) {
@@ -1381,7 +1381,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         final Transferable transferable = message.getTransferable();
         final boolean unInitiatedButKnownSize = MessageUtils.unInitiatedButKnownSize(message);
 
-        final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && conversation.getMode() == Conversation.MODE_MULTI && activity.xmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getJid(), message.getOccupantId(), null, null));
+        final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && conversation.getMode() == Conversation.MODE_MULTI && activity.xmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getAddress(), message.getOccupantId(), null, null));
         if (muted) {
             // Muted MUC participant
             displayInfoMessage(viewHolder, "Muted", bubbleColor);

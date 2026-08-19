@@ -1,6 +1,5 @@
 package eu.siacs.conversations.ui;
 
-import static eu.siacs.conversations.entities.Bookmark.printableValue;
 import static eu.siacs.conversations.utils.StringUtils.changed;
 
 import android.app.Activity;
@@ -59,7 +58,6 @@ import eu.siacs.conversations.R;
 import eu.siacs.conversations.databinding.ActivityMucDetailsBinding;
 import eu.siacs.conversations.databinding.ThreadRowBinding;
 import eu.siacs.conversations.entities.Account;
-import eu.siacs.conversations.entities.Bookmark;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.ListItem;
@@ -90,6 +88,8 @@ import eu.siacs.conversations.xmpp.XmppConnection;
 
 import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
+import im.conversations.android.model.Bookmark;
+import im.conversations.android.model.ImmutableBookmark;
 import im.conversations.android.xmpp.model.muc.Affiliation;
 import im.conversations.android.xmpp.model.muc.Role;
 import java.util.Collections;
@@ -356,7 +356,7 @@ public class ConferenceDetailsActivity extends XmppActivity
                 });
         this.binding.relatedMucs.setOnClickListener(v -> {
             final Intent intent = new Intent(this, ChannelDiscoveryActivity.class);
-            intent.putExtra("services", new String[]{ mConversation.getJid().getDomain().toString(), mConversation.getAccount().getJid().toString() });
+            intent.putExtra("services", new String[]{ mConversation.getAddress().getDomain().toString(), mConversation.getAccount().getJid().toString() });
             startActivity(intent);
         });
     }
@@ -445,7 +445,7 @@ public class ConferenceDetailsActivity extends XmppActivity
             final String name = mucOptions.getName();
             this.binding.mucEditTitle.setText("");
             final boolean owner = mucOptions.getSelf().ranks(Affiliation.OWNER);
-            if (owner || printableValue(name)) {
+            if (owner || Bookmark.printableValue(name)) {
                 this.binding.mucEditTitle.setVisibility(View.VISIBLE);
                 if (name != null) {
                     this.binding.mucEditTitle.append(name);
@@ -466,16 +466,17 @@ public class ConferenceDetailsActivity extends XmppActivity
 
             final Bookmark bookmark = mConversation.getBookmark();
             if (bookmark != null && mConversation.getAccount().getXmppConnection().getFeatures().bookmarks2() && showDynamicTags) {
-                for (final ListItem.Tag group : bookmark.getGroupTags()) {
+                for (final ListItem.Tag group : bookmark.getTags()) {
                     binding.editTags.addObjectSync(group);
                 }
                 ArrayList<ListItem.Tag> tags = new ArrayList<>();
                 for (final Account account : xmppConnectionService.getAccounts()) {
                     for (Contact contact : account.getRoster().getContacts()) {
-                        tags.addAll(contact.getTags(this));
+                        tags.addAll(contact.getTags());
                     }
-                    for (Bookmark bmark : account.getBookmarks()) {
-                        tags.addAll(bmark.getTags(this));
+                    final var bookmarks = account.getXmppConnection().getManager(BookmarkManager.class);
+                    for (Bookmark bmark : bookmarks.getBookmarks()) {
+                        tags.addAll(bmark.getTags());
                     }
                 }
                 Comparator<Map.Entry<ListItem.Tag,Integer>> sortTagsBy = Map.Entry.comparingByValue(Comparator.reverseOrder());
@@ -508,8 +509,8 @@ public class ConferenceDetailsActivity extends XmppActivity
 
             final Bookmark bookmark = mConversation.getBookmark();
             if (bookmark != null && mConversation.getAccount().getXmppConnection().getFeatures().bookmarks2()) {
-                bookmark.setGroups(binding.editTags.getObjects().stream().map(tag -> tag.getName()).collect(Collectors.toList()));
-                xmppConnectionService.createBookmark(bookmark.getAccount(), bookmark);
+					 final var newBmark = bookmark.withTags(binding.editTags.getObjects().stream().map(tag -> tag.getName()).collect(Collectors.toList()));
+                xmppConnectionService.createBookmark(bookmark.getAccount(), newBmark);
             }
 
             SoftKeyboardUtils.hideSoftKeyboard(this);
@@ -552,9 +553,9 @@ public class ConferenceDetailsActivity extends XmppActivity
         if (mConversation != null) {
             if (http) {
                 return "https://conversations.im/j/"
-                        + XmppUri.lameUrlEncode(mConversation.getJid().asBareJid().toString());
+                        + XmppUri.lameUrlEncode(mConversation.getAddress().asBareJid().toString());
             } else {
-                return "xmpp:" + Uri.encode(mConversation.getJid().asBareJid().toString(), "@/+") + "?join";
+                return "xmpp:" + Uri.encode(mConversation.getAddress().asBareJid().toString(), "@/+") + "?join";
             }
         } else {
             return null;
@@ -708,22 +709,22 @@ public class ConferenceDetailsActivity extends XmppActivity
         this.binding.truejid.setVisibility(View.GONE);
         if (mConversation.isPrivateAndNonAnonymous()) {
             this.binding.jid.setText(
-                    getString(R.string.hosted_on, mConversation.getJid().getDomain()));
-            this.binding.truejid.setText(mConversation.getJid().asBareJid().toString());
+                    getString(R.string.hosted_on, mConversation.getAddress().getDomain()));
+            this.binding.truejid.setText(mConversation.getAddress().asBareJid().toString());
             if (mAdvancedMode) this.binding.truejid.setVisibility(View.VISIBLE);
         } else {
-            this.binding.jid.setText(mConversation.getJid().asBareJid().toString());
+            this.binding.jid.setText(mConversation.getAddress().asBareJid().toString());
         }
         AvatarWorkerTask.loadAvatar(
                 mConversation, binding.yourPhoto, R.dimen.avatar_on_details_screen_size);
         String roomName = mucOptions.getName();
         String subject = mucOptions.getSubject();
         final boolean hasTitle;
-        if (printableValue(roomName)) {
+        if (Bookmark.printableValue(roomName)) {
             this.binding.mucTitle.setText(roomName);
             this.binding.mucTitle.setVisibility(View.VISIBLE);
             hasTitle = true;
-        } else if (!printableValue(subject)) {
+        } else if (!Bookmark.printableValue(subject)) {
             this.binding.mucTitle.setText(mConversation.getName());
             hasTitle = true;
             this.binding.mucTitle.setVisibility(View.VISIBLE);
@@ -731,7 +732,7 @@ public class ConferenceDetailsActivity extends XmppActivity
             hasTitle = false;
             this.binding.mucTitle.setVisibility(View.GONE);
         }
-        if (printableValue(subject)) {
+        if (Bookmark.printableValue(subject)) {
             final var spannable = new SpannableString(subject);
             StylingHelper.format(spannable, this.binding.mucSubject.getCurrentTextColor());
             Linkify.addLinks(spannable);
@@ -858,7 +859,7 @@ public class ConferenceDetailsActivity extends XmppActivity
             Util.justifyListViewHeightBasedOnChildren(binding.recentThreads);
         }
 
-        final List<ListItem.Tag> tagList = bookmark.getTags(this);
+        final var tagList = bookmark.getTags();
         if (tagList.isEmpty() || !this.showDynamicTags) {
             binding.tags.setVisibility(View.GONE);
         } else {

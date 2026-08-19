@@ -347,7 +347,7 @@ public class MessageArchiveService implements OnAdvancedStreamFeaturesLoaded {
                 if (query.account == conversation.getAccount() && query.isCatchup()) {
                     final Jid with = query.getWith() == null ? null : query.getWith().asBareJid();
                     if ((conversation.getMode() == Conversational.MODE_SINGLE && with == null)
-                            || (conversation.getJid().asBareJid().equals(with))) {
+                            || (conversation.getAddress().asBareJid().equals(with))) {
                         return true;
                     }
                 }
@@ -652,7 +652,7 @@ public class MessageArchiveService implements OnAdvancedStreamFeaturesLoaded {
         }
 
         public Jid getWith() {
-            return conversation == null ? null : conversation.getJid().asBareJid();
+            return conversation == null ? null : conversation.getAddress().asBareJid();
         }
 
         public boolean muc() {
