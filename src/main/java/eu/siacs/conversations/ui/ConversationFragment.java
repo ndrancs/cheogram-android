@@ -1681,14 +1681,28 @@ public class ConversationFragment extends XmppFragment
 
                     final var allUsers = conversation.getMucOptions().getUsers();
                     if (!conversation.getMucOptions().getUsersByRole(Role.MODERATOR).isEmpty()) {
-                        final var u = new MucOptions.User(conversation.getMucOptions(), null, "\0role:moderator", "Notify active moderators", new HashSet<>());
-                        u.setRole(Role.PARTICIPANT);
-                        allUsers.add(u);
+                        allUsers.add(
+                                new MucOptions.User(
+                                        conversation.getMucOptions(),
+                                        null,
+                                        null,
+                                        "\0role:moderator",
+                                        "Notify active moderators",
+                                        Role.PARTICIPANT,
+                                        Affiliation.NONE,
+                                        new HashSet<>()));
                     }
                     if (!allUsers.isEmpty() && conversation.getMucOptions().getSelf() != null && conversation.getMucOptions().getSelf().ranks(Affiliation.MEMBER)) {
-                        final var u = new MucOptions.User(conversation.getMucOptions(), null, "\0attention", "Notify active participants", new HashSet<>());
-                        u.setRole(Role.PARTICIPANT);
-                        allUsers.add(u);
+                        allUsers.add(
+                                new MucOptions.User(
+                                        conversation.getMucOptions(),
+                                        null,
+                                        null,
+                                        "\0attention",
+                                        "Notify active participants",
+                                        Role.PARTICIPANT,
+                                        Affiliation.NONE,
+                                        new HashSet<>()));
                     }
                     final String needle = query.toString().toLowerCase(Locale.getDefault());
                     if (getRecyclerView() != null) getRecyclerView().setItemAnimator(null);

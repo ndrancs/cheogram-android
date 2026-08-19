@@ -5,7 +5,6 @@ import android.content.Context;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Log;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -18,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.gson.JsonObject;
 
+import com.google.common.collect.Lists;
 import de.gultsch.common.IntMap;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.services.AvatarService;
@@ -54,9 +54,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 public class MucOptions {
     private static final IntMap<Affiliation> AFFILIATION_RANKS =
             new IntMap<>(
@@ -77,8 +74,7 @@ public class MucOptions {
                             .put(Role.NONE, 0)
                             .build());
 
-    // TODO this should be a list
-    private final Set<User> users = new HashSet<>();
+    private final List<User> users = new ArrayList<>();
     private final Conversation conversation;
     public OnRenameListener onRenameListener = null;
     private boolean mAutoPushConfiguration = true;
@@ -92,9 +88,18 @@ public class MucOptions {
         this.account = conversation.getAccount();
         this.conversation = conversation;
         final String nick = getProposedNick(conversation.getAttribute("mucNick"));
-        this.self = new User(this, createJoinJid(nick), null, nick, new HashSet<>());
-        this.self.affiliation = Item.affiliationOrNone(conversation.getAttribute("affiliation"));
-        this.self.role = Item.roleOrNone(conversation.getAttribute("role"));
+        final var affiliation = Item.affiliationOrNone(conversation.getAttribute("affiliation"));
+        final var role = Item.roleOrNone(conversation.getAttribute("role"));
+        this.self =
+                new User(
+                        this,
+                        createJoinJid(nick),
+                        null,
+                        null,
+                        nick,
+                        role,
+                        affiliation,
+                        new HashSet<>());
     }
 
     public Account getAccount() {
@@ -111,15 +116,23 @@ public class MucOptions {
     }
 
     public void changeAffiliation(final Jid jid, final Affiliation affiliation) {
-        var user = findUserByRealJid(jid);
+        final var user = findUserByRealJid(jid);
         synchronized (users) {
             if (user == null) {
-                user = new User(this, null, null, null, new HashSet<>());
-                user.setRealJid(jid);
-                user.setOnline(false);
-                users.add(user);
+                users.add(
+                        new User(
+                                this,
+                                null,
+                                jid,
+                                null,
+                                null,
+                                Role.NONE,
+                                affiliation,
+                                new HashSet<>()));
+            } else {
+                users.remove(user);
+                users.add(user.withAffiliation(affiliation));
             }
-            user.affiliation = affiliation;
         }
     }
 
@@ -305,64 +318,61 @@ public class MucOptions {
         return features.contains(Namespace.MODERATION);
     }
 
-    public User deleteUser(Jid jid) {
-        User user = findUserByFullJid(jid);
-        if (user != null) {
-            synchronized (users) {
-                users.remove(user);
-                boolean realJidInMuc = false;
-                for (User u : users) {
-                    if (user.realJid != null && user.realJid.equals(u.realJid)) {
-                        realJidInMuc = true;
-                        break;
-                    }
-                }
-                boolean self =
-                        user.realJid != null && user.realJid.equals(account.getJid().asBareJid());
-                if (membersOnly()
-                        && nonanonymous()
-                        && user.ranks(Affiliation.MEMBER)
-                        && user.realJid != null
-                        && !realJidInMuc
-                        && !self) {
-                    user.role = Role.NONE;
-                    user.avatar = null;
-                    user.fullJid = null;
-                    users.add(user);
-                }
+    public User deleteUser(final Jid jid) {
+        final User user = findUserByFullJid(jid);
+        if (user == null) {
+            return null;
+        }
+        synchronized (users) {
+            users.remove(user);
+            final boolean realJidInMuc =
+                    user.realJid != null
+                            && Iterables.any(this.users, u -> user.realJid.equals(u.realJid));
+            final boolean self =
+                    user.realJid != null && user.realJid.equals(account.getJid().asBareJid());
+            if (membersOnly()
+                    && nonanonymous()
+                    && user.ranks(Affiliation.MEMBER)
+                    && user.realJid != null
+                    && !realJidInMuc
+                    && !self) {
+                Log.d(Config.LOGTAG, "user " + jid + " left. keeping offline variant");
+                users.add(user.asOfflineUser());
             }
         }
         return user;
     }
 
     // returns true if real jid was new;
-    public boolean updateUser(User user) {
-        assert(user.options == null || user.options == this);
-
-        User old;
-        boolean realJidFound = false;
+    public boolean updateUser(final User user) {
+        User old = null;
+        final boolean realJidFound;
         if (user.fullJid == null && user.realJid != null) {
-            old = findUserByRealJid(user.realJid);
-            realJidFound = old != null;
-            if (old != null) {
-                if (old.fullJid != null) {
+            final var existingRealJid = old = findUserByRealJid(user.realJid);
+            realJidFound = existingRealJid != null;
+            if (existingRealJid != null) {
+                if (existingRealJid.fullJid != null) {
                     return false; // don't add. user already exists
                 } else {
                     synchronized (users) {
-                        users.remove(old);
+                        users.remove(existingRealJid);
                     }
                 }
             }
         } else if (user.realJid != null) {
-            old = findUserByRealJid(user.realJid);
-            realJidFound = old != null;
+            final var existingRealJid = old = findUserByRealJid(user.realJid);
+            realJidFound = existingRealJid != null;
             synchronized (users) {
-                if (old != null && (old.fullJid == null || old.role == Role.NONE)) {
-                    users.remove(old);
+                if (existingRealJid != null
+                        && (existingRealJid.fullJid == null || existingRealJid.role == Role.NONE)) {
+                    users.remove(existingRealJid);
                 }
             }
+        } else {
+            realJidFound = false;
         }
-        old = findUserByFullJid(user.getFullJid());
+        final var existingFullJid = findUserByFullJid(user.getFullJid());
+        if (old == null) old = existingFullJid;
 
         synchronized (this.users) {
             if (old != null) {
@@ -383,46 +393,26 @@ public class MucOptions {
         return false;
     }
 
+    public User findUserByFullJid(final Jid jid) {
+        synchronized (users) {
+            return jid == null
+                    ? null
+                    : Iterables.find(users, u -> jid.equals(u.getFullJid()), null);
+        }
+    }
+
     public User findUserByName(final String name) {
-        if (name == null) {
-            return null;
-        }
         synchronized (users) {
-            for (User user : users) {
-                if (name.equals(user.getName())) {
-                    return user;
-                }
-            }
+            return name == null ? null : Iterables.find(users, u -> name.equals(u.getName()), null);
         }
-        return null;
     }
 
-    public User findUserByFullJid(Jid jid) {
-        if (jid == null) {
-            return null;
-        }
+    public User findUserByRealJid(final Jid jid) {
         synchronized (users) {
-            for (User user : users) {
-                if (jid.equals(user.getFullJid())) {
-                    return user;
-                }
-            }
+            return jid == null
+                    ? null
+                    : Iterables.find(users, u -> jid.equals(u.getRealJid()), null);
         }
-        return null;
-    }
-
-    public User findUserByRealJid(Jid jid) {
-        if (jid == null) {
-            return null;
-        }
-        synchronized (users) {
-            for (User user : users) {
-                if (jid.asBareJid().equals(user.realJid)) {
-                    return user;
-                }
-            }
-        }
-        return null;
     }
 
     public User findUserByOccupantId(final String occupantId, final Jid counterpart) {
@@ -431,7 +421,16 @@ public class MucOptions {
                     ? null
                     : Iterables.find(this.users, u -> occupantId.equals(u.occupantId), null);
             if (Strings.isNullOrEmpty(occupantId) || found != null) return found;
-            final var user = new User(this, counterpart, occupantId, null, new HashSet<>());
+            final var user =
+                    new User(
+                            this,
+                            counterpart,
+                            null,
+                            occupantId,
+                            null,
+                            Role.NONE,
+                            Affiliation.NONE,
+                            new HashSet<>());
             user.setOnline(false);
             return user;
         }
@@ -442,13 +441,21 @@ public class MucOptions {
         if (existing != null) {
             return existing;
         }
-        final var user = new User(this, fullJid, occupantId, null, new HashSet<>());
-        user.setRealJid(jid);
+        final var user =
+                new User(
+                        this,
+                        fullJid,
+                        jid,
+                        occupantId,
+                        null,
+                        Role.NONE,
+                        Affiliation.NONE,
+                        new HashSet<>());
         user.setOnline(false);
         return user;
     }
 
-    public User findUser(ReadByMarker readByMarker) {
+    public User findUser(final ReadByMarker readByMarker) {
         if (readByMarker.getRealJid() != null) {
             return findOrCreateUserByRealJid(
                     readByMarker.getRealJid().asBareJid(), readByMarker.getFullJid(), null);
@@ -467,7 +474,15 @@ public class MucOptions {
         if (existing != null) {
             return existing;
         } else if (reaction.from != null) {
-            return new User(this,reaction.from,reaction.occupantId,null,new HashSet<>());
+            return new User(
+                    this,
+                    reaction.from,
+                    null,
+                    reaction.occupantId,
+                    null,
+                    Role.NONE,
+                    Affiliation.NONE,
+                    new HashSet<>());
         } else {
             return null;
         }
@@ -484,8 +499,8 @@ public class MucOptions {
         return builder.build();
     }
 
-    public boolean isContactInRoom(Contact contact) {
-        return contact != null && isUserInRoom(findUserByRealJid(contact.getAddress().asBareJid()));
+    public boolean isContactInRoom(final Contact contact) {
+        return contact != null && findUserByRealJid(contact.getAddress().asBareJid()) != null;
     }
 
     public boolean isUserInRoom(Jid jid) {
@@ -690,13 +705,19 @@ public class MucOptions {
     }
 
     private List<User> getFallbackUsersFromCryptoTargets() {
-        List<User> users = new ArrayList<>();
-        for (Jid jid : conversation.getAcceptedCryptoTargets()) {
-            User user = new User(this, null, null, null, new HashSet<>());
-            user.setRealJid(jid);
-            users.add(user);
-        }
-        return users;
+        return ImmutableList.copyOf(
+                Lists.transform(
+                        conversation.getAcceptedCryptoTargets(),
+                        jid ->
+                                new User(
+                                        this,
+                                        null,
+                                        jid,
+                                        null,
+                                        null,
+                                        Role.NONE,
+                                        Affiliation.NONE,
+                                        new HashSet<>())));
     }
 
     public List<User> getUsersRelevantForNameAndAvatar() {
@@ -910,24 +931,35 @@ public class MucOptions {
                 return new CacheEntry(user.getAvatar(), user.getNick());
             }
         }
-        public record OccupantId(String inner) { }
-        private Role role = Role.NONE;
-        private Affiliation affiliation = Affiliation.NONE;
-        private Jid realJid;
-        private Jid fullJid;
-        protected String nick;
-        private long pgpKeyId = 0;
-        private String avatar;
+		  public record OccupantId(String inner) { }
         private final MucOptions options;
+        private final Jid fullJid;
+        private final Jid realJid;
+        private final String occupantId;
+        private final Role role;
+        private final Affiliation affiliation;
+        private Long pgpKeyId;
+        private String avatar;
         private ChatState chatState = Config.DEFAULT_CHAT_STATE;
+        protected String nick;
         protected Set<Hat> hats;
-        protected String occupantId;
         protected boolean online = true;
 
-        public User(final MucOptions options, Jid fullJid, final String occupantId, final String nick, final Set<Hat> hats) {
+        public User(
+                final MucOptions options,
+                final Jid fullJid,
+                final Jid realJid,
+                final String occupantId,
+                final String nick,
+                final Role role,
+                final Affiliation affiliation,
+                final Set<Hat> hats) {
             this.options = options;
             this.fullJid = fullJid;
+            this.realJid = realJid != null ? realJid.asBareJid() : null;
             this.occupantId = occupantId;
+            this.role = role;
+            this.affiliation = affiliation;
             this.nick = nick;
             this.hats = hats;
 
@@ -969,16 +1001,8 @@ public class MucOptions {
             return this.role;
         }
 
-        public void setRole(final Role role) {
-            this.role = role;
-        }
-
         public Affiliation getAffiliation() {
             return this.affiliation;
-        }
-
-        public void setAffiliation(final Affiliation affiliation) {
-            this.affiliation = affiliation;
         }
 
         public Set<Hat> getHats() {
@@ -997,7 +1021,7 @@ public class MucOptions {
         }
 
         public long getPgpKeyId() {
-            if (this.pgpKeyId != 0) {
+            if (this.pgpKeyId != null) {
                 return this.pgpKeyId;
             } else if (realJid != null) {
                 return getAccount().getRoster().getContact(realJid).getPgpKeyId();
@@ -1006,7 +1030,7 @@ public class MucOptions {
             }
         }
 
-        public void setPgpKeyId(long id) {
+        public void setPgpKeyId(final Long id) {
             this.pgpKeyId = id;
         }
 
@@ -1110,10 +1134,6 @@ public class MucOptions {
             return realJid;
         }
 
-        public void setRealJid(Jid jid) {
-            this.realJid = jid != null ? jid.asBareJid() : null;
-        }
-
         public boolean setChatState(ChatState chatState) {
             if (this.chatState == chatState) {
                 return false;
@@ -1131,10 +1151,6 @@ public class MucOptions {
         @Override
         public String getAvatarName() {
             return getConversation().getName().toString();
-        }
-
-        public void setOccupantId(final String occupantId) {
-            this.occupantId = occupantId;
         }
 
         public String getOccupantId() {
@@ -1158,11 +1174,11 @@ public class MucOptions {
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof User user)) return false;
-            return pgpKeyId == user.pgpKeyId
-                    && role == user.role
+            return role == user.role
                     && affiliation == user.affiliation
                     && Objects.equal(realJid, user.realJid)
                     && Objects.equal(fullJid, user.fullJid)
+                    && Objects.equal(pgpKeyId, user.pgpKeyId)
                     && Objects.equal(avatar, user.avatar)
                     && Objects.equal(occupantId, user.occupantId);
         }
@@ -1171,6 +1187,40 @@ public class MucOptions {
         public int hashCode() {
             return Objects.hashCode(
                     role, affiliation, realJid, fullJid, pgpKeyId, avatar, occupantId);
+        }
+
+        public User asOfflineUser() {
+            final var offlineUser =
+                    new User(
+                            this.options,
+                            null,
+                            this.realJid,
+                            this.occupantId,
+                            this.nick,
+                            Role.NONE,
+                            this.affiliation,
+                            this.hats);
+            offlineUser.pgpKeyId = this.pgpKeyId;
+            offlineUser.chatState = this.chatState;
+            offlineUser.online = false;
+            return offlineUser;
+        }
+
+        public User withAffiliation(final Affiliation affiliation) {
+            final var user = new User(
+                    this.options,
+                    this.fullJid,
+                    this.realJid,
+                    this.occupantId,
+                    this.nick,
+                    this.role,
+                    affiliation,
+                    this.hats);
+            user.pgpKeyId = this.pgpKeyId;
+            user.avatar = this.avatar;
+            user.chatState = this.chatState;
+            user.online = this.online;
+            return user;
         }
     }
 }

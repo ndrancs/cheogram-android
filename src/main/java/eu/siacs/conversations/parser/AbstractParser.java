@@ -17,6 +17,7 @@ import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
+import im.conversations.android.xmpp.model.muc.Item;
 import im.conversations.android.xmpp.model.stanza.Stanza;
 
 public abstract class AbstractParser extends XmppConnection.Delegate {
@@ -153,7 +154,7 @@ public abstract class AbstractParser extends XmppConnection.Delegate {
                 fullJid = null;
             }
         }
-        Jid realJid = item.getAttributeAsJid("jid");
+        final Jid realJid = Jid.Invalid.getNullForInvalid(item.getAttributeAsJid("jid"));
         if (fullJid != null) nick = fullJid.getResource();
         String nickname = null;
         if (nick != null && nicknameIn != null) nickname = nick.equals(nicknameIn) ? nick : null;
@@ -168,13 +169,15 @@ public abstract class AbstractParser extends XmppConnection.Delegate {
                 hats.add(new MucOptions.Hat(hat));
             }
         }
-        MucOptions.User user = new MucOptions.User(conference.getMucOptions(), fullJid, occupantId == null ? null : occupantId.getAttribute("id"), nickname, hatsEl == null ? null : hats);
-        if (Jid.Invalid.isValid(realJid)) {
-            user.setRealJid(realJid);
-        }
-        // user.setAffiliation(affiliation);
-        // user.setRole(role);
-        return user;
+        return new MucOptions.User(
+                conference.getMucOptions(),
+                fullJid,
+                realJid,
+                occupantId == null ? null : occupantId.getAttribute("id"),
+                nickname,
+                Item.roleOrNone(role),
+                Item.affiliationOrNone(affiliation),
+                hatsEl == null ? null : hats);
     }
 
     public static String extractErrorMessage(final Element packet) {

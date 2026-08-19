@@ -1199,7 +1199,7 @@ public class Message extends AbstractEntity implements AvatarService.Avatar {
         Message prev = this.prev();
         if (prev != null && getModerated() != null && prev.getModerated() != null) return true;
         if (getOccupantId() != null && xmppConnectionService != null) {
-            final boolean muted = getStatus() == Message.STATUS_RECEIVED && conversation.getMode() == Conversation.MODE_MULTI && xmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getAddress(), getOccupantId(), null, null));
+            final boolean muted = getStatus() == Message.STATUS_RECEIVED && conversation.getMode() == Conversation.MODE_MULTI && xmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getAddress(), null, getOccupantId(), null, im.conversations.android.xmpp.model.muc.Role.NONE, im.conversations.android.xmpp.model.muc.Affiliation.NONE, null));
             if (prev != null && muted && getOccupantId().equals(prev.getOccupantId())) return true;
         }
         return false;

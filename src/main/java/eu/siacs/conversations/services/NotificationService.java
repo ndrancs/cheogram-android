@@ -1951,7 +1951,7 @@ public class NotificationService {
         if (message.getConversation() instanceof Conversation) {
             Conversation conversation = (Conversation) message.getConversation();
             final MucOptions.User sender = conversation.getMucOptions().findUserByFullJid(message.getCounterpart());
-            final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && mXmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getAddress(), message.getOccupantId(), null, null));
+            final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && mXmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getAddress(), null, message.getOccupantId(), null, im.conversations.android.xmpp.model.muc.Role.NONE, Affiliation.NONE, null));
             if (muted) return false;
             if (sender != null && sender.ranks(Affiliation.MEMBER) && message.isAttention()) {
                 return true;

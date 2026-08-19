@@ -412,8 +412,9 @@ public class MultiUserChatManager extends AbstractManager {
         final var occupant = presence.getOnlyExtension(OccupantId.class);
         final String occupantId =
                 mucOptions.occupantId() && occupant != null ? occupant.getId() : null;
-        final MucOptions.User user = MultiUserChatManager.itemToUser(conversation, item, from, occupantId, nick == null ? null : nick.getContent(), hats);
-        user.setOccupantId(occupantId);
+        final MucOptions.User user =
+                MultiUserChatManager.itemToUser(
+                        conversation, item, from, occupantId, nick == null ? null : nick.getContent(), hats);
         if (codes.contains(MucUser.STATUS_CODE_SELF_PRESENCE)
                 || (codes.contains(MucUser.STATUS_CODE_ROOM_CREATED)
                         && jid.equals(
@@ -1307,14 +1308,16 @@ public class MultiUserChatManager extends AbstractManager {
         } else {
             fullAddress = ofNick(conference, nick);
         }
-        final Jid realJid = item.getAttributeAsJid("jid");
-        MucOptions.User user = new MucOptions.User(conference.getMucOptions(), fullAddress, occupantId, nick, hats);
-        if (Jid.Invalid.isValid(realJid)) {
-            user.setRealJid(realJid);
-        }
-        user.setAffiliation(affiliation);
-        user.setRole(role);
-        return user;
+        final Jid realJid = Jid.Invalid.getNullForInvalid(item.getAttributeAsJid("jid"));
+        return new MucOptions.User(
+                conference.getMucOptions(),
+                fullAddress,
+                realJid,
+                occupantId,
+                nick,
+                role,
+                affiliation,
+                hats);
     }
 
     private static Jid ofNick(final Conversation conversation, final String nick) {

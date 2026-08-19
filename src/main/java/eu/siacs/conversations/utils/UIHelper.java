@@ -195,7 +195,7 @@ public class UIHelper {
             final XmppConnectionService context, final Message message, @ColorInt int textColor) {
         final Transferable d = message.getTransferable();
         final boolean moderated = message.getModerated() != null;
-        final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && message.getConversation().getMode() == Conversation.MODE_MULTI && context.isMucUserMuted(new MucOptions.User(null, message.getConversation().getAddress(), message.getOccupantId(), null, null));
+        final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && message.getConversation().getMode() == Conversation.MODE_MULTI && context.isMucUserMuted(new MucOptions.User(null, message.getConversation().getAddress(), null, message.getOccupantId(), null, im.conversations.android.xmpp.model.muc.Role.NONE, im.conversations.android.xmpp.model.muc.Affiliation.NONE, null));
         if (muted) {
             return new Pair<>("Muted", false);
         } else if (d != null && !moderated) {

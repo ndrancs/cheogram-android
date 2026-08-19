@@ -1716,7 +1716,7 @@ public class Conversation extends AbstractEntity
                 if (message.getSubject() != null && !message.isOOb() && (message.getRawBody() == null || message.getRawBody().length() == 0)) continue;
                 if (asReaction(message) != null) continue;
                 if ((message.getRawBody() == null || "".equals(message.getRawBody()) || " ".equals(message.getRawBody())) && message.getReply() != null && message.edited() && message.getHtml() != null) continue;
-                final boolean muted = xmppConnectionService != null && message.getStatus() == Message.STATUS_RECEIVED && getMode() == Conversation.MODE_MULTI && xmppConnectionService.isMucUserMuted(new MucOptions.User(null, getAddress(), message.getOccupantId(), null, null));
+                final boolean muted = xmppConnectionService != null && message.getStatus() == Message.STATUS_RECEIVED && getMode() == Conversation.MODE_MULTI && xmppConnectionService.isMucUserMuted(new MucOptions.User(null, getAddress(), null, message.getOccupantId(), null, im.conversations.android.xmpp.model.muc.Role.NONE, im.conversations.android.xmpp.model.muc.Affiliation.NONE, null));
                 if (muted) continue;
                 if (message.isRead()) {
                     if (message.getType() == Message.TYPE_RTP_SESSION) {

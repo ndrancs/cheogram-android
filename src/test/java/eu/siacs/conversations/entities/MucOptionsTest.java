@@ -54,8 +54,11 @@ public class MucOptionsTest {
         user = new MucOptions.User(
             mucOptions,
             Jid.ofLocalAndDomain("testUser", "example.org"),
+            null,
             OCCUPANT_ID,
             "testNick",
+            im.conversations.android.xmpp.model.muc.Role.NONE,
+            im.conversations.android.xmpp.model.muc.Affiliation.NONE,
             new HashSet<>()
         );
     }
@@ -73,8 +76,11 @@ public class MucOptionsTest {
         final var cachedUser = new MucOptions.User(
             mucOptions,
             Jid.ofLocalAndDomain("testUser2", "example.org"),
+            null,
             "occ-2",
             null,
+            im.conversations.android.xmpp.model.muc.Role.NONE,
+            im.conversations.android.xmpp.model.muc.Affiliation.NONE,
             new HashSet<>()
         );
         Assert.assertEquals("cachedNick", cachedUser.getNick());
@@ -94,7 +100,15 @@ public class MucOptionsTest {
         final var realJid = Jid.ofLocalAndDomain("realUser", "example.org");
         final var contact = mock(Contact.class);
         when(roster.getContactFromContactList(realJid)).thenReturn(contact);
-        user.setRealJid(realJid);
+        user = new MucOptions.User(
+                mucOptions,
+                Jid.ofLocalAndDomain("testUser", "example.org"),
+                realJid,
+                OCCUPANT_ID,
+                "testNick",
+                im.conversations.android.xmpp.model.muc.Role.NONE,
+                im.conversations.android.xmpp.model.muc.Affiliation.NONE,
+                new HashSet<>());
 
         when(conversation.setCachedOccupantAvatar(CACHE_KEY, "avatarHash")).thenReturn(true);
         user.setAvatar("avatarHash");
