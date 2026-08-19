@@ -234,9 +234,7 @@ public class Conversation extends AbstractEntity
             "formerly_private_non_anonymous";
     public static final String ATTRIBUTE_PINNED_ON_TOP = "pinned_on_top";
     static final String ATTRIBUTE_MUC_PASSWORD = "muc_password";
-    static final String ATTRIBUTE_MEMBERS_ONLY = "members_only";
-    static final String ATTRIBUTE_MODERATED = "moderated";
-    static final String ATTRIBUTE_NON_ANONYMOUS = "non_anonymous";
+    static final String ATTRIBUTE_CAPS2_HASH = "muc_caps2_hash";
     private static final String ATTRIBUTE_NEXT_MESSAGE = "next_message";
     private static final String ATTRIBUTE_NEXT_MESSAGE_TIMESTAMP = "next_message_timestamp";
     private static final String ATTRIBUTE_CRYPTO_TARGETS = "crypto_targets";
@@ -1581,12 +1579,6 @@ public class Conversation extends AbstractEntity
         }
     }
 
-    public void remove(Message message) {
-        synchronized (this.messages) {
-            this.messages.remove(message);
-        }
-    }
-
     public void checkSpam(Message... messages) {
         if (anyMatchSpam) return;
 
@@ -1703,6 +1695,12 @@ public class Conversation extends AbstractEntity
 
     public boolean isInHistoryPart() {
         return !historyPartMessages.isEmpty();
+    }
+	 
+    public boolean remove(final Message message) {
+        final var success = this.messages.remove(message);
+        this.untieMessages();
+        return success;
     }
 
     private void untieMessages() {

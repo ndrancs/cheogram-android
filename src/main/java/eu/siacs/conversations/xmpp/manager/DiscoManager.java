@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -146,15 +147,23 @@ public class DiscoManager extends AbstractManager {
 
     public ListenableFuture<Void> infoOrCache(
             final Entity entity, final String node, final EntityCapabilities.Hash hash) {
+        if (loadFromCache(entity, node, hash)) {
+            return Futures.immediateFuture(null);
+        }
+        return Futures.transform(
+                info(entity, node, hash), f -> null, MoreExecutors.directExecutor());
+    }
+
+    public boolean loadFromCache(
+            final Entity entity, final String node, final EntityCapabilities.Hash hash) {
         final var cached = getDatabase().getInfoQuery(hash);
         if (cached != null && Config.ENABLE_CAPS_CACHE) {
             if (node == null || hash != null) {
                 this.put(entity.address, cached);
             }
-            return Futures.immediateFuture(null);
+            return true;
         }
-        return Futures.transform(
-                info(entity, node, hash), f -> null, MoreExecutors.directExecutor());
+        return false;
     }
 
     public ListenableFuture<InfoQuery> info(
@@ -345,7 +354,6 @@ public class DiscoManager extends AbstractManager {
         } else {
             features.add(Namespace.BOOKMARKS + "+notify");
         }
-        Log.d(Config.LOGTAG, "our features: " + features.build());
         return new ServiceDescription(
                 features.build(),
                 new ServiceDescription.Identity(BuildConfig.APP_NAME, "client", getIdentityType()));
@@ -479,8 +487,24 @@ public class DiscoManager extends AbstractManager {
     }
 
     public void clear() {
+        final var account = getAccount().getJid().asBareJid();
+        final var domain = account.getDomain();
+        final Set<Jid> items;
+        synchronized (this.discoItems) {
+            final var discoItems = this.discoItems.get(domain);
+            if (discoItems != null) {
+                items = ImmutableSet.copyOf(discoItems);
+            } else {
+                items = Collections.emptySet();
+            }
+            this.discoItems.clear();
+        }
         synchronized (this.entityInformation) {
-            this.entityInformation.clear();
+            this.entityInformation.remove(account);
+            this.entityInformation.remove(domain);
+            for (final var item : items) {
+                this.entityInformation.remove(item);
+            }
         }
         synchronized (this.commands) {
             this.commands.clear();

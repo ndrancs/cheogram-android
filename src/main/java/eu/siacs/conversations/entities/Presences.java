@@ -2,6 +2,7 @@ package eu.siacs.conversations.entities;
 
 import android.util.Pair;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.manager.DiscoManager;
@@ -68,9 +69,11 @@ public class Presences {
         }
     }
 
-    public void clearPresences() {
+    public Set<String> clearPresences() {
         synchronized (this.presences) {
+            final var resources = ImmutableSet.copyOf(this.presences.keySet());
             this.presences.clear();
+            return resources;
         }
     }
 

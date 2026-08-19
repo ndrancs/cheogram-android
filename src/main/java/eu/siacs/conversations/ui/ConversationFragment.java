@@ -83,6 +83,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.pm.ShortcutInfoCompat;
 import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.graphics.ColorUtils;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.inputmethod.InputConnectionCompat;
 import androidx.core.view.inputmethod.InputContentInfoCompat;
 import androidx.databinding.DataBindingUtil;
@@ -141,12 +142,15 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import de.gultsch.common.Linkify;
 import de.gultsch.common.Patterns;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
+import eu.siacs.conversations.databinding.DialogModerationBinding;
 import eu.siacs.conversations.databinding.FragmentConversationBinding;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Blockable;
@@ -223,9 +227,13 @@ import im.conversations.android.xmpp.model.stanza.Iq;
 
 import org.jetbrains.annotations.NotNull;
 import eu.siacs.conversations.xmpp.manager.HttpUploadManager;
+import eu.siacs.conversations.xmpp.manager.ModerationManager;
 import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
 import eu.siacs.conversations.xmpp.manager.PresenceManager;
+import im.conversations.android.xmpp.model.muc.Role;
 import im.conversations.android.xmpp.model.stanza.Presence;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -243,6 +251,8 @@ public class ConversationFragment extends XmppFragment
                 MessageAdapter.OnContactPictureLongClicked,
                 MessageAdapter.OnContactPictureClicked,
                 MessageAdapter.OnInlineImageLongClicked {
+
+    private static Instant ackModeration = Instant.MIN;
 
     public static final int REQUEST_SEND_MESSAGE = 0x0201;
     public static final int REQUEST_DECRYPT_PGP = 0x0202;
@@ -1529,7 +1539,7 @@ public class ConversationFragment extends XmppFragment
                 } else {
                     menuOngoingCall.setVisible(false);
                     final RtpCapability.Capability rtpCapability =
-                            RtpCapability.check(conversation.getContact());
+                            RtpCapability.checkWithFallback(conversation.getContact());
                     final boolean cameraAvailable =
                             activity != null && activity.isCameraFeatureAvailable();
                     menuCall.setVisible(true);
@@ -2043,6 +2053,10 @@ public class ConversationFragment extends XmppFragment
         }
     }
 
+    private static boolean isAckedModerationDisclaimer() {
+        return ackModeration.isAfter(Instant.now());
+    }
+
     private void populateContextMenu(final ContextMenu menu) {
         final Message m = this.selectedMessage;
         final Transferable t = m.getTransferable();
@@ -2077,7 +2091,6 @@ public class ConversationFragment extends XmppFragment
             final MenuItem retryDecryption = menu.findItem(R.id.retry_decryption);
             final MenuItem correctMessage = menu.findItem(R.id.correct_message);
             final MenuItem retractMessage = menu.findItem(R.id.retract_message);
-            final MenuItem moderateMessage = menu.findItem(R.id.moderate_message);
             final MenuItem onlyThisThread = menu.findItem(R.id.only_this_thread);
             final MenuItem shareWith = menu.findItem(R.id.share_with);
             final MenuItem sendAgain = menu.findItem(R.id.send_again);
@@ -2089,6 +2102,7 @@ public class ConversationFragment extends XmppFragment
             final MenuItem cancelTransmission = menu.findItem(R.id.cancel_transmission);
             final MenuItem blockMedia = menu.findItem(R.id.block_media);
             final MenuItem deleteFile = menu.findItem(R.id.delete_file);
+            final MenuItem moderateMessage = menu.findItem(R.id.moderation);
             final MenuItem showErrorMessage = menu.findItem(R.id.show_error_message);
             onlyThisThread.setVisible(!conversation.getLockThread() && m.getThread() != null);
             final boolean unInitiatedButKnownSize = MessageUtils.unInitiatedButKnownSize(m);
@@ -2116,7 +2130,17 @@ public class ConversationFragment extends XmppFragment
                                 && (c.getMode() == Conversational.MODE_SINGLE
                                         || (c.getMucOptions().occupantId()
                                                 && c.getMucOptions().participating())));
+                if (c.getMode() == Conversational.MODE_MULTI) {
+                    final var mucOptions = c.getMucOptions();
+                    moderateMessage.setVisible(
+                                    mucOptions.moderation()
+                                    && mucOptions.getSelf().ranks(Role.MODERATOR)
+                                    && m.getServerMsgId() != null && m.getModerated() == null);
+                } else {
+                    moderateMessage.setVisible(false);
+                }
             } else {
+                moderateMessage.setVisible(false);
                 addReaction.setVisible(false);
             }
             if (!m.isFileOrImage()
@@ -2160,9 +2184,6 @@ public class ConversationFragment extends XmppFragment
             if (m.getStatus() == Message.STATUS_WAITING) {
                 correctMessage.setVisible(true);
                 retractMessage.setVisible(true);
-            }
-            if (conversation.getMode() == Conversation.MODE_MULTI && m.getServerMsgId() != null && m.getModerated() == null && conversation.getMucOptions().getSelf().ranks(Role.MODERATOR) && conversation.getMucOptions().hasFeature("urn:xmpp:message-moderate:0")) {
-                moderateMessage.setVisible(true);
             }
             if ((m.isFileOrImage() && !deleted && !receiving)
                     || (m.getType() == Message.TYPE_TEXT && !m.treatAsDownloadable())
@@ -2283,12 +2304,6 @@ public class ConversationFragment extends XmppFragment
                     })
                     .setNegativeButton(R.string.no, null).show();
                 return true;
-            case R.id.moderate_message:
-                activity.quickEdit("Spam", (reason) -> {
-                    activity.xmppConnectionService.moderateMessage(conversation.getAccount(), selectedMessage, reason);
-                    return null;
-                }, R.string.moderate_reason, false, false, true, true);
-                return true;
             case R.id.copy_message:
                 ShareUtil.copyToClipboard(activity, selectedMessage);
                 return true;
@@ -2347,6 +2362,12 @@ public class ConversationFragment extends XmppFragment
                 return true;
             case R.id.delete_file:
                 deleteFile(selectedMessage);
+                return true;
+            case R.id.moderation:
+                activity.quickEdit("Spam", (reason) -> {
+                    activity.xmppConnectionService.moderateMessage(conversation.getAccount(), selectedMessage, reason);
+                    return null;
+                }, R.string.moderate_reason, false, false, true, true);
                 return true;
             case R.id.show_error_message:
                 showErrorMessage(selectedMessage);
@@ -3332,6 +3353,56 @@ public class ConversationFragment extends XmppFragment
                     }
                 });
         builder.create().show();
+    }
+
+    private void moderate(final Message message) {
+        final var manager =
+                message.getConversation()
+                        .getAccount()
+                        .getXmppConnection()
+                        .getManager(ModerationManager.class);
+        final FutureCallback<Void> callback =
+                new FutureCallback<Void>() {
+                    @Override
+                    public void onSuccess(Void result) {}
+
+                    @Override
+                    public void onFailure(@NonNull Throwable t) {
+                        Log.d(Config.LOGTAG, "could not moderate message", t);
+                        Toast.makeText(
+                                        requireActivity(),
+                                        R.string.could_not_moderate_message,
+                                        Toast.LENGTH_LONG)
+                                .show();
+                    }
+                };
+        if (isAckedModerationDisclaimer()) {
+            final var future = manager.moderate(message);
+            Futures.addCallback(future, callback, ContextCompat.getMainExecutor(requireActivity()));
+        } else {
+            final DialogModerationBinding viewBinding =
+                    DataBindingUtil.inflate(
+                            requireActivity().getLayoutInflater(),
+                            R.layout.dialog_moderation,
+                            null,
+                            false);
+            final MaterialAlertDialogBuilder builder =
+                    new MaterialAlertDialogBuilder(requireActivity());
+            builder.setNegativeButton(R.string.cancel, null);
+            builder.setView(viewBinding.getRoot());
+            builder.setTitle(R.string.delete_message);
+            builder.setPositiveButton(
+                    R.string.confirm,
+                    (dialog, which) -> {
+                        if (viewBinding.doNotShowAgain.isChecked()) {
+                            ackModeration = Instant.now().plus(Duration.ofMinutes(5));
+                        }
+                        final var future = manager.moderate(message);
+                        Futures.addCallback(
+                                future, callback, ContextCompat.getMainExecutor(requireActivity()));
+                    });
+            builder.create().show();
+        }
     }
 
     private void resendMessage(final Message message, final boolean forceP2P) {

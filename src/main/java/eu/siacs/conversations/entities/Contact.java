@@ -55,6 +55,10 @@ import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.jingle.RtpCapability;
 import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import eu.siacs.conversations.xmpp.pep.Avatar;
+import java.util.Set;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class Contact implements ListItem, Blockable {
     public static final String TABLENAME = "contacts";
@@ -324,10 +328,11 @@ public class Contact implements ListItem, Blockable {
         refreshCaps();
     }
 
-    public void clearPresences() {
-        this.presences.clearPresences();
+    public Set<String> clearPresences() {
+        final var resources = this.presences.clearPresences();
         this.resetOption(Options.PENDING_SUBSCRIPTION_REQUEST);
         refreshCaps();
+        return resources;
     }
 
     public im.conversations.android.xmpp.model.stanza.Presence.Availability getShownStatus() {
@@ -792,7 +797,7 @@ public class Contact implements ListItem, Blockable {
 
     public boolean refreshRtpCapability() {
         final RtpCapability.Capability previous = this.rtpCapability;
-        this.rtpCapability = RtpCapability.check(this, false);
+        this.rtpCapability = RtpCapability.check(this, getPresences());
         return !Objects.equals(previous, this.rtpCapability);
     }
 
