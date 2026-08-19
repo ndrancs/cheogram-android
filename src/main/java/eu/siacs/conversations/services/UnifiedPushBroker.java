@@ -55,7 +55,7 @@ public class UnifiedPushBroker {
 
     public UnifiedPushBroker(final XmppConnectionService xmppConnectionService) {
         this.service = xmppConnectionService;
-        SCHEDULER.scheduleAtFixedRate(
+        SCHEDULER.scheduleWithFixedDelay(
                 this::renewUnifiedPushEndpoints,
                 RENEWAL_INTERVAL,
                 RENEWAL_INTERVAL,

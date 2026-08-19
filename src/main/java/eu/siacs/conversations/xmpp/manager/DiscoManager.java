@@ -452,6 +452,12 @@ public class DiscoManager extends AbstractManager {
         return builder.buildKeepingLast();
     }
 
+    private boolean hasServerItem(final Jid address) {
+        final var domain = connection.getAccount().getDomain();
+        final var items = this.discoItems.get(domain);
+        return items != null && items.contains(address);
+    }
+
     public boolean hasServerFeature(final String feature) {
         final var infoQuery = this.get(getAccount().getDomain());
         return infoQuery != null && infoQuery.hasFeature(feature);
@@ -512,6 +518,10 @@ public class DiscoManager extends AbstractManager {
     }
 
     public void clear(final Jid address) {
+        if (hasServerItem(address)) {
+            Log.d(Config.LOGTAG, "do not clear disco#info for " + address);
+            return;
+        }
         synchronized (this.entityInformation) {
             if (address.isFullJid()) {
                 this.entityInformation.remove(address);
