@@ -204,13 +204,6 @@
     <string name="server_info_available">有效</string>
     <string name="server_info_unavailable">无效</string>
     <string name="missing_public_keys">缺少公钥公布</string>
-    <string name="last_seen_now">最后上线于刚刚</string>
-    <string name="last_seen_min">最后上线于 1 分钟前</string>
-    <string name="last_seen_mins">最后上线于 %d 分钟前</string>
-    <string name="last_seen_hour">最后上线于 1 小时前</string>
-    <string name="last_seen_hours">最后上线于 %d 小时前</string>
-    <string name="last_seen_day">最后上线于 1 天前</string>
-    <string name="last_seen_days">最后上线于 %d 天前</string>
     <string name="install_openkeychain">加密消息。请安装 OpenKeychain 解密。</string>
     <string name="openpgp_messages_found">发现新的 OpenPGP 加密消息</string>
     <string name="openpgp_key_id">OpenPGP 密钥 ID</string>
@@ -563,8 +556,8 @@
     <string name="gp_short">短</string>
     <string name="gp_medium">中</string>
     <string name="gp_long">长</string>
-    <string name="pref_broadcast_last_activity">最后上线</string>
-    <string name="pref_broadcast_last_activity_summary">让您的联系人知道您最后一次使用此应用的时间</string>
+    <string name="pref_broadcast_last_activity">显示最后上线</string>
+    <string name="pref_broadcast_last_activity_summary">允许您的联系人查看您最后一次在应用中的活动时间</string>
     <string name="pref_privacy">隐私</string>
     <string name="pref_theme_options">主题</string>
     <string name="pref_theme_options_summary">选择调色板</string>
@@ -1131,4 +1124,5 @@
     <string name="moderate_delete">以主持人身份删除</string>
     <string name="could_not_moderate_message">无法审核撤回消息</string>
     <string name="delete_message">删除消息</string>
+    <string name="last_seen">最后上线：%s</string>
 </resources>

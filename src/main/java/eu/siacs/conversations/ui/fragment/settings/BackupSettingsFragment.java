@@ -98,7 +98,7 @@ public class BackupSettingsFragment extends XmppPreferenceFragment {
         try {
             this.pickBackupLocationLauncher.launch(null);
         } catch (final ActivityNotFoundException e) {
-            Toast.makeText(requireActivity(), R.string.no_application_found, Toast.LENGTH_LONG)
+            Toast.makeText(requireContext(), R.string.no_application_found, Toast.LENGTH_LONG)
                     .show();
         }
         return false;

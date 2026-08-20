@@ -417,7 +417,7 @@ public class CallIntegrationConnectionService extends ConnectionService {
                 continue;
             }
 
-            if (!contact.getPresences().anyIdentity("gateway", "pstn")) {
+            if (!contact.hasIdentity("gateway", "pstn")) {
                 continue;
             }
 

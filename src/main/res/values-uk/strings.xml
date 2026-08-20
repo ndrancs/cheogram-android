@@ -192,13 +192,6 @@
     <string name="server_info_available">так</string>
     <string name="server_info_unavailable">ні</string>
     <string name="missing_public_keys">Бракує інформації про публічний ключ</string>
-    <string name="last_seen_now">зараз у мережі</string>
-    <string name="last_seen_min">у мережі 1 хвилину тому</string>
-    <string name="last_seen_mins">у мережі %d хвилин тому</string>
-    <string name="last_seen_hour">у мережі 1 годину тому</string>
-    <string name="last_seen_hours">у мережі %d годин тому</string>
-    <string name="last_seen_day">у мережі 1 день тому</string>
-    <string name="last_seen_days">у мережі %d днів тому</string>
     <string name="install_openkeychain">Повідомлення зашифровано. Щоб його розшифрувати, будь ласка, встановіть OpenKeychain.</string>
     <string name="openpgp_messages_found">Знайдено нові повідомлення, зашифровані OpenPGP</string>
     <string name="openpgp_key_id">Ідентифікатор ключа OpenPGP</string>
@@ -542,8 +535,8 @@
     <string name="gp_short">Короткий</string>
     <string name="gp_medium">Середній</string>
     <string name="gp_long">Довгий</string>
-    <string name="pref_broadcast_last_activity">Остання активність</string>
-    <string name="pref_broadcast_last_activity_summary">Дозволити контактам бачити, коли Ви востаннє користувалися додатком</string>
+    <string name="pref_broadcast_last_activity">Показувати останню активність</string>
+    <string name="pref_broadcast_last_activity_summary">Дозволити контактам бачити час Вашої останньої активності в додатку</string>
     <string name="pref_privacy">Приватність</string>
     <string name="pref_theme_options">Тема</string>
     <string name="pref_theme_options_summary">Виберіть колір теми</string>
@@ -557,7 +550,7 @@
     <string name="type_tablet">Планшет</string>
     <string name="type_web">Браузер</string>
     <string name="type_console">Консоль</string>
-    <string name="payment_required">Вимагається оплата</string>
+    <string name="payment_required">Необхідна оплата</string>
     <string name="missing_internet_permission">Надати дозвіл на доступ до Інтернету</string>
     <string name="me">Я</string>
     <string name="contact_asks_for_presence_subscription">Контакт просить надавати інформацію про присутність</string>
@@ -1184,4 +1177,5 @@
     <string name="delete_message">Видалити повідомлення</string>
     <string name="moderation_explained">Повідомлення буде видалено для Вас і всіх учасників цього публічного каналу.</string>
     <string name="moderate_delete">Видалити як модератор</string>
+    <string name="last_seen">остання активність %s</string>
 </resources>

@@ -115,6 +115,7 @@ import eu.siacs.conversations.utils.ExceptionHelper;
 import eu.siacs.conversations.utils.PhoneNumberUtilWrapper;
 import eu.siacs.conversations.utils.SignupUtils;
 import eu.siacs.conversations.utils.ThemeHelper;
+import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
@@ -216,6 +217,7 @@ public class ConversationsActivity extends XmppActivity
     @Override
     protected void refreshUiReal() {
         invalidateOptionsMenu();
+        invalidateActionBarTitle();
         for (@IdRes int id : FRAGMENT_ID_NOTIFICATION_ORDER) {
             refreshFragment(id);
         }
@@ -760,7 +762,6 @@ public class ConversationsActivity extends XmppActivity
         filterByMainFilter(list, new ArrayList<>());
     }
 
-    @Override
     public void launchStartConversation() {
         launchStartConversation(0);
     }
@@ -1483,12 +1484,7 @@ public class ConversationsActivity extends XmppActivity
         if (mainFragment instanceof ConversationFragment conversationFragment) {
             final Conversation conversation = conversationFragment.getConversation();
             if (conversation != null) {
-                actionBar.setTitle(conversation.getName());
-                actionBar.setDisplayHomeAsUpEnabled(!xmppConnectionService.isOnboarding() || !conversation.getAddress().equals(Jid.of("cheogram.com")));
-                ToolbarUtils.setActionBarOnClickListener(
-                        binding.toolbar,
-                        (v) -> { if(!xmppConnectionService.isOnboarding()) openConversationDetails(conversation); }
-                );
+                setTitleAndSubtitle(actionBar, conversation, true);
                 return;
             }
         }
@@ -1497,12 +1493,13 @@ public class ConversationsActivity extends XmppActivity
         if (secondaryFragment instanceof ConversationFragment conversationFragment) {
             final Conversation conversation = conversationFragment.getConversation();
             if (conversation != null) {
-                actionBar.setTitle(conversation.getName());
+                setTitleAndSubtitle(actionBar, conversation, false);
             } else {
                 actionBar.setTitle(R.string.app_name);
             }
         } else {
             actionBar.setTitle(R.string.app_name);
+            actionBar.setSubtitle(null);
         }
         actionBar.setDisplayHomeAsUpEnabled(true);
         actionBar.setHomeAsUpIndicator(invisibles ? R.drawable.menu_with_dot_24dp : R.drawable.menu_24dp);
@@ -1511,6 +1508,26 @@ public class ConversationsActivity extends XmppActivity
                 binding.toolbar,
                 (v) -> { if (binding.drawer != null) binding.drawer.getDrawerLayout().openDrawer(binding.drawer); }
         );
+    }
+
+    private void setTitleAndSubtitle(
+            final ActionBar actionBar, final Conversation conversation, final boolean clickable) {
+        actionBar.setTitle(conversation.getName());
+        if (conversation.getMode() == Conversational.MODE_SINGLE && this.mShowLastUserInteraction) {
+            final var contact = conversation.getContact();
+            actionBar.setSubtitle(
+                    UIHelper.lastUserInteraction(this, contact.getLastUserInteraction()));
+        } else {
+            actionBar.setSubtitle(null);
+        }
+        actionBar.setDisplayHomeAsUpEnabled(true);
+        actionBar.setDisplayHomeAsUpEnabled(!xmppConnectionService.isOnboarding() || !conversation.getAddress().equals(Jid.of("cheogram.com")));
+        if (clickable) {
+            ToolbarUtils.setActionBarOnClickListener(
+                    binding.toolbar,
+                    (v) -> { if(!xmppConnectionService.isOnboarding()) openConversationDetails(conversation); }
+            );
+        }
     }
 
     private void openConversationDetails(final Conversation conversation) {

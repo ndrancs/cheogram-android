@@ -2,12 +2,14 @@ package eu.siacs.conversations.xmpp.manager;
 
 import android.content.Context;
 import android.util.Log;
+import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
@@ -35,6 +37,7 @@ import im.conversations.android.xmpp.model.disco.items.ItemsQuery;
 import im.conversations.android.xmpp.model.error.Condition;
 import im.conversations.android.xmpp.model.error.Error;
 import im.conversations.android.xmpp.model.stanza.Iq;
+import im.conversations.android.xmpp.model.stanza.Presence;
 import im.conversations.android.xmpp.model.version.Version;
 import java.util.Arrays;
 import java.util.Collection;
@@ -59,16 +62,16 @@ public class DiscoManager extends AbstractManager {
                     Namespace.JINGLE_TRANSPORTS_IBB,
                     Namespace.JINGLE_ENCRYPTED_TRANSPORT,
                     Namespace.JINGLE_ENCRYPTED_TRANSPORT_OMEMO,
-                    "http://jabber.org/protocol/muc",
-                    "jabber:x:conference",
                     "http://jabber.org/protocol/xhtml-im",
                     "urn:xmpp:bob",
+                    Namespace.MUC,
+                    Namespace.DIRECT_MUC_INVITATIONS,
                     Namespace.OOB,
                     Namespace.ENTITY_CAPABILITIES,
                     Namespace.ENTITY_CAPABILITIES_2,
                     Namespace.DISCO_INFO,
-                    "urn:xmpp:avatar:metadata+notify",
-                    Namespace.NICK + "+notify",
+                    notify(Namespace.AVATAR_METADATA),
+                    notify(Namespace.NICK),
                     Namespace.PING,
                     Namespace.VERSION,
                     Namespace.CHAT_STATES,
@@ -330,7 +333,7 @@ public class DiscoManager extends AbstractManager {
         final ImmutableList.Builder<String> features = ImmutableList.builder();
         features.addAll(STATIC_FEATURES);
         if (Config.MESSAGE_DISPLAYED_SYNCHRONIZATION) {
-            features.add(Namespace.MDS_DISPLAYED + "+notify");
+            features.add(notify(Namespace.MDS_DISPLAYED));
         }
         if (appSettings.isConfirmMessages()) {
             features.addAll(MESSAGE_CONFIRMATION_FEATURES);
@@ -350,9 +353,9 @@ public class DiscoManager extends AbstractManager {
             features.add(Namespace.IDLE);
         }
         if (getManager(NativeBookmarkManager.class).hasFeature()) {
-            features.add(Namespace.BOOKMARKS2 + "+notify");
+            features.add(notify(Namespace.BOOKMARKS2));
         } else {
-            features.add(Namespace.BOOKMARKS + "+notify");
+            features.add(notify(Namespace.BOOKMARKS));
         }
         return new ServiceDescription(
                 features.build(),
@@ -472,17 +475,27 @@ public class DiscoManager extends AbstractManager {
         synchronized (this.entityInformation) {
             this.entityInformation.put(address, infoQuery);
         }
+        final var contact = getAccount().getRoster().getContact(address);
+		  getAccount().setupGatewaysFor(contact, infoQuery);
         if (infoQuery.hasIdentityWithCategoryAndType("gateway", "pstn")) {
-            final var contact = getAccount().getRoster().getContact(address);
             contact.registerAsPhoneAccount(context);
-            contact.refreshCaps();
             context.getQuickConversationsService().considerSyncBackground(false);
         }
     }
 
+    // TODO would optional be better instead of returning null?!
     public InfoQuery get(final Jid address) {
         synchronized (this.entityInformation) {
             return this.entityInformation.get(address);
+        }
+    }
+
+    public List<Optional<InfoQuery>> get(final List<Presence> presences) {
+        synchronized (this.entityInformation) {
+            return ImmutableList.copyOf(
+                    Lists.transform(
+                            presences,
+                            p -> Optional.fromNullable(this.entityInformation.get(p.getFrom()))));
         }
     }
 
@@ -535,6 +548,7 @@ public class DiscoManager extends AbstractManager {
                 }
             }
         }
+        getAccount().setupGatewaysFor(getAccount().getRoster().getContact(address), null);
     }
 
     public Map<Jid, InfoQuery> findDiscoItemsByFeature(final String feature) {
@@ -572,6 +586,10 @@ public class DiscoManager extends AbstractManager {
                     }
                 },
                 MoreExecutors.directExecutor());
+    }
+
+    private static String notify(final String feature) {
+        return String.format("%s+notify", feature);
     }
 
     public static final class CapsHashMismatchException extends IllegalStateException {

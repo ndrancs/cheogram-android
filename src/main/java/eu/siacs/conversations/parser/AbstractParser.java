@@ -129,57 +129,6 @@ public abstract class AbstractParser extends XmppConnection.Delegate {
         contact.setLastResource(from.isBareJid() ? "" : from.getResource());
     }
 
-    protected static String avatarData(Element items) {
-        Element item = items.findChild("item");
-        if (item == null) {
-            return null;
-        }
-        return item.findChildContent("data", "urn:xmpp:avatar:data");
-    }
-
-    public static MucOptions.User parseItem(final Conversation conference, Element item) {
-        return parseItem(conference,item,null,null,null,new Element("hats", "urn:xmpp:hats:0"));
-    }
-
-    public static MucOptions.User parseItem(final Conversation conference, Element item, Jid fullJid, final Element occupantId, final String nicknameIn, final Element hatsEl) {
-        final String local = conference.getAddress().getLocal();
-        final String domain = conference.getAddress().getDomain().toString();
-        String affiliation = item.getAttribute("affiliation");
-        String role = item.getAttribute("role");
-        String nick = item.getAttribute("nick");
-        if (nick != null && fullJid == null) {
-            try {
-                fullJid = Jid.of(local, domain, nick);
-            } catch (IllegalArgumentException e) {
-                fullJid = null;
-            }
-        }
-        final Jid realJid = Jid.Invalid.getNullForInvalid(item.getAttributeAsJid("jid"));
-        if (fullJid != null) nick = fullJid.getResource();
-        String nickname = null;
-        if (nick != null && nicknameIn != null) nickname = nick.equals(nicknameIn) ? nick : null;
-        try {
-            if (nickname == null && nicknameIn != null && nick != null && gnu.inet.encoding.Punycode.decode(nick).equals(nicknameIn)) {
-                nickname = nicknameIn;
-            }
-        } catch (final Exception e) { }
-        Set<MucOptions.Hat> hats = new TreeSet<>();
-        for (Element hat : hatsEl.getChildren()) {
-            if ("hat".equals(hat.getName()) && ("urn:xmpp:hats:0".equals(hat.getNamespace()) || "xmpp:prosody.im/protocol/hats:1".equals(hat.getNamespace()))) {
-                hats.add(new MucOptions.Hat(hat));
-            }
-        }
-        return new MucOptions.User(
-                conference.getMucOptions(),
-                fullJid,
-                realJid,
-                occupantId == null ? null : occupantId.getAttribute("id"),
-                nickname,
-                Item.roleOrNone(role),
-                Item.affiliationOrNone(affiliation),
-                hatsEl == null ? null : hats);
-    }
-
     public static String extractErrorMessage(final Element packet) {
         final Element error = packet.findChild("error");
         if (error != null && error.getChildren().size() > 0) {

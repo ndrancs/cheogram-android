@@ -23,8 +23,10 @@ import com.cheogram.android.SpannedToXHTML;
 
 import com.google.common.io.ByteSource;
 import com.google.common.base.Strings;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.primitives.Longs;
 
 import org.json.JSONException;
@@ -1212,16 +1214,14 @@ public class Message extends AbstractEntity implements AvatarService.Avatar {
     }
 
     public boolean fixCounterpart() {
-        final Presences presences = conversation.getContact().getPresences();
-        if (counterpart != null && presences.has(Strings.nullToEmpty(counterpart.getResource()))) {
+        final var fullAddresses = conversation.getContact().getFullAddresses();
+        if (counterpart != null && fullAddresses.contains(counterpart)) {
             return true;
-        } else if (presences.isEmpty()) {
+        } else if (fullAddresses.isEmpty()) {
             counterpart = null;
             return false;
         } else {
-            counterpart =
-                    PresenceSelector.getNextCounterpart(
-                            getContact(), presences.toResourceArray()[0]);
+            counterpart = Preconditions.checkNotNull(Iterables.getFirst(fullAddresses, null));
             return true;
         }
     }

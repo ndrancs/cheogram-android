@@ -11,6 +11,8 @@ import com.google.common.primitives.Longs;
 import eu.siacs.conversations.utils.XmlHelper;
 import eu.siacs.conversations.xmpp.Jid;
 import im.conversations.android.xmpp.model.stanza.Message;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
@@ -88,6 +90,10 @@ public class Element implements Node {
 		return this;
 	}
 
+    public boolean hasChild(final String name) {
+        return findChild(name) != null;
+    }
+
 	public Element findChild(String name) {
 		for (Element child : this.children) {
 			if (child.getName().equals(name)) {
@@ -127,10 +133,6 @@ public class Element implements Node {
 	public String findChildContent(String name, String xmlns) {
 		Element element = findChild(name,xmlns);
 		return element == null ? null : element.getContent();
-	}
-
-	public boolean hasChild(final String name) {
-		return findChild(name) != null;
 	}
 
 	public Element setAttribute(final String name, final Enum<?> e) {
@@ -358,4 +360,16 @@ public class Element implements Node {
 			return mut == null ? original : mut;
 		}
 	}
+
+    protected Instant getAttributeAsInstant(final String name) {
+        final var value = getAttribute(name);
+        if (Strings.isNullOrEmpty(value)) {
+            return null;
+        }
+        try {
+            return Instant.parse(value);
+        } catch (final DateTimeParseException e) {
+            return null;
+        }
+    }
 }

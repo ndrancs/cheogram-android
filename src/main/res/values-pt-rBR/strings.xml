@@ -201,13 +201,6 @@
     <string name="server_info_available">disponível</string>
     <string name="server_info_unavailable">indisponível</string>
     <string name="missing_public_keys">Avisos de ausência de chave pública</string>
-    <string name="last_seen_now">visto agora</string>
-    <string name="last_seen_min">visto há 1 minuto atrás</string>
-    <string name="last_seen_mins">visto há %d minutos atrás</string>
-    <string name="last_seen_hour">visto há 1 hora atrás</string>
-    <string name="last_seen_hours">visto há %d horas atrás</string>
-    <string name="last_seen_day">visto há 1 dia atrás</string>
-    <string name="last_seen_days">visto há %d dias atrás</string>
     <string name="install_openkeychain">Mensagem criptografada. Por favor instale o OpenKeychain para descriptografá-la.</string>
     <string name="openpgp_messages_found">Foram encontradas novas mensagens criptografadas com OpenPGP</string>
     <string name="openpgp_key_id">ID da chave OpenPGP</string>
@@ -563,8 +556,8 @@
     <string name="gp_short">Curto</string>
     <string name="gp_medium">Médio</string>
     <string name="gp_long">Longo</string>
-    <string name="pref_broadcast_last_activity">Visto por último</string>
-    <string name="pref_broadcast_last_activity_summary">Permita que os seus contatos vejam quando você usou o app</string>
+    <string name="pref_broadcast_last_activity">Mostrar visto por último</string>
+    <string name="pref_broadcast_last_activity_summary">Permita que os seus contatos vejam quando você estava ativo no app anteriormente</string>
     <string name="pref_privacy">Privacidade</string>
     <string name="pref_theme_options">Tema</string>
     <string name="pref_theme_options_summary">Selecione a paleta de cores</string>
@@ -1154,4 +1147,5 @@
     <string name="delete_message">Apagar mensagem</string>
     <string name="do_not_show_this_warning_again">Não mostrar este aviso novamente.</string>
     <string name="moderation_explained">Esta mensagem será apagada para você e todos os outros participantes deste canal público.</string>
+    <string name="last_seen">visto por último %s</string>
 </resources>

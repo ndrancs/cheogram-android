@@ -198,13 +198,6 @@
     <string name="server_info_available">Dispoñible</string>
     <string name="server_info_unavailable">Fallo</string>
     <string name="missing_public_keys">Anuncios de chave pública non notificados</string>
-    <string name="last_seen_now">acaba de estar dispoñible</string>
-    <string name="last_seen_min">visto hai un minuto</string>
-    <string name="last_seen_mins">visto hai 1%d minutos</string>
-    <string name="last_seen_hour">visto hai unha hora</string>
-    <string name="last_seen_hours">visto hai 1%d horas</string>
-    <string name="last_seen_day">visto hai un día</string>
-    <string name="last_seen_days">última conexión hai 1%d días</string>
     <string name="install_openkeychain">Mensaxe cifrada. Instala OpenKeychain para descifrala.</string>
     <string name="openpgp_messages_found">Atoparonse novas mensaxes cifradas cn OpenPGP</string>
     <string name="openpgp_key_id">ID da chave OpenPGP</string>
@@ -556,7 +549,7 @@
     <string name="gp_short">Breve</string>
     <string name="gp_medium">Medio</string>
     <string name="gp_long">Longo</string>
-    <string name="pref_broadcast_last_activity">Último uso</string>
+    <string name="pref_broadcast_last_activity">Mostrar último uso</string>
     <string name="pref_broadcast_last_activity_summary">Permitirlle aos teus contactos ver a última vez que usaches a app</string>
     <string name="pref_privacy">Privacidade</string>
     <string name="pref_theme_options">Decorado</string>
@@ -1136,4 +1129,5 @@
     <string name="do_not_show_this_warning_again">Non volver a mostrar esta mensaxe.</string>
     <string name="delete_message">Eliminar mensaxe</string>
     <string name="moderation_explained">Vaise eliminar esta mensaxe para ti e todas as persoas participantes nesta canle pública.</string>
+    <string name="last_seen">último uso %s</string>
 </resources>

@@ -44,8 +44,12 @@ import com.cheogram.android.Util;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 
 import org.openintents.openpgp.util.OpenPgpUtils;
@@ -539,7 +543,11 @@ public class ContactDetailsActivity extends OmemoActivity
             binding.detailsSendPresence.setOnCheckedChangeListener(null);
             binding.detailsReceivePresence.setOnCheckedChangeListener(null);
 
-            Collection<String> statusMessages = contact.getPresences().getStatusMessages();
+            Collection<String> statusMessages =
+                    ImmutableSet.copyOf(
+                            Collections2.filter(
+                                    Lists.transform(contact.getPresences(), Presence::getStatus),
+                                    s -> !Strings.isNullOrEmpty(s)));
             if (statusMessages.isEmpty()) {
                 binding.statusMessage.setVisibility(View.GONE);
             } else if (statusMessages.size() == 1) {
@@ -597,18 +605,7 @@ public class ContactDetailsActivity extends OmemoActivity
             binding.detailsLastSeen.setVisibility(View.VISIBLE);
             binding.detailsLastSeen.setText(R.string.contact_blocked);
         } else {
-            if (showLastSeen
-                    && contact.getLastseen() > 0
-                    && contact.getPresences().allOrNonSupport(Namespace.IDLE)) {
-                binding.detailsLastSeen.setVisibility(View.VISIBLE);
-                binding.detailsLastSeen.setText(
-                        UIHelper.lastseen(
-                                getApplicationContext(),
-                                contact.isActive(),
-                                contact.getLastseen()));
-            } else {
-                binding.detailsLastSeen.setVisibility(View.GONE);
-            }
+            binding.detailsLastSeen.setVisibility(View.GONE);
         }
 
         binding.detailsContactXmppAddress.setText(
@@ -759,7 +756,7 @@ public class ContactDetailsActivity extends OmemoActivity
             }
             final var connection = contact.getAccount().getXmppConnection();
             if (contact.getAddress().isDomainJid() && connection != null) {
-                for (final var jid : contact.getPresences().getFullJids()) {
+                for (final var jid : contact.getFullAddresses()) {
                     final var disco = connection.getManager(DiscoManager.class).get(jid);
                     if (disco == null) continue;
                     for (final var identity : disco.getIdentities()) {

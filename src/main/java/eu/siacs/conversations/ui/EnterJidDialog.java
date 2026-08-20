@@ -222,9 +222,12 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
         if (account == null) return;
 
         for (final Contact contact : account.getRoster().getContacts()) {
-            if (contact.showInRoster() && contact.getPresences().size() > 0 && (contact.getPresences().anyIdentity("gateway", null) || contact.getPresences().anySupport("jabber:iq:gateway"))) {
+            if (contact.showInRoster()
+                    && !contact.getPresences().isEmpty()
+                    && (contact.hasIdentity("gateway", null)
+                            || contact.hasFeature("jabber:iq:gateway"))) {
                 context.xmppConnectionService.fetchFromGateway(account, contact.getAddress(), null, (final String prompt, String errorMessage) -> {
-                    if (prompt == null && !contact.getPresences().anyIdentity("gateway", null)) return;
+                    if (prompt == null && !contact.hasIdentity("gateway", null)) return;
 
                     context.runOnUiThread(() -> {
                             gatewayListAdapter.add(contact, prompt);
@@ -541,7 +544,17 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
             final var connection = gateway.getAccount().getXmppConnection();
             if (connection == null) return types;
 
-            for(final var jid : gateway.getPresences().getFullJids()) {
+            final var bareJidDisco =
+                    connection
+                            .getManager(DiscoManager.class)
+                            .get(gateway.getAddress().asBareJid());
+            if (bareJidDisco != null) {
+                for (final var id : bareJidDisco.getIdentities()) {
+                    if ("gateway".equals(id.getCategory())) types.add(id.getType());
+                }
+            }
+            for(final var jid : gateway.getFullAddresses()) {
+                if (jid.isBareJid()) continue;
                 final var disco = connection.getManager(DiscoManager.class).get(jid);
                 if(disco != null) {
                     for (final var id : disco.getIdentities()) {
@@ -567,7 +580,18 @@ public class EnterJidDialog extends DialogFragment implements OnBackendConnected
             if (connection == null) return null;
 
             Pair<Jid,InfoQuery> presence = null;
-            for (final var jid  : gateway.first.getPresences().getFullJids()) {
+            final var bareJid = gateway.first.getAddress().asBareJid();
+            final var bareJidDisco = connection.getManager(DiscoManager.class).get(bareJid);
+            if (bareJidDisco != null) {
+                if (bareJidDisco.hasFeature("jabber:iq:gateway")) {
+                    return new Pair(gateway.second, new Pair<>(bareJid, bareJidDisco));
+                }
+                if (bareJidDisco.hasIdentityWithCategoryAndType("gateway", null)) {
+                    presence = new Pair<>(bareJid, bareJidDisco);
+                }
+            }
+            for (final var jid : gateway.first.getFullAddresses()) {
+                if (jid.isBareJid()) continue;
                 final var disco = connection.getManager(DiscoManager.class).get(jid);
                 if (disco != null) {
                     if (disco.hasFeature("jabber:iq:gateway")) {

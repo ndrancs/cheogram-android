@@ -162,7 +162,7 @@ public class GeoHelper {
         if (message.getStatus() == Message.STATUS_RECEIVED) {
             try {
                 return URLEncoder.encode(UIHelper.getMessageDisplayName(message), "UTF-8");
-            } catch (UnsupportedEncodingException e) {
+            } catch (final UnsupportedEncodingException e) {
                 throw new AssertionError(e);
             }
         } else {

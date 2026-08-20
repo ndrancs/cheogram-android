@@ -2607,15 +2607,14 @@ public class ConversationFragment extends XmppFragment
         final var connection = conversation.getContact().getAccount().getXmppConnection();
         if (connection == null) return;
 
-        var jids = conversation.getContact().getPresences().getFullJids();
+        final var jids = new HashSet<>(conversation.getContact().getFullAddresses());
         if (jids.isEmpty()) {
-            jids = new HashSet<>();
             jids.add(conversation.getContact().getAddress());
         }
         for (final var jid : jids) {
             Futures.addCallback(
                 connection.getManager(DiscoManager.class).info(Entity.presence(jid), null, null),
-                new FutureCallback<>() {
+                new FutureCallback<InfoQuery>() {
                     @Override
                     public void onSuccess(InfoQuery disco) {
                         if (activity == null) return;

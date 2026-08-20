@@ -23,6 +23,44 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.HashMultimap;
 
 import org.json.JSONException;
+import com.google.common.collect.ImmutableMap;
+import eu.siacs.conversations.Config;
+import eu.siacs.conversations.crypto.axolotl.AxolotlService;
+import eu.siacs.conversations.crypto.axolotl.FingerprintStatus;
+import eu.siacs.conversations.crypto.axolotl.SQLiteAxolotlStore;
+import eu.siacs.conversations.entities.Account;
+import eu.siacs.conversations.entities.Contact;
+import eu.siacs.conversations.entities.Conversation;
+import eu.siacs.conversations.entities.Message;
+import eu.siacs.conversations.entities.PresenceTemplate;
+import eu.siacs.conversations.services.QuickConversationsService;
+import eu.siacs.conversations.services.ShortcutService;
+import eu.siacs.conversations.utils.CryptoHelper;
+import eu.siacs.conversations.utils.CursorUtils;
+import eu.siacs.conversations.utils.FtsUtils;
+import eu.siacs.conversations.utils.MimeUtils;
+import eu.siacs.conversations.utils.Resolver;
+import eu.siacs.conversations.xmpp.Jid;
+import eu.siacs.conversations.xmpp.mam.MamReference;
+import im.conversations.android.xml.XmlElementReader;
+import im.conversations.android.xmpp.EntityCapabilities;
+import im.conversations.android.xmpp.EntityCapabilities2;
+import im.conversations.android.xmpp.model.disco.info.InfoQuery;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.json.JSONObject;
 import org.jxmpp.jid.parts.Localpart;
 import org.jxmpp.stringprep.XmppStringprepException;
@@ -2164,8 +2202,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
             if (cursor.moveToFirst()) {
                 final var cached = cursor.getString(0);
                 try {
-                    final var element =
-                            XmlElementReader.read(cached.getBytes(StandardCharsets.UTF_8));
+                    final var element = XmlElementReader.read(cached);
                     if (element instanceof InfoQuery infoQuery) {
                         return infoQuery;
                     }

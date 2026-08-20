@@ -49,6 +49,7 @@ import eu.siacs.conversations.xmpp.manager.BlockingManager;
 import eu.siacs.conversations.xmpp.manager.DiscoManager;
 import eu.siacs.conversations.xmpp.manager.HttpUploadManager;
 import eu.siacs.conversations.xmpp.manager.RosterManager;
+import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -613,13 +614,8 @@ public class Account extends AbstractEntity implements AvatarService.Avatar {
             return 0;
         }
         int i = 0;
-        for (String resource : getSelfContact().getPresences().getPresencesMap().keySet()) {
-            final var jid =
-                    Strings.isNullOrEmpty(resource)
-                            ? getJid().asBareJid()
-                            : getJid().withResource(resource);
-            if (RtpCapability.check(connection.getManager(DiscoManager.class).get(jid))
-                    != RtpCapability.Capability.NONE) {
+        for (final var optionalInfoQuery : getSelfContact().getCapabilities()) {
+            if (RtpCapability.check(optionalInfoQuery.orNull()) != RtpCapability.Capability.NONE) {
                 i++;
             }
         }
@@ -673,17 +669,22 @@ public class Account extends AbstractEntity implements AvatarService.Avatar {
         return xmppConnection.getManager(RosterManager.class);
     }
 
-    public void refreshCapsFor(Contact contact) {
-        final var connection = getXmppConnection();
-        if (connection == null) return;
-
+    public void setupGatewaysFor(Contact contact, InfoQuery disco) {
         synchronized (gateways) {
             for (final var k : new HashSet<>(gateways.keySet())) {
                 gateways.remove(k, contact);
             }
-            for (final var jid : contact.getPresences().getFullJids()) {
-                final var disco = connection.getManager(DiscoManager.class).get(jid);
-                if (disco == null) continue;
+            /* Maybe this? for (final var capability : contact.getCapabilities()) {
+                if (!capability.isPresent()) {
+                    continue;
+                }
+                for (final var identity : capability.get().getIdentities()) {
+                    if ("gateway".equals(identity.getCategory())) {
+                        gateways.put(identity.getType(), contact);
+                    }
+                }
+            }*/
+				if (disco != null) {
                 for (final var identity : disco.getIdentities()) {
                     if ("gateway".equals(identity.getCategory())) {
                         gateways.put(identity.getType(), contact);

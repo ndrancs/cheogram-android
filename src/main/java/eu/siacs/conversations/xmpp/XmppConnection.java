@@ -187,6 +187,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -204,6 +206,9 @@ import javax.net.ssl.X509TrustManager;
 import okhttp3.HttpUrl;
 
 public class XmppConnection implements Runnable {
+
+    public static final Executor RECONNNECTION_EXECUTOR =
+            MoreExecutors.newSequentialExecutor(Executors.newCachedThreadPool());
 
     protected final Account account;
     private final Features features = new Features(this);
@@ -1666,10 +1671,17 @@ public class XmppConnection implements Runnable {
     }
 
     private void authenticate() throws IOException {
+        final var streamFeatures = this.streamFeatures;
         final boolean isSecure = isSecure();
-        if (isSecure && this.streamFeatures.hasStreamFeature(Authentication.class)) {
+        if (streamFeatures == null) {
+            Log.d(
+                    Config.LOGTAG,
+                    "could not pick alternate authentication mechanism. server never sent"
+                            + " features");
+            throw new StateChangingException(Account.State.INCOMPATIBLE_SERVER);
+        } else if (isSecure && streamFeatures.hasStreamFeature(Authentication.class)) {
             authenticate(SaslMechanism.Version.SASL_2);
-        } else if (isSecure && this.streamFeatures.hasStreamFeature(Mechanisms.class)) {
+        } else if (isSecure && streamFeatures.hasStreamFeature(Mechanisms.class)) {
             authenticate(SaslMechanism.Version.SASL);
         } else {
             throw new StateChangingException(Account.State.INCOMPATIBLE_SERVER);
@@ -2011,7 +2023,8 @@ public class XmppConnection implements Runnable {
     }
 
     public void cancelRegistration() {
-        this.changeStateTerminal(Account.State.REGISTRATION_FAILED);
+        RECONNNECTION_EXECUTOR.execute(
+                () -> this.changeStateTerminal(Account.State.REGISTRATION_FAILED));
     }
 
     public HttpUrl getRedirectionUrl() {
@@ -2188,7 +2201,6 @@ public class XmppConnection implements Runnable {
     private void sendPostBindInitialization(
             final boolean waitForDisco, final boolean carbonsEnabled) {
         getManager(CarbonsManager.class).setEnabledOnBind(carbonsEnabled);
-        features.blockListRequested = false;
         getManager(DiscoManager.class).clear();
         Log.d(Config.LOGTAG, account.getJid().asBareJid() + ": starting service discovery");
         mWaitForDisco.set(waitForDisco);
@@ -3031,7 +3043,6 @@ public class XmppConnection implements Runnable {
 
         // TODO move these three into their respective managers or into XmppConnection
         private boolean encryptionEnabled = false;
-        private boolean blockListRequested = false;
 
         public Features(final XmppConnection connection) {
             this.connection = connection;
@@ -3061,20 +3072,6 @@ public class XmppConnection implements Runnable {
                     && connection.streamFeatures.clientStateIndication();
         }
 
-        // TODO move to manager
-        public boolean pep() {
-            final var infoQuery = getManager(DiscoManager.class).get(account.getJid().asBareJid());
-            return infoQuery != null && infoQuery.hasIdentityWithCategoryAndType("pubsub", "pep");
-        }
-
-        public boolean pepPersistent() {
-            final var infoQuery = getManager(DiscoManager.class).get(account.getJid().asBareJid());
-            return infoQuery != null
-                    && infoQuery
-                            .getFeatureStrings()
-                            .contains("http://jabber.org/protocol/pubsub#persistent-items");
-        }
-
         public boolean bind2() {
             final var loginInfo = XmppConnection.this.loginInfo;
             return loginInfo != null && !loginInfo.inlineBindFeatures.isEmpty();
@@ -3091,11 +3088,11 @@ public class XmppConnection implements Runnable {
         }
 
         public boolean pepPublishOptions() {
-            return hasDiscoFeature(account.getJid().asBareJid(), Namespace.PUBSUB_PUBLISH_OPTIONS);
+            return hasDiscoFeature(account.getJid().asBareJid(), Namespace.PUB_SUB_PUBLISH_OPTIONS);
         }
 
         public boolean pepConfigNodeMax() {
-            return hasDiscoFeature(account.getJid().asBareJid(), Namespace.PUBSUB_CONFIG_NODE_MAX);
+            return hasDiscoFeature(account.getJid().asBareJid(), Namespace.PUB_SUB_CONFIG_NODE_MAX);
         }
 
         public boolean pepOmemoWhitelisted() {
@@ -3119,10 +3116,6 @@ public class XmppConnection implements Runnable {
 
         public boolean rosterVersioning() {
             return connection.streamFeatures != null && connection.streamFeatures.hasChild("ver");
-        }
-
-        public void setBlockListRequested(boolean value) {
-            this.blockListRequested = value;
         }
 
         public HttpUrl getServiceOutageStatus() {

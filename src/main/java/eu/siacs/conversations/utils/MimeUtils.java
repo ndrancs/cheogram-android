@@ -581,7 +581,8 @@ public final class MimeUtils {
             if (parts2.length > 0) return parts2[0];
         }
         final String mimeTypeContentResolver = guessFromContentResolver(context, uri);
-        final String mimeTypeFromQueryParameter = uri.isHierarchical() ? uri.getQueryParameter("mimeType") : null;
+        final String mimeTypeFromQueryParameter =
+                uri.isHierarchical() ? uri.getQueryParameter("mimeType") : null;
         final String name = "content".equals(uri.getScheme()) ? getDisplayName(context, uri) : null;
         final String mimeTypeFromName = Strings.isNullOrEmpty(name) ? null : guessFromPath(name);
         final String path = uri.getPath();

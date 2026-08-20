@@ -134,6 +134,7 @@ import eu.siacs.conversations.entities.DownloadableFile;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.MucOptions;
 import eu.siacs.conversations.entities.PresenceTemplate;
+import eu.siacs.conversations.entities.Presences;
 import eu.siacs.conversations.entities.Reaction;
 import eu.siacs.conversations.generator.AbstractGenerator;
 import eu.siacs.conversations.generator.IqGenerator;
@@ -1652,7 +1653,7 @@ public class XmppConnectionService extends Service {
             unregisterReceiver(this.mInternalEventReceiver);
             unregisterReceiver(this.mInternalRestrictedEventReceiver);
             unregisterReceiver(this.mInternalScreenEventReceiver);
-        } catch (final IllegalArgumentException e) {
+        } catch (final RuntimeException e) {
             // ignored
         }
         destroyed = false;
@@ -1803,9 +1804,7 @@ public class XmppConnectionService extends Service {
                 account.getXmppConnection().getManager(RosterManager.class).writeToDatabase();
                 activeAccounts++;
             }
-            if (account.getXmppConnection() != null) {
-                new Thread(() -> disconnect(account, false)).start();
-            }
+            XmppConnection.RECONNNECTION_EXECUTOR.execute(() -> disconnect(account, false));
         }
         if (stop || activeAccounts == 0) {
             Log.d(Config.LOGTAG, "good bye");
@@ -3184,18 +3183,8 @@ public class XmppConnectionService extends Service {
                     contact.unregisterAsPhoneAccount(this);
                 }
             }).start();
-            if (account.getXmppConnection() != null) {
-                new Thread(() -> disconnect(account, !connected)).start();
-            }
-            final Runnable runnable =
-                    () -> {
-                        if (!databaseBackend.deleteAccount(account)) {
-                            Log.d(
-                                    Config.LOGTAG,
-                                    account.getJid().asBareJid() + ": unable to delete account");
-                        }
-                    };
-            mDatabaseWriterExecutor.execute(runnable);
+            XmppConnection.RECONNNECTION_EXECUTOR.execute(() -> disconnect(account, !connected));
+            mDatabaseWriterExecutor.execute(() -> databaseBackend.deleteAccount(account));
             this.accounts.remove(account);
             if (CallIntegration.hasSystemFeature(this)) {
                 CallIntegrationConnectionService.unregisterPhoneAccount(this, account);
@@ -3686,34 +3675,6 @@ public class XmppConnectionService extends Service {
         }
     }
 
-    public void createPublicChannel(
-            final Account account,
-            final String name,
-            final Jid address,
-            final UiCallback<Conversation> callback) {
-        final var future =
-                account.getXmppConnection()
-                        .getManager(MultiUserChatManager.class)
-                        .createPublicChannel(address, name);
-
-        Futures.addCallback(
-                future,
-                new FutureCallback<Conversation>() {
-                    @Override
-                    public void onSuccess(Conversation result) {
-                        callback.success(result);
-                    }
-
-                    @Override
-                    public void onFailure(Throwable t) {
-                        Log.d(Config.LOGTAG, "could not create public channel", t);
-                        // TODO I guess it’s better to just not use callbacks here
-                        callback.error(R.string.unable_to_set_channel_configuration, null);
-                    }
-                },
-                MoreExecutors.directExecutor());
-    }
-
     public void checkIfMuc(final Account account, final Jid jid, Consumer<Boolean> cb) {
         if (jid.isDomainJid()) {
             // Spec basically says MUC needs to have a node
@@ -4121,7 +4082,7 @@ public class XmppConnectionService extends Service {
                 scheduleWakeUpCall(Config.CONNECT_DISCO_TIMEOUT, account.getUuid().hashCode());
             } else {
                 disconnect(account, force || account.getTrueStatus().isError() || !hasInternet);
-                connection.getManager(RosterManager.class).clearPresences();
+                connection.getManager(PresenceManager.class).clear();
                 connection.resetEverything();
                 final AxolotlService axolotlService = account.getAxolotlService();
                 if (axolotlService != null) {
@@ -4136,7 +4097,7 @@ public class XmppConnectionService extends Service {
     }
 
     public void reconnectAccountInBackground(final Account account) {
-        new Thread(() -> reconnectAccount(account, false, true)).start();
+        XmppConnection.RECONNNECTION_EXECUTOR.execute(() -> reconnectAccount(account, false, true));
     }
 
     public void invite(final Conversation conversation, final Jid contact) {
@@ -5032,7 +4993,8 @@ public class XmppConnectionService extends Service {
 
     public List<PresenceTemplate> getPresenceTemplates(Account account) {
         List<PresenceTemplate> templates = databaseBackend.getPresenceTemplates();
-        for (PresenceTemplate template : account.getSelfContact().getPresences().asTemplates()) {
+        for (PresenceTemplate template :
+                Presences.asTemplates(account.getSelfContact().getPresences())) {
             if (!templates.contains(template)) {
                 templates.add(0, template);
             }
