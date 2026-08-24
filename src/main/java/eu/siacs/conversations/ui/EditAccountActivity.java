@@ -74,6 +74,7 @@ import eu.siacs.conversations.databinding.DialogPresenceBinding;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.PresenceTemplate;
 import eu.siacs.conversations.services.BarcodeProvider;
+import eu.siacs.conversations.services.PushManagementService;
 import eu.siacs.conversations.services.QuickConversationsService;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.services.XmppConnectionService.OnAccountUpdate;
@@ -1452,16 +1453,18 @@ public class EditAccountActivity extends OmemoActivity
                 this.binding.serverInfoHttpUpload.setText(R.string.server_info_unavailable);
             }
 
-            this.binding.pushRow.setVisibility(
-                    xmppConnectionService.getPushManagementService().isStub()
-                            ? View.GONE
-                            : View.VISIBLE);
-
-            if (xmppConnectionService.getPushManagementService().available(mAccount)) {
-                this.binding.serverInfoPush.setText(R.string.server_info_available);
+            if (PushManagementService.isStub()) {
+                this.binding.pushRow.setVisibility(View.GONE);
             } else {
-                this.binding.serverInfoPush.setText(R.string.server_info_unavailable);
+                final var pushManagementService = new PushManagementService(this);
+                if (pushManagementService.available(mAccount)) {
+                    this.binding.serverInfoPush.setText(R.string.server_info_available);
+                } else {
+                    this.binding.serverInfoPush.setText(R.string.server_info_unavailable);
+                }
+                this.binding.pushRow.setVisibility(View.VISIBLE);
             }
+
             final long pgpKeyId = this.mAccount.getPgpId();
             if (pgpKeyId != 0 && Config.supportOpenPgp()) {
                 OnClickListener openPgp = view -> launchOpenKeyChain(pgpKeyId);

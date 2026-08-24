@@ -22,7 +22,7 @@
     <string name="title_activity_share_via_account">Teilen über Konto</string>
     <string name="title_activity_block_list">Sperrliste</string>
     <string name="just_now">gerade</string>
-    <string name="minute_ago">vor einer Minute</string>
+    <string name="minute_ago">vor 1 Minute</string>
     <string name="minutes_ago">vor %d Minuten</string>
     <plurals name="x_unread_conversations">
         <item quantity="one">%d ungelesener Chat</item>
@@ -1118,7 +1118,7 @@
     <string name="save_to_contact">In Kontakten speichern</string>
     <string name="show_in_contacts">In Kontakten anzeigen</string>
     <string name="pref_account_avatar">Konten</string>
-    <string name="pref_account_avatar_summary">Kontoaprofilbilder bei gesendeten Nachrichten anzeigen, um die Identifizierung und Verwaltung zu erleichtern.</string>
+    <string name="pref_account_avatar_summary">Kontoprofilbilder bei gesendeten Nachrichten anzeigen, um die Identifizierung und Verwaltung zu erleichtern.</string>
     <string name="pref_category_avatars">Profilbilder</string>
     <string name="pref_show_11_chats">1:1 Chats</string>
     <string name="pref_show_11_sender_chats_summary">Profilbilder in 1:1-Chats bei empfangenen Nachrichten anzeigen. (Profilbilder in Gruppenchats werden immer angezeigt.)</string>
@@ -1130,4 +1130,8 @@
     <string name="moderation_explained">Diese Nachricht wird für dich und jeden Teilnehmer dieses öffentlichen Channels gelöscht.</string>
     <string name="moderate_delete_dot_dot_dot">Als Moderator löschen…</string>
     <string name="last_seen">Zuletzt genutzt %s</string>
+    <plurals name="x_participants">
+        <item quantity="one">%1$d Teilnehmer</item>
+        <item quantity="other">%1$d Teilnehmer</item>
+    </plurals>
 </resources>

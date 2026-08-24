@@ -1,11 +1,16 @@
 package eu.siacs.conversations.utils;
 
 import net.fellbaum.jemoji.EmojiManager;
+import android.util.LruCache;
+import androidx.annotation.NonNull;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class Emoticons {
-
     private static final int VARIATION_16 = 0xFE0F;
     private static final int VARIATION_15 = 0xFE0E;
     private static final String VARIATION_16_STRING = new String(new char[] {VARIATION_16});

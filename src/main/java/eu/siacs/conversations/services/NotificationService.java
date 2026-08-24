@@ -51,6 +51,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
@@ -1679,7 +1680,7 @@ public class NotificationService {
                     messagingStyle.addMessage(imageMessage);
                 } else {
                     messagingStyle.addMessage(
-                            UIHelper.getMessagePreview(mXmppConnectionService, message).first,
+                            UIHelper.getMessagePreview(mXmppConnectionService, message, '\n').first,
                             message.getTimeSent(),
                             sender);
                 }
@@ -1692,7 +1693,7 @@ public class NotificationService {
                         new NotificationCompat.BigTextStyle().bigText(getMergedBodies(messages)));
                 final CharSequence preview =
                         UIHelper.getMessagePreview(
-                                        mXmppConnectionService, messages.get(messages.size() - 1))
+                                        mXmppConnectionService, Iterables.getLast(messages))
                                 .first;
                 builder.setContentText(preview);
                 builder.setTicker(preview);
@@ -1759,14 +1760,13 @@ public class NotificationService {
     }
 
     private CharSequence getMergedBodies(final ArrayList<Message> messages) {
-        final StringBuilder text = new StringBuilder();
-        for (Message message : messages) {
-            if (text.length() != 0) {
-                text.append("\n");
-            }
-            text.append(UIHelper.getMessagePreview(mXmppConnectionService, message).first);
-        }
-        return text.toString();
+        return Joiner.on('\n')
+                .join(
+                        Collections2.transform(
+                                messages,
+                                m ->
+                                        UIHelper.getMessagePreview(mXmppConnectionService, m, '\n')
+                                                .first));
     }
 
     private PendingIntent createShowLocationIntent(final Message message) {

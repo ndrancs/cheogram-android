@@ -566,7 +566,7 @@
     <string name="gp_short">Короткий</string>
     <string name="gp_medium">Средний</string>
     <string name="gp_long">Длинный</string>
-    <string name="pref_broadcast_last_activity">Показывать последнюю активность</string>
+    <string name="pref_broadcast_last_activity">Показывать активность</string>
     <string name="pref_broadcast_last_activity_summary">Позволяет вашим контактам видеть, когда вы в последний раз были активны в приложении</string>
     <string name="pref_privacy">Приватность</string>
     <string name="pref_theme_options">Тема</string>
@@ -1177,4 +1177,10 @@
     <string name="do_not_show_this_warning_again">Больше не предупреждать.</string>
     <string name="could_not_moderate_message">Не удалось отмодерировать сообщение</string>
     <string name="last_seen">последняя активность %s</string>
+    <plurals name="x_participants">
+        <item quantity="one">%1$d участник</item>
+        <item quantity="few">%1$d участника</item>
+        <item quantity="many">%1$d участников</item>
+        <item quantity="other">%1$d участников</item>
+    </plurals>
 </resources>

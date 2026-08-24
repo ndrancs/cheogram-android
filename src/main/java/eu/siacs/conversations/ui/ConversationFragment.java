@@ -2137,13 +2137,15 @@ public class ConversationFragment extends XmppFragment
                 }
             }
             if (conversational instanceof Conversation c) {
+                final var singleOrOccupantId =
+                        c.getMode() == Conversational.MODE_SINGLE
+                                || (c.getMucOptions().occupantId()
+                                        && c.getMucOptions().participating());
                 addReaction.setVisible(
                         m.getStatus() != Message.STATUS_SEND_FAILED
                                 && !m.isDeleted()
                                 && !m.isPrivateMessage()
-                                && (c.getMode() == Conversational.MODE_SINGLE
-                                        || (c.getMucOptions().occupantId()
-                                                && c.getMucOptions().participating())));
+                                && singleOrOccupantId);
                 if (c.getMode() == Conversational.MODE_MULTI) {
                     final var mucOptions = c.getMucOptions();
                     moderateMessage.setVisible(
@@ -2156,6 +2158,7 @@ public class ConversationFragment extends XmppFragment
             } else {
                 moderateMessage.setVisible(false);
                 addReaction.setVisible(false);
+                correctMessage.setVisible(false);
             }
             if (!m.isFileOrImage()
                     && !encrypted

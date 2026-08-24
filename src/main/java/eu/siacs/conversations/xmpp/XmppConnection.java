@@ -149,6 +149,7 @@ import im.conversations.android.xmpp.model.sasl.Success;
 import im.conversations.android.xmpp.model.sasl2.Authenticate;
 import im.conversations.android.xmpp.model.sasl2.Authentication;
 import im.conversations.android.xmpp.model.sasl2.UserAgent;
+import im.conversations.android.xmpp.model.session.Session;
 import im.conversations.android.xmpp.model.sm.Ack;
 import im.conversations.android.xmpp.model.sm.Enable;
 import im.conversations.android.xmpp.model.sm.Enabled;
@@ -2086,8 +2087,7 @@ public class XmppConnection implements Runnable {
                                             + ": jid changed during bind. updating database");
                             mXmppConnectionService.databaseBackend.updateAccount(account);
                         }
-                        if (streamFeatures.hasChild("session")
-                                && !streamFeatures.findChild("session").hasChild("optional")) {
+                        if (streamFeatures.session()) {
                             sendStartSession();
                         } else {
                             final boolean waitForDisco = enableStreamManagement();
@@ -2169,7 +2169,7 @@ public class XmppConnection implements Runnable {
                 Config.LOGTAG,
                 account.getJid().asBareJid() + ": sending legacy session to outdated server");
         final Iq startSession = new Iq(Iq.Type.SET);
-        startSession.addChild("session", "urn:ietf:params:xml:ns:xmpp-session");
+        startSession.addExtension(new Session());
         this.sendUnmodifiedIqPacket(
                 startSession,
                 (packet) -> {
@@ -3107,11 +3107,6 @@ public class XmppConnection implements Runnable {
         public Collection<String> getAccountFeatures() {
             final var infoQuery = getManager(DiscoManager.class).get(account.getJid().asBareJid());
             return infoQuery == null ? Collections.emptyList() : infoQuery.getFeatureStrings();
-        }
-
-        public boolean push() {
-            return hasDiscoFeature(account.getJid().asBareJid(), Namespace.PUSH)
-                    || hasDiscoFeature(account.getDomain(), Namespace.PUSH);
         }
 
         public boolean rosterVersioning() {

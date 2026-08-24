@@ -72,6 +72,14 @@ import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xml.Tag;
 import eu.siacs.conversations.xml.XmlReader;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
+import org.json.JSONException;
 
 public class Message extends AbstractEntity implements AvatarService.Avatar {
 
@@ -173,7 +181,6 @@ public class Message extends AbstractEntity implements AvatarService.Avatar {
     private Boolean treatAsDownloadable = null;
     private FileParams fileParams = null;
     private List<MucOptions.User> counterparts;
-    private WeakReference<MucOptions.User> user;
 
     protected Message(Conversational conversation) {
         this.conversation = conversation;
@@ -729,19 +736,6 @@ public class Message extends AbstractEntity implements AvatarService.Avatar {
         return occupantId;
     }
 
-    public void setMucUser(MucOptions.User user) {
-        this.user = new WeakReference<>(user);
-        if (user != null && user.getOccupantId() != null) setOccupantId(user.getOccupantId());
-    }
-
-    public boolean sameMucUser(Message otherMessage) {
-        final MucOptions.User thisUser = this.user == null ? null : this.user.get();
-        final MucOptions.User otherUser = otherMessage.user == null ? null : otherMessage.user.get();
-        return
-            (thisUser != null && thisUser == otherUser) ||
-            (getOccupantId() != null && getOccupantId().equals(otherMessage.getOccupantId()));
-    }
-
     public String getErrorMessage() {
         return errorMessage;
     }
@@ -1043,7 +1037,10 @@ public class Message extends AbstractEntity implements AvatarService.Avatar {
     }
 
     public boolean isEditable() {
-        return status != STATUS_RECEIVED && !isCarbon() && type != Message.TYPE_RTP_SESSION;
+        return status != STATUS_RECEIVED
+                && !isCarbon()
+                && type != Message.TYPE_RTP_SESSION
+                && type != Message.TYPE_STATUS;
     }
 
     public void setCounterparts(List<MucOptions.User> counterparts) {

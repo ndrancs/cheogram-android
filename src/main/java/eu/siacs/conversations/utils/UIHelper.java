@@ -57,6 +57,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 
 public class UIHelper {
 
@@ -159,9 +160,14 @@ public class UIHelper {
         } else if (interaction instanceof LastUserInteraction.None) {
             return null; // just hide the subtitle
         } else if (interaction instanceof LastUserInteraction.Idle idle) {
-            return context.getString(
-                    R.string.last_seen,
-                    UIHelper.readableTimeDifferenceFull(context, idle.getSince().toEpochMilli()));
+            if (context.getResources().getBoolean(R.bool.last_seen_full_text)) {
+                return context.getString(
+                        R.string.last_seen,
+                        UIHelper.readableTimeDifferenceFull(
+                                context, idle.getSince().toEpochMilli()));
+            } else {
+                return UIHelper.readableTimeDifference(context, idle.getSince().toEpochMilli());
+            }
         } else {
             return null;
         }
@@ -181,12 +187,26 @@ public class UIHelper {
         return XEP0392Helper.rgbFromNick(name);
     }
 
-    public static Pair<CharSequence, Boolean> getMessagePreview(final XmppConnectionService context, final Message message) {
-        return getMessagePreview(context, message, 0);
+    public static Pair<CharSequence, Boolean> getMessagePreview(
+            final XmppConnectionService context, final Message message) {
+        return getMessagePreview(context, message, null, ' ');
     }
 
     public static Pair<CharSequence, Boolean> getMessagePreview(
-            final XmppConnectionService context, final Message message, @ColorInt int textColor) {
+            final XmppConnectionService context, final Message message, final char separator) {
+        return getMessagePreview(context, message, null, separator);
+    }
+
+    public static Pair<CharSequence, Boolean> getMessagePreview(
+            final XmppConnectionService context, final Message message, final @ColorInt int textColor) {
+        return getMessagePreview(context, message, textColor, null);
+    }
+
+    private static Pair<CharSequence, Boolean> getMessagePreview(
+            final XmppConnectionService context,
+            final Message message,
+            final @Nullable @ColorInt Integer textColor,
+            @Nullable final Character separator) {
         final Transferable d = message.getTransferable();
         final boolean moderated = message.getModerated() != null;
         final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && message.getConversation().getMode() == Conversation.MODE_MULTI && context.isMucUserMuted(new MucOptions.User(null, message.getConversation().getAddress(), null, message.getOccupantId(), null, im.conversations.android.xmpp.model.muc.Role.NONE, im.conversations.android.xmpp.model.muc.Affiliation.NONE, null));
@@ -275,56 +295,20 @@ public class UIHelper {
                                 getFileDescriptionString(context, message)),
                         true);
             } else {
-                Drawable fallbackImg = ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_photo_24dp, null);
-                fallbackImg.setBounds(0, 0, fallbackImg.getIntrinsicWidth(), fallbackImg.getIntrinsicHeight());
-                SpannableStringBuilder styledBody = message.getSpannableBody(null, fallbackImg);
-                final var processMarkup = styledBody.getSpans(0, body.length(), Message.PlainTextSpan.class).length > 0;
-                if (textColor != 0 && processMarkup) {
-                    StylingHelper.format(styledBody, 0, styledBody.length() - 1, textColor, false);
+                if (textColor != null) {
+                    return new Pair<>(getStyledBodyOneLine(body, textColor), false);
+                } else if (separator != null) {
+                    return new Pair<>(getBodyOmitQuotesAndBlocks(body, separator), false);
+                } else {
+                    throw new AssertionError("specify either separator or textColor");
                 }
-                Linkify.addLinks(styledBody, message.getConversation().getAccount(), message.getConversation().getAddress());
 
-                for (final android.text.style.QuoteSpan quote : Lists.reverse(Lists.newArrayList(styledBody.getSpans(0, styledBody.length(), android.text.style.QuoteSpan.class)))) {
-                    int start = styledBody.getSpanStart(quote);
-                    int end = styledBody.getSpanEnd(quote);
-                    if (start < 0 || end < 0 || (start == 0 && end == styledBody.length())) continue;
-                    styledBody.delete(start, end);
-                    styledBody.removeSpan(quote);
-                }
-                if (!processMarkup) return new Pair<>(styledBody, false);
-
-                SpannableStringBuilder builder = new SpannableStringBuilder();
-                for (CharSequence l : CharSequenceUtils.split(styledBody, '\n')) {
-                    if (l.length() > 0) {
-                        if (l.toString().equals("```")) {
-                            continue;
-                        }
-                        char first = l.charAt(0);
-                        if ((!QuoteHelper.isPositionQuoteStart(l, 0))) {
-                            CharSequence line = CharSequenceUtils.trim(l);
-                            if (line.length() == 0) {
-                                continue;
-                            }
-                            char last = line.charAt(line.length() - 1);
-                            if (builder.length() != 0) {
-                                builder.append(' ');
-                            }
-                            builder.append(line);
-                            if (!PUNCTIONATION.contains(last)) {
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (builder.length() == 0) {
-                    builder.append(body.trim());
-                }
-                return new Pair<>(builder, false);
             }
         }
     }
 
-    private static CharSequence getBodyOmitQuotesAndBlocks(final String body) {
+    private static CharSequence getBodyOmitQuotesAndBlocks(
+            final String body, final char separator) {
         final var parts = Splitter.on('\n').trimResults().omitEmptyStrings().splitToList(body);
         final var filtered =
                 Collections2.filter(
@@ -335,7 +319,7 @@ public class UIHelper {
         if (filtered.isEmpty()) {
             return body;
         }
-        return Joiner.on(' ').join(filtered);
+        return Joiner.on(separator).join(filtered);
     }
 
     private static CharSequence getStyledBodyOneLine(final String body, final int textColor) {
