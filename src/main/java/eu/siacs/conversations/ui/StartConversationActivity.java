@@ -1390,6 +1390,7 @@ public class StartConversationActivity extends XmppActivity
                                                   .account(xmppConnectionService.getAccounts().get(0))
                                                   .address(Jid.of("discuss@conference.soprani.ca"))
                                                   .name("Soprani.ca / Cheogram Discussion")
+                                                  .isAutoJoin(false)
                                                   .build().withTags(List.of("support"));
             this.contacts.add(0, bookmark);
         }
