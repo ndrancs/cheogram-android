@@ -10,11 +10,9 @@ import com.otaliastudios.transcoder.Transcoder;
 import com.otaliastudios.transcoder.TranscoderListener;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
-import eu.siacs.conversations.crypto.PgpEngine;
 import eu.siacs.conversations.entities.DownloadableFile;
 import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.persistance.FileBackend;
-import eu.siacs.conversations.ui.UiCallback;
 import eu.siacs.conversations.utils.MimeUtils;
 import eu.siacs.conversations.utils.TranscoderStrategies;
 import java.io.File;
@@ -28,24 +26,21 @@ public class AttachFileToConversationRunnable implements Runnable, TranscoderLis
     private final XmppConnectionService mXmppConnectionService;
     private final Message message;
     private final Uri uri;
-    private final String mimeType;
     private final String type;
-    private final UiCallback<Message> callback;
+    private final String mimeType;
     private final boolean isVideoMessage;
     private final long originalFileSize;
     private int currentProgress = -1;
 
     AttachFileToConversationRunnable(
-            XmppConnectionService xmppConnectionService,
-            Uri uri,
-            String type,
-            Message message,
-            UiCallback<Message> callback) {
+            final XmppConnectionService xmppConnectionService,
+            final Uri uri,
+            final String type,
+            final Message message) {
         this.uri = uri;
         this.type = type;
         this.mXmppConnectionService = xmppConnectionService;
         this.message = message;
-        this.callback = callback;
         mimeType =
                 MimeUtils.guessMimeTypeFromUriAndMime(mXmppConnectionService, uri, type);
         final int autoAcceptFileSize =
@@ -69,35 +64,14 @@ public class AttachFileToConversationRunnable implements Runnable, TranscoderLis
             final int encryption = message.getEncryption();
             mXmppConnectionService.getHttpConnectionManager().createNewDownloadConnection(message, false, (file) -> {
                 message.setEncryption(encryption);
-                mXmppConnectionService.sendMessage(message, () -> callback.success(message));
+                mXmppConnectionService.sendMessage(message);
             });
         } else if (path != null && !FileBackend.isPathBlacklisted(path)) {
             message.setRelativeFilePath(path);
             mXmppConnectionService.getFileBackend().updateFileParams(message);
-            if (message.getEncryption() == Message.ENCRYPTION_DECRYPTED) {
-                mXmppConnectionService.getPgpEngine().encrypt(message, callback);
-            } else {
-                mXmppConnectionService.sendMessage(message, () -> callback.success(message));
-            }
         } else {
-            try {
-                mXmppConnectionService
-                        .getFileBackend()
-                        .copyFileToPrivateStorage(message, uri, type);
-                mXmppConnectionService.getFileBackend().updateFileParams(message);
-                if (message.getEncryption() == Message.ENCRYPTION_DECRYPTED) {
-                    final PgpEngine pgpEngine = mXmppConnectionService.getPgpEngine();
-                    if (pgpEngine != null) {
-                        pgpEngine.encrypt(message, callback);
-                    } else if (callback != null) {
-                        callback.error(R.string.unable_to_connect_to_keychain, null);
-                    }
-                } else {
-                    mXmppConnectionService.sendMessage(message, () -> callback.success(message));
-                }
-            } catch (final FileBackend.FileCopyException e) {
-                callback.error(e.getResId(), message);
-            }
+            mXmppConnectionService.getFileBackend().copyFileToPrivateStorage(message, uri, type);
+            mXmppConnectionService.getFileBackend().updateFileParams(message);
         }
     }
 
@@ -188,11 +162,6 @@ public class AttachFileToConversationRunnable implements Runnable, TranscoderLis
             }
         }
         mXmppConnectionService.getFileBackend().updateFileParams(message);
-        if (message.getEncryption() == Message.ENCRYPTION_DECRYPTED) {
-            mXmppConnectionService.getPgpEngine().encrypt(message, callback);
-        } else {
-            mXmppConnectionService.sendMessage(message, () -> callback.success(message));
-        }
     }
 
     @Override

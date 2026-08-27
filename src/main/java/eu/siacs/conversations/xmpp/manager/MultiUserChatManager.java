@@ -1,13 +1,16 @@
 package eu.siacs.conversations.xmpp.manager;
 
 import android.util.Log;
-import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -15,9 +18,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import de.gultsch.common.FutureMerger;
 import eu.siacs.conversations.Config;
-import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.entities.Account;
-import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Conversational;
 import eu.siacs.conversations.entities.MucOptions;
@@ -68,10 +69,15 @@ import java.util.HashSet;
 import java.util.TreeSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import org.jspecify.annotations.NonNull;
 
 public class MultiUserChatManager extends AbstractManager {
+
+    private static final Collection<String> VOLATILE_ROOM_INFO =
+            Collections.singleton("muc#roominfo_occupants");
 
     private final XmppConnectionService service;
 
@@ -182,6 +188,17 @@ public class MultiUserChatManager extends AbstractManager {
         }
     }
 
+    public Collection<MucOptions.User> getUsers(
+            final MucOptions.IdentifiableUser identifiableUser) {
+        synchronized (this.states) {
+            return ImmutableList.copyOf(
+                    Collections2.filter(
+                            Collections2.transform(
+                                    this.states.values(), s -> s.getUser(identifiableUser)),
+                            Objects::nonNull));
+        }
+    }
+
     public ListenableFuture<Void> joinFollowingInvite(final Conversation conversation) {
         // TODO this special treatment is probably unnecessary; just always make sure the bookmark
         // exists
@@ -213,10 +230,6 @@ public class MultiUserChatManager extends AbstractManager {
     private Void checkConfigurationSendPresenceFetchHistory(final Conversation conversation) {
         final Account account = conversation.getAccount();
         final MucOptions mucOptions = getOrCreateState(conversation);
-        Log.d(
-                Config.LOGTAG,
-                "checkConfigurationSendPresenceFetchHistory(" + conversation.getAddress() + ")");
-
         if (mucOptions.nonanonymous()
                 && !mucOptions.membersOnly()
                 && !conversation.getBooleanAttribute("accept_non_anonymous", false)) {
@@ -227,15 +240,6 @@ public class MultiUserChatManager extends AbstractManager {
             service.updateConversationUi();
             return null;
         }
-
-        Log.d(
-                Config.LOGTAG,
-                "moderation: "
-                        + mucOptions.moderation()
-                        + " ("
-                        + mucOptions.getConversation().getAddress().asBareJid()
-                        + ")");
-
         final Jid joinJid = mucOptions.getSelf().getFullJid();
         Log.d(
                 Config.LOGTAG,
@@ -265,7 +269,7 @@ public class MultiUserChatManager extends AbstractManager {
         }
 
         if (mucOptions.mamSupport()) {
-            this.service.getMessageArchiveService().catchupMUC(conversation);
+            getManager(MessageArchiveManager.class).catchupMUC(conversation);
         }
         fetchMembers(conversation);
         synchronized (this.inProgressConferenceJoins) {
@@ -368,7 +372,7 @@ public class MultiUserChatManager extends AbstractManager {
         final int count = mucOptions.getUserCount();
         final var isGeneratedAvatar = Strings.isNullOrEmpty(mucOptions.getAvatar());
         final var tileUserBefore =
-                isGeneratedAvatar ? mucOptions.getUsers(5) : Collections.emptyList();
+                isGeneratedAvatar ? mucOptions.getUsersPreview(5) : Collections.emptyList();
         if (type == null) {
             handleAvailablePresence(presence);
         } else if (type == Presence.Type.UNAVAILABLE) {
@@ -377,7 +381,7 @@ public class MultiUserChatManager extends AbstractManager {
             throw new AssertionError("presences of this type should not be routed here");
         }
         final var tileUserAfter =
-                isGeneratedAvatar ? mucOptions.getUsers(5) : Collections.emptyList();
+                isGeneratedAvatar ? mucOptions.getUsersPreview(5) : Collections.emptyList();
         if (isGeneratedAvatar && !tileUserAfter.equals(tileUserBefore)) {
             // TODO test that this is doing something
             service.getAvatarService().clear(mucOptions);
@@ -418,7 +422,7 @@ public class MultiUserChatManager extends AbstractManager {
             hats = presence.findChild("hats", "xmpp:prosody.im/protocol/hats:1");
         }
         if (hats == null) hats = new Element("hats", "urn:xmpp:hats:0");
-		  
+
         final var occupant = presence.getOnlyExtension(OccupantId.class);
         final String occupantId =
                 mucOptions.occupantId() && occupant != null ? occupant.getId() : null;
@@ -427,36 +431,20 @@ public class MultiUserChatManager extends AbstractManager {
                         conversation, item, from, occupantId, nick == null ? null : nick.getContent(), hats);
         if (codes.contains(MucUser.STATUS_CODE_SELF_PRESENCE)
                 || (codes.contains(MucUser.STATUS_CODE_ROOM_CREATED)
-                        && jid.equals(
-                                Jid.Invalid.getNullForInvalid(item.getAttributeAsJid("jid"))))) {
-            Log.d(
-                    Config.LOGTAG,
-                    account.getJid().asBareJid()
-                            + ": got self-presence from "
-                            + user.getFullJid()
-                            + ". occupant-id="
-                            + occupantId);
-            if (mucOptions.setOnline()) {
-                service.getAvatarService().clear(mucOptions);
-            }
+                        && jid.equals(item.getJid()))) {
             final var current = mucOptions.getSelf().getFullJid();
-            if (mucOptions.setSelf(user)) {
+            if (mucOptions.setSelf(user.asConnectedSelf())) {
                 Log.d(Config.LOGTAG, "role or affiliation changed");
                 getDatabase().updateConversation(conversation);
             }
             final var modified = current == null || !current.equals(user.getFullJid());
             service.persistSelfNick(user, modified);
             invokeRenameListener(mucOptions, true);
-        }
-        boolean isNew = mucOptions.updateUser(user);
-        final AxolotlService axolotlService = conversation.getAccount().getAxolotlService();
-        Contact contact = user.getContact();
-        if (isNew
-                && user.getRealJid() != null
-                && mucOptions.isPrivateAndNonAnonymous()
-                && (contact == null || !contact.mutualPresenceSubscription())
-                && axolotlService.hasEmptyDeviceList(user.getRealJid())) {
-            axolotlService.fetchDeviceIds(user.getRealJid());
+            service.getAvatarService().clear(mucOptions);
+        } else {
+            final var previousMembers = mucOptions.getMembers();
+            mucOptions.updateUser(user, null);
+            fetchDeviceIdsIfNeeded(previousMembers, user);
         }
         if (codes.contains(MucUser.STATUS_CODE_ROOM_CREATED)
                 && mucOptions.autoPushConfiguration()) {
@@ -559,10 +547,21 @@ public class MultiUserChatManager extends AbstractManager {
             }
         } else {
             final var item = x.getItem();
+            final MucOptions.User user;
             if (item != null) {
-                mucOptions.updateUser(MultiUserChatManager.itemToUser(conversation, item, from, occupantId, nick == null ? null : nick.getContent(), hats));
+                // TODO if there is a re-name status code we can potentially avoid an unnecessary
+                // switch to offline by parsing the nick from the item element
+                user = MultiUserChatManager.itemToUser(conversation, item, from, occupantId, nick == null ? null : nick.getContent(), hats);
+
+                // TODO not calling delete after update currently breaks renames and possibly other
+                // things
+                // we could also put presence type into the parameter
+
+                mucOptions.updateUser(user, Presence.Type.UNAVAILABLE);
+            } else {
+                // TODO add some logging to find out if and when this is happening
+                user = mucOptions.deleteUser(from);
             }
-            final var user = mucOptions.deleteUser(from);
             if (user != null) {
                 service.getAvatarService().clear(user);
             }
@@ -654,6 +653,9 @@ public class MultiUserChatManager extends AbstractManager {
         if (from == null || from.isFullJid() || mucUser == null) {
             return;
         }
+
+        // TODO just get state?!
+
         final var conversation = this.service.find(getAccount(), from);
         if (conversation == null || conversation.getMode() != Conversation.MODE_MULTI) {
             return;
@@ -695,7 +697,8 @@ public class MultiUserChatManager extends AbstractManager {
             return;
         }
         final var mucOptions = getOrCreateState(conversation);
-        final boolean isNew = mucOptions.updateUser(user);
+        final var previousMembers = mucOptions.getMembers();
+        mucOptions.updateUser(user);
         final var avatarService = this.service.getAvatarService();
         if (Strings.isNullOrEmpty(mucOptions.getAvatar())) {
             avatarService.clear(mucOptions);
@@ -704,11 +707,16 @@ public class MultiUserChatManager extends AbstractManager {
         this.service.updateMucRosterUi();
         this.service.updateConversationUi();
         if (user.ranks(Affiliation.MEMBER)) {
-            fetchDeviceIdsIfNeeded(isNew, user);
+            fetchDeviceIdsIfNeeded(previousMembers, user);
         } else {
             final var jid = user.getRealJid();
-            final var cryptoTargets = conversation.getAcceptedCryptoTargets();
-            if (cryptoTargets.remove(user.getRealJid())) {
+            if (jid == null) {
+                return;
+            }
+            final var previousCryptoTarget = conversation.getAcceptedCryptoTargets();
+            final var cryptoTargets =
+                    Sets.difference(previousCryptoTarget, Sets.newHashSet(jid)).immutableCopy();
+            if (!previousCryptoTarget.equals(cryptoTargets)) {
                 Log.d(
                         Config.LOGTAG,
                         account.getJid().asBareJid()
@@ -722,16 +730,20 @@ public class MultiUserChatManager extends AbstractManager {
         }
     }
 
-    private void fetchDeviceIdsIfNeeded(final boolean isNew, final MucOptions.User user) {
+    private void fetchDeviceIdsIfNeeded(
+            final Collection<Jid> previousMembers, final MucOptions.User user) {
+        final var real = user.getRealJid();
+        if (real == null) {
+            return;
+        }
         final var contact = user.getContact();
         final var mucOptions = user.getMucOptions();
         final var axolotlService = connection.getAxolotlService();
-        if (isNew
-                && user.getRealJid() != null
+        if (!previousMembers.contains(real)
                 && mucOptions.isPrivateAndNonAnonymous()
                 && (contact == null || !contact.mutualPresenceSubscription())
-                && axolotlService.hasEmptyDeviceList(user.getRealJid())) {
-            axolotlService.fetchDeviceIds(user.getRealJid());
+                && axolotlService.hasEmptyDeviceList(real)) {
+            axolotlService.fetchDeviceIds(real);
         }
     }
 
@@ -756,8 +768,9 @@ public class MultiUserChatManager extends AbstractManager {
 
     private Void setDiscoInfo(
             final Conversation conversation,
-            final InfoQuery infoQuery,
+            final InfoQuery rawinfoQuery,
             final MucConfigSummary previousMucConfig) {
+        final var infoQuery = clean(rawinfoQuery);
         final var caps = EntityCapabilities.hash(infoQuery);
         final var caps2 = EntityCapabilities2.hash(infoQuery);
         final var account = conversation.getAccount();
@@ -813,6 +826,23 @@ public class MultiUserChatManager extends AbstractManager {
         }
         this.service.updateConversationUi();
         return null;
+    }
+
+    private static InfoQuery clean(final InfoQuery input) {
+        final var identities = input.getIdentities();
+        final var features = input.getFeatureStrings();
+        final var extension = input.getServiceDiscoveryExtension(Namespace.MUC_ROOM_INFO);
+        if (extension == null) {
+            return new InfoQuery(identities, features);
+        } else {
+            return new InfoQuery(
+                    identities,
+                    features,
+                    Data.of(
+                            Maps.filterKeys(
+                                    extension.asMap(), k -> !VOLATILE_ROOM_INFO.contains(k)),
+                            Namespace.MUC_ROOM_INFO));
+        }
     }
 
     public void resendPresence(final Conversation conversation) {
@@ -914,31 +944,27 @@ public class MultiUserChatManager extends AbstractManager {
 
     private void setMembers(final Conversation conversation, final List<MucOptions.User> users) {
         final var mucOptions = this.getOrCreateState(conversation);
+        final var previousMembers = mucOptions.getMembers();
         for (final var user : users) {
             if (user.realJidMatchesAccount()) {
                 continue;
             }
-            boolean isNew = mucOptions.updateUser(user);
-            fetchDeviceIdsIfNeeded(isNew, user);
+            mucOptions.updateUser(user);
+            fetchDeviceIdsIfNeeded(previousMembers, user);
         }
-        final var members = mucOptions.getMembers(true);
-        final var cryptoTargets = conversation.getAcceptedCryptoTargets();
-        boolean changed = false;
-        for (final var iterator = cryptoTargets.listIterator(); iterator.hasNext(); ) {
-            final var jid = iterator.next();
-            if (!members.contains(jid) && !members.contains(jid.getDomain())) {
-                iterator.remove();
-                Log.d(
-                        Config.LOGTAG,
-                        getAccount().getJid().asBareJid()
-                                + ": removed "
-                                + jid
-                                + " from crypto targets of "
-                                + conversation.getName());
-                changed = true;
-            }
-        }
-        if (changed) {
+        final var members = mucOptions.getMembersWithDomains();
+        final var previousCryptoTargets = conversation.getAcceptedCryptoTargets();
+        final var cryptoTargets =
+                ImmutableSet.copyOf(
+                        Collections2.filter(
+                                previousCryptoTargets,
+                                t -> members.contains(t) || members.contains(t.getDomain())));
+        if (!previousCryptoTargets.equals(cryptoTargets)) {
+            Log.d(
+                    Config.LOGTAG,
+                    getAccount().getJid().asBareJid()
+                            + ": removed crypto targets from "
+                            + conversation.getName());
             conversation.setAcceptedCryptoTargets(cryptoTargets);
             getDatabase().updateConversation(conversation);
         }
@@ -1207,8 +1233,11 @@ public class MultiUserChatManager extends AbstractManager {
                         + " to "
                         + conversation.getAddress().asBareJid());
         final MucOptions.User user =
-                getOrCreateState(conversation).findUserByRealJid(address.asBareJid());
+                getOrCreateState(conversation)
+                        .getUser(MucOptions.IdentifiableUser.realAddress(address.asBareJid()));
         if (user == null || user.getAffiliation() == Affiliation.OUTCAST) {
+            // TODO either don’t do this or pick a better target affiliation for members only
+            Log.d(Config.LOGTAG, "changing affiliation of invitee to None");
             this.setAffiliation(conversation, Affiliation.NONE, address);
         }
 
@@ -1283,6 +1312,36 @@ public class MultiUserChatManager extends AbstractManager {
             }
         }
         return builder.build();
+    }
+
+    @Nullable
+    public MucOptions.User getMucUser(
+            @NonNull final Message message, @Nullable final MessageArchiveManager.Query query) {
+        final var from = message.getFrom();
+        if (from == null) {
+            return null;
+        }
+        final var state = getState(from.asBareJid());
+        if (state == null) {
+            return null;
+        }
+        final var occupant = state.occupantId() ? message.getOnlyExtension(OccupantId.class) : null;
+        final var occupantId = occupant == null ? null : occupant.getId();
+        if (query != null) {
+            final var mucUser = message.getExtension(MucUser.class);
+            final var item = mucUser == null ? null : mucUser.getItem();
+            if (item != null) {
+                return itemToUser(state.getConversation(), item, from, occupantId, null, null);
+            }
+        }
+        if (occupantId != null) {
+            return state.getUser(occupantId);
+        }
+        if (query != null) {
+            // for MAM messages it ends here
+            return null;
+        }
+        return state.getUser(from);
     }
 
     public static MucOptions.User itemToUser(

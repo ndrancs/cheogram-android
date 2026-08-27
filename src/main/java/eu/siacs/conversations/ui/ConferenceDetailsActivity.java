@@ -94,7 +94,6 @@ import im.conversations.android.model.Bookmark;
 import im.conversations.android.model.ImmutableBookmark;
 import im.conversations.android.xmpp.model.muc.Affiliation;
 import im.conversations.android.xmpp.model.muc.Role;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import me.drakeet.support.toast.ToastCompat;
@@ -659,6 +658,7 @@ public class ConferenceDetailsActivity extends XmppActivity
         builder.setPositiveButton(
                 R.string.ok,
                 (dialog, which) -> {
+                    // TODO call manager directly
                     final var future = xmppConnectionService.destroyRoom(mConversation);
                     Futures.addCallback(
                             future,
@@ -790,6 +790,23 @@ public class ConferenceDetailsActivity extends XmppActivity
             } else {
                 this.binding.mucInfoMam.setText(R.string.server_info_unavailable);
             }
+            if (mucOptions.occupantId()) {
+                this.binding.mucInfoOccupantId.setText(R.string.server_info_available);
+            } else {
+                this.binding.mucInfoOccupantId.setText(R.string.server_info_unavailable);
+            }
+            if (mucOptions.isPrivateAndNonAnonymous()) {
+                this.binding.mucInfoModeratedRow.setVisibility(View.GONE);
+            } else {
+                this.binding.mucInfoModeratedRow.setVisibility(View.VISIBLE);
+                if (mucOptions.moderation()) {
+                    this.binding.mucInfoModeratedMessageRetraction.setText(
+                            R.string.server_info_available);
+                } else {
+                    this.binding.mucInfoModeratedMessageRetraction.setText(
+                            R.string.server_info_unavailable);
+                }
+            }
             if (self.ranks(Affiliation.OWNER)) {
                 this.binding.changeConferenceButton.setVisibility(View.VISIBLE);
             } else {
@@ -822,7 +839,7 @@ public class ConferenceDetailsActivity extends XmppActivity
             this.binding.notificationStatusButton.setImageResource(
                     R.drawable.ic_notifications_none_24dp);
         }
-        final List<User> users = mucOptions.getUsers();
+        final List<User> users = new ArrayList<>(mucOptions.getUsers());
         users.add(mucOptions.getSelf());
         Collections.sort(
                 users,
@@ -837,23 +854,25 @@ public class ConferenceDetailsActivity extends XmppActivity
                         } else if (a.getAvatar() == null && b.getAvatar() != null) {
                             return 1;
                         } else {
-                            return a.getComparableName().compareToIgnoreCase(b.getComparableName());
+                            return a.getNick().compareToIgnoreCase(b.getNick());
                         }
                     }
                 });
         this.binding.users.post(
                 () -> {
                     final var list =
-                            MucOptions.sub(users, GridManager.getCurrentColumnCount(binding.users));
+                            mucOptions.getUsersPreview(
+                                    GridManager.getCurrentColumnCount(binding.users));
                     this.mUserPreviewAdapter.submitList(list);
                 });
+        final var userCount = mucOptions.getUserCount();
         this.binding.invite.setVisibility(mucOptions.canInvite() ? View.VISIBLE : View.GONE);
-        this.binding.showUsers.setVisibility(mucOptions.getUsers(true, mucOptions.getSelf().ranks(Affiliation.ADMIN)).size() > 0 ? View.VISIBLE : View.GONE);
+        this.binding.showUsers.setVisibility(userCount > 0 ? View.VISIBLE : View.GONE);
         this.binding.showUsers.setText(
-                getResources().getQuantityString(R.plurals.view_users, users.size(), users.size()));
+                getResources().getQuantityString(R.plurals.view_users, userCount, userCount));
         this.binding.usersWrapper.setVisibility(
-                users.size() > 0 || mucOptions.canInvite() ? View.VISIBLE : View.GONE);
-        if (users.isEmpty()) {
+                userCount > 0 || mucOptions.canInvite() ? View.VISIBLE : View.GONE);
+        if (userCount == 0) {
             this.binding.noUsersHints.setText(
                     mucOptions.isPrivateAndNonAnonymous()
                             ? R.string.no_users_hint_group_chat

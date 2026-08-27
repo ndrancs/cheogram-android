@@ -82,6 +82,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 
@@ -106,6 +107,7 @@ import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
 import im.conversations.android.model.Bookmark;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
@@ -948,15 +950,15 @@ public class Conversation extends AbstractEntity
         return MamReference.fromAttribute(getAttribute(ATTRIBUTE_LAST_CLEAR_HISTORY));
     }
 
-    public List<Jid> getAcceptedCryptoTargets() {
+    public ImmutableSet<Jid> getAcceptedCryptoTargets() {
         if (mode == MODE_SINGLE) {
-            return Collections.singletonList(getAddress().asBareJid());
+            return ImmutableSet.of(getAddress().asBareJid());
         } else {
             return getJidListAttribute(ATTRIBUTE_CRYPTO_TARGETS);
         }
     }
 
-    public void setAcceptedCryptoTargets(List<Jid> acceptedTargets) {
+    public void setAcceptedCryptoTargets(final Collection<Jid> acceptedTargets) {
         setAttribute(ATTRIBUTE_CRYPTO_TARGETS, acceptedTargets);
     }
 
@@ -1109,16 +1111,17 @@ public class Conversation extends AbstractEntity
         } else if (Bookmark.printableValue(bookmarkName)) {
             return bookmarkName;
         } else {
-            final String generatedName = mucOptions.createNameFromParticipants();
-            if (Bookmark.printableValue(generatedName)) {
-                return generatedName;
-            } else {
-                final var address = mucOptions.getConversation().getAddress();
-                if (address.isDomainJid()) {
-                    return address.toString();
-                } else {
-                    return address.getLocal();
+            if (mucOptions.isPrivateAndNonAnonymous()) {
+                final var users = mucOptions.getUsersPreviewWithFallback();
+                if (!users.isEmpty()) {
+                    return UIHelper.concatNames(users, true);
                 }
+            }
+            final var address = mucOptions.getConversation().getAddress();
+            if (address.isDomainJid()) {
+                return address.toString();
+            } else {
+                return address.getLocal();
             }
         }
     }
@@ -1501,9 +1504,9 @@ public class Conversation extends AbstractEntity
         }
     }
 
-    public boolean setAttribute(String key, List<Jid> jids) {
+    public boolean setAttribute(final String key, final Collection<Jid> addresses) {
         JSONArray array = new JSONArray();
-        for (Jid jid : jids) {
+        for (Jid jid : addresses) {
             array.put(jid.asBareJid().toString());
         }
         synchronized (this.attributes) {
@@ -1522,14 +1525,14 @@ public class Conversation extends AbstractEntity
         }
     }
 
-    private List<Jid> getJidListAttribute(String key) {
-        ArrayList<Jid> list = new ArrayList<>();
+    private ImmutableSet<Jid> getJidListAttribute(final String key) {
+        final var builder = new ImmutableSet.Builder<Jid>();
         synchronized (this.attributes) {
             try {
                 JSONArray array = this.attributes.getJSONArray(key);
                 for (int i = 0; i < array.length(); ++i) {
                     try {
-                        list.add(Jid.of(array.getString(i)));
+                        builder.add(Jid.of(array.getString(i)));
                     } catch (IllegalArgumentException e) {
                         // ignored
                     }
@@ -1538,7 +1541,7 @@ public class Conversation extends AbstractEntity
                 // ignored
             }
         }
-        return list;
+        return builder.build();
     }
 
     private int getIntAttribute(String key, int defaultValue) {
@@ -1810,7 +1813,7 @@ public class Conversation extends AbstractEntity
     }
 
     @Override
-    public String getAvatarName() {
+    public String getDisplayName() {
         return getName().toString();
     }
 

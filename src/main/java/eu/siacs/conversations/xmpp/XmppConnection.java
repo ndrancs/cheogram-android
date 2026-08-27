@@ -99,7 +99,6 @@ import eu.siacs.conversations.parser.PresenceParser;
 import eu.siacs.conversations.persistance.DatabaseBackend;
 import eu.siacs.conversations.persistance.FileBackend;
 import eu.siacs.conversations.services.MemorizingTrustManager;
-import eu.siacs.conversations.services.MessageArchiveService;
 import eu.siacs.conversations.services.NotificationService;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.ui.util.PendingItem;
@@ -121,6 +120,7 @@ import eu.siacs.conversations.xmpp.manager.AbstractManager;
 import eu.siacs.conversations.xmpp.manager.BlockingManager;
 import eu.siacs.conversations.xmpp.manager.CarbonsManager;
 import eu.siacs.conversations.xmpp.manager.DiscoManager;
+import eu.siacs.conversations.xmpp.manager.MessageArchiveManager;
 import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
 import eu.siacs.conversations.xmpp.manager.PingManager;
 import eu.siacs.conversations.xmpp.manager.RegistrationManager;
@@ -238,7 +238,6 @@ public class XmppConnection implements Runnable {
     private long lastConnectionStarted = 0;
     private long lastSessionStarted = 0;
     private long lastDiscoStarted = 0;
-    private boolean isMamPreferenceAlways = false;
     private final AtomicBoolean mWaitForDisco = new AtomicBoolean(true);
     private final AtomicBoolean mWaitingForSmCatchup = new AtomicBoolean(false);
     private final AtomicInteger mSmCatchupMessageCounter = new AtomicInteger(0);
@@ -1546,7 +1545,7 @@ public class XmppConnection implements Runnable {
                 (SSLSocket)
                         sslSocketFactory.createSocket(
                                 socket, address.getHostAddress(), socket.getPort(), true);
-        SSLSockets.setSecurity(sslSocket);
+        SSLSockets.setSecurity(sslSocket, isRequireTlsV13());
         SSLSockets.setHostname(sslSocket, IDN.toASCII(account.getServer()));
         SSLSockets.setApplicationProtocol(sslSocket, "xmpp-client");
         final XmppDomainVerifier xmppDomainVerifier = new XmppDomainVerifier();
@@ -1835,7 +1834,7 @@ public class XmppConnection implements Runnable {
 
     private void checkRequireChannelBinding(@NonNull final SaslMechanism mechanism)
             throws StateChangingException {
-        if (appSettings.isRequireChannelBinding()) {
+        if (isRequireChannelBinding()) {
             if (mechanism instanceof ChannelBindingMechanism) {
                 return;
             }
@@ -2215,7 +2214,7 @@ public class XmppConnection implements Runnable {
 
         final var features = getFeatures();
         if (!features.bind2()) {
-            discoverMamPreferences();
+            getManager(MessageArchiveManager.class).fetchArchivingPreferences();
         }
 
         final var accountInfoFuture =
@@ -2317,30 +2316,6 @@ public class XmppConnection implements Runnable {
         return false;
     }
 
-    private void discoverMamPreferences() {
-        final Iq request = new Iq(Iq.Type.GET);
-        request.addChild("prefs", MessageArchiveService.Version.MAM_2.namespace);
-        sendIqPacket(
-                request,
-                (response) -> {
-                    if (response.getType() == Iq.Type.RESULT) {
-                        Element prefs =
-                                response.findChild(
-                                        "prefs", MessageArchiveService.Version.MAM_2.namespace);
-                        isMamPreferenceAlways =
-                                "always"
-                                        .equals(
-                                                prefs == null
-                                                        ? null
-                                                        : prefs.getAttribute("default"));
-                    }
-                });
-    }
-
-    public boolean isMamPreferenceAlways() {
-        return isMamPreferenceAlways;
-    }
-
     private void finalizeBindOrError() {
         try {
             finalizeBind();
@@ -2371,6 +2346,11 @@ public class XmppConnection implements Runnable {
         final var discoManager = getManager(DiscoManager.class);
         if (discoManager.hasServerCommands()) {
             discoManager.fetchServerCommands();
+        }
+
+        final var messageArchiveManager = getManager(MessageArchiveManager.class);
+        if (messageArchiveManager.hasFeature()) {
+            messageArchiveManager.catchup();
         }
     }
 
@@ -2451,7 +2431,7 @@ public class XmppConnection implements Runnable {
                     SaslMechanism.ensureAvailable(
                             account.getQuickStartMechanism(),
                             sslVersion,
-                            appSettings.isRequireChannelBinding());
+                            isRequireChannelBinding());
         } else {
             quickStartMechanism = null;
         }
@@ -2486,6 +2466,16 @@ public class XmppConnection implements Runnable {
             sendStartStream(secureConnection, true);
             return false;
         }
+    }
+
+    private boolean isRequireChannelBinding() {
+        return AppSettings.SECURE_DOMAINS.contains(account.getDomain())
+                || appSettings.isRequireChannelBinding();
+    }
+
+    private boolean isRequireTlsV13() {
+        return AppSettings.SECURE_DOMAINS.contains(account.getDomain())
+                || appSettings.isRequireTlsV13();
     }
 
     private void sendStartStream(final boolean from, final boolean flush) throws IOException {
@@ -2847,16 +2837,12 @@ public class XmppConnection implements Runnable {
         this.changeStateTerminal(Account.State.CONNECTION_TIMEOUT);
     }
 
-    public Account getAccount() {
-        return this.account;
-    }
-
     public Features getStreamFeatures() {
         return this.features;
     }
 
     public boolean fromServer(final Stanza stanza) {
-        final var account = getAccount().getJid();
+        final var account = this.account.getJid();
         final Jid from = stanza.getFrom();
         return from == null
                 || from.equals(account.getDomain())
@@ -2865,7 +2851,7 @@ public class XmppConnection implements Runnable {
     }
 
     public boolean fromAccount(final Stanza stanza) {
-        final var account = getAccount().getJid();
+        final var account = this.account.getJid();
         final Jid from = stanza.getFrom();
         return from == null || from.asBareJid().equals(account.asBareJid());
     }
@@ -3053,14 +3039,6 @@ public class XmppConnection implements Runnable {
             return infoQuery != null && infoQuery.getFeatureStrings().contains(feature);
         }
 
-        public boolean blocking() {
-            return connection.getManager(BlockingManager.class).hasFeature();
-        }
-
-        public boolean spamReporting() {
-            return hasDiscoFeature(account.getDomain(), Namespace.REPORTING);
-        }
-
         public boolean sm() {
             return streamId != null
                     || (connection.streamFeatures != null
@@ -3093,20 +3071,6 @@ public class XmppConnection implements Runnable {
 
         public boolean pepConfigNodeMax() {
             return hasDiscoFeature(account.getJid().asBareJid(), Namespace.PUB_SUB_CONFIG_NODE_MAX);
-        }
-
-        public boolean pepOmemoWhitelisted() {
-            return hasDiscoFeature(
-                    account.getJid().asBareJid(), AxolotlService.PEP_OMEMO_WHITELISTED);
-        }
-
-        public boolean mam() {
-            return MessageArchiveService.Version.has(getAccountFeatures());
-        }
-
-        public Collection<String> getAccountFeatures() {
-            final var infoQuery = getManager(DiscoManager.class).get(account.getJid().asBareJid());
-            return infoQuery == null ? Collections.emptyList() : infoQuery.getFeatureStrings();
         }
 
         public boolean rosterVersioning() {

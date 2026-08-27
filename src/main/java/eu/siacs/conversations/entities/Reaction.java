@@ -38,7 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-public class Reaction {
+public class Reaction implements MucOptions.IdentifiableUser {
 
     public static final List<String> SUGGESTIONS =
             Arrays.asList(
@@ -116,6 +116,7 @@ public class Reaction {
         return builder.build();
     }
 
+    // TODO take 'user' object
     public static Collection<Reaction> withOccupantId(
             final Collection<Reaction> existing,
             final Collection<String> reactions,
@@ -168,6 +169,22 @@ public class Reaction {
                 Collections2.transform(
                         reactions, r -> new Reaction(r, null, received, from, null, null, envelopeId)));
         return builder.build();
+    }
+
+    @Override
+    public Jid mucUserAddress() {
+        return this.from;
+    }
+
+    @Override
+    public Jid mucUserRealAddress() {
+        final var address = this.trueJid;
+        return address == null ? null : address.asBareJid();
+    }
+
+    @Override
+    public String mucUserOccupantId() {
+        return this.occupantId;
     }
 
     private static class JidTypeAdapter extends TypeAdapter<Jid> {

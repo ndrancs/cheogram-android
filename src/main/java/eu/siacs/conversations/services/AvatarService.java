@@ -14,13 +14,22 @@ import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.LruCache;
+import android.view.Surface;
 import androidx.annotation.ColorInt;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.res.ResourcesCompat;
+import androidx.core.graphics.drawable.IconCompat;
+import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Multimap;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
@@ -39,7 +48,6 @@ import im.conversations.android.model.Bookmark;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 public class AvatarService {
@@ -48,6 +56,7 @@ public class AvatarService {
 	private static final int TRANSPARENT = 0x00000000;
 	private static final int PLACEHOLDER_COLOR = 0xFF202020;
 
+	private static final int AVATAR_SIZE_ADAPTIVE = 108;
 	public static final int SYSTEM_UI_AVATAR_SIZE = 48;
 
 	private static final String PREFIX_CONTACT = "contact";
@@ -120,6 +129,30 @@ public class AvatarService {
 		}
 		if (avatar != null) this.mXmppConnectionService.getDrawableCache().put(KEY, avatar);
 		return avatar;
+	}
+
+	public IconCompat getAdaptive(final Contact contact) {
+		final var metrics = this.mXmppConnectionService.getResources().getDisplayMetrics();
+		int size = Math.round(metrics.density * AVATAR_SIZE_ADAPTIVE);
+		final var avatar = get(contact, size, false);
+		final Bitmap bitmap = FileBackend.drawDrawable(avatar);
+		if (false) {
+			return IconCompat.createWithAdaptiveBitmap(bitmap);
+		} else {
+			return IconCompat.createWithBitmap(bitmap);
+		}
+	}
+
+	public IconCompat getAdaptive(final MucOptions mucOptions) {
+		final var metrics = this.mXmppConnectionService.getResources().getDisplayMetrics();
+		final int size = Math.round(metrics.density * AVATAR_SIZE_ADAPTIVE);
+		final var avatar = get(mucOptions, size, false);
+		final Bitmap bitmap = FileBackend.drawDrawable(avatar);
+		if (false) {
+			return IconCompat.createWithAdaptiveBitmap(bitmap);
+		} else {
+			return IconCompat.createWithBitmap(bitmap);
+		}
 	}
 
 	public Bitmap getRoundedShortcut(final MucOptions mucOptions) {
@@ -237,12 +270,13 @@ public class AvatarService {
 				this.mXmppConnectionService.getDrawableCache().remove(key(contact, size));
 			}
 		}
-		for (Conversation conversation : mXmppConnectionService.findAllConferencesWith(contact)) {
-			MucOptions.User user = conversation.getMucOptions().findUserByRealJid(contact.getAddress().asBareJid());
-			if (user != null) {
-				clear(user);
+		final var connection = contact.getAccount().getXmppConnection();
+		for (final var user : connection.getManager(MultiUserChatManager.class).getUsers(contact)) {
+			final var mucOptions = user.getMucOptions();
+			clear(user);
+			if (Strings.isNullOrEmpty(mucOptions.getAvatar()) && mucOptions.isPrivateAndNonAnonymous()) {
+				clear(mucOptions);
 			}
-			clear(conversation);
 		}
 	}
 
@@ -349,7 +383,7 @@ public class AvatarService {
 		if (bitmap == null) {
 			Conversation c = mucOptions.getConversation();
 			if (mucOptions.isPrivateAndNonAnonymous()) {
-				final List<MucOptions.User> users = mucOptions.getUsersRelevantForNameAndAvatar();
+				final List<MucOptions.User> users = mucOptions.getUsersPreviewWithFallback();
 				if (users.size() == 0) {
 					bitmap = getImpl(c.getName().toString(), c.getAddress().asBareJid().toString(), size);
 				} else {
@@ -469,11 +503,7 @@ public class AvatarService {
 		if (avatar == null) {
 			final String displayName = account.getDisplayName();
 			final String jid = account.getJid().asBareJid().toString();
-			if (QuickConversationsService.isQuicksy() && !TextUtils.isEmpty(displayName)) {
-				avatar = get(displayName, jid, size, false);
-			} else {
-				avatar = get(jid, null, size, false);
-			}
+			avatar = get(jid, null, size, false);
 		}
 		mXmppConnectionService.getDrawableCache().put(KEY, avatar);
 		return avatar;
@@ -492,13 +522,24 @@ public class AvatarService {
 				final Jid trueCounterpart = message.getTrueCounterpart();
 				final MucOptions mucOptions = ((Conversation) conversation).getMucOptions();
 				MucOptions.User user;
-				if (trueCounterpart != null) {
-					user = mucOptions.findOrCreateUserByRealJid(trueCounterpart, message.getCounterpart(), message.getOccupantId());
-				} else if(message.getOccupantId() != null) {
-					user = mucOptions.findUserByOccupantId(message.getOccupantId(), message.getCounterpart());
-				} else {
-					user = mucOptions.findUserByFullJid(message.getCounterpart());
-				}
+				user = mucOptions.getUser(
+					new MucOptions.IdentifiableUser() {
+						@Override
+						public Jid mucUserAddress() {
+							return message.getCounterpart();
+						}
+
+						@Override
+						public Jid mucUserRealAddress() {
+							return trueCounterpart;
+						}
+
+						@Override
+						public String mucUserOccupantId() {
+							return message.getOccupantId();
+						}
+					}
+				);
 				if (message.getModerated() != null) user = null;
 				if (user != null) {
 					return getImpl(user, size, cachedOnly);
@@ -565,7 +606,7 @@ public class AvatarService {
 	}
 
 	private static boolean drawTile(Canvas canvas, String letter, int tileColor, int left, int top, int right, int bottom) {
-		letter = letter.toUpperCase(Locale.getDefault());
+		letter = letter.toUpperCase();
 		Paint tilePaint = new Paint(), textPaint = new Paint();
 		tilePaint.setColor(tileColor);
 		textPaint.setFlags(Paint.ANTI_ALIAS_FLAG);
@@ -608,7 +649,7 @@ public class AvatarService {
 			drawTile(canvas, contact.getDisplayName(), seed, left, top, right, bottom);
 		} else {
 			String seed = user.getRealJid() == null ? null : user.getRealJid().asBareJid().toString();
-			drawTile(canvas, user.getName(), seed, left, top, right, bottom);
+			drawTile(canvas, user.getNick(), seed, left, top, right, bottom);
 		}
 		return true;
 	}
@@ -670,7 +711,7 @@ public class AvatarService {
 
 	public interface Avatar {
 		@ColorInt int getAvatarBackgroundColor();
-		String getAvatarName();
+		String getDisplayName();
 	}
 
 	public static class TextDrawable extends Drawable {

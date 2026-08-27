@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.Iterables;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.databinding.ActivityUriHandlerBinding;
@@ -36,6 +37,9 @@ import eu.siacs.conversations.utils.ProvisioningUtils;
 import eu.siacs.conversations.utils.SignupUtils;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.Jid;
+import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.HttpUrl;
@@ -148,7 +152,7 @@ public class UriHandlerActivity extends BaseActivity {
     private boolean handleUri(final Uri uri, final boolean scanned) {
         final Intent intent;
         final XmppUri xmppUri = new XmppUri(uri);
-        final List<Jid> accounts = DatabaseBackend.getInstance(this).getAccountJids(false);
+        final var accounts = DatabaseBackend.getInstance(this).getAccountAddresses(false);
 
         if (uri == null) return true;
 
@@ -220,7 +224,7 @@ public class UriHandlerActivity extends BaseActivity {
                     intent = new Intent(this, StartConversationActivity.class);
                     intent.setAction(Intent.ACTION_VIEW);
                     intent.setData(uri);
-                    intent.putExtra("account", accounts.get(0).toString());
+                    intent.putExtra("account", Iterables.getFirst(accounts, null).toString());
                 }
             } else {
                 intent = new Intent(this, ShareWithActivity.class);

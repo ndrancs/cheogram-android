@@ -12,6 +12,7 @@ import android.widget.ImageView;
 import androidx.annotation.DimenRes;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.entities.Account;
+import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.services.AvatarService;
 import eu.siacs.conversations.ui.XmppActivity;
 import java.lang.ref.WeakReference;
@@ -129,9 +130,12 @@ public class AvatarWorkerTask extends AsyncTask<AvatarService.Avatar, Void, Draw
         final Context context = imageView.getContext();
         if (avatar instanceof Account) {
             imageView.setContentDescription(context.getString(R.string.your_avatar));
+        } else if (avatar instanceof Message m && m.getType() == Message.TYPE_STATUS) {
+            imageView.setContentDescription(null);
+            return;
         } else {
             imageView.setContentDescription(
-                    context.getString(R.string.avatar_for_x, avatar.getAvatarName()));
+                    context.getString(R.string.avatar_for_x, avatar.getDisplayName()));
         }
     }
 

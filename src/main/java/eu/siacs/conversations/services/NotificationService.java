@@ -1515,14 +1515,18 @@ public class NotificationService {
         final ShortcutInfoCompat info;
         if (conversation.getMode() == Conversation.MODE_SINGLE) {
             final Contact contact = conversation.getContact();
-            final Uri systemAccount = contact.getSystemAccount();
-            if (systemAccount != null) {
-                notificationBuilder.addPerson(systemAccount.toString());
+            if (contact.isSelf()) {
+                info = null;
+            } else {
+                final Uri systemAccount = contact.getSystemAccount();
+                if (systemAccount != null) {
+                    notificationBuilder.addPerson(systemAccount.toString());
+                }
+                info =
+                        mXmppConnectionService
+                                .getShortcutService()
+                                .getShortcutInfo(contact, conversation.getUuid());
             }
-            info =
-                    mXmppConnectionService
-                            .getShortcutService()
-                            .getShortcutInfo(contact, conversation.getUuid());
         } else {
             info =
                     mXmppConnectionService
@@ -1536,7 +1540,7 @@ public class NotificationService {
         if (mXmppConnectionService.getAccounts().size() > 1) {
             notificationBuilder.setSubText(conversation.getAccount().getJid().asBareJid().toString());
         }
-        if (channel.equals(MESSAGES_NOTIFICATION_CHANNEL)) {
+        if (channel.equals(MESSAGES_NOTIFICATION_CHANNEL) && info != null) {
             // when do not want 'customized' notifications for silent notifications in their
             // respective channels
             notificationBuilder.setShortcutInfo(info);
@@ -1950,7 +1954,7 @@ public class NotificationService {
     private boolean wasHighlightedOrPrivate(final Message message) {
         if (message.getConversation() instanceof Conversation) {
             Conversation conversation = (Conversation) message.getConversation();
-            final MucOptions.User sender = conversation.getMucOptions().findUserByFullJid(message.getCounterpart());
+            final MucOptions.User sender = conversation.getMucOptions().getUser(message.getCounterpart());
             final boolean muted = message.getStatus() == Message.STATUS_RECEIVED && mXmppConnectionService.isMucUserMuted(new MucOptions.User(null, conversation.getAddress(), null, message.getOccupantId(), null, im.conversations.android.xmpp.model.muc.Role.NONE, Affiliation.NONE, null));
             if (muted) return false;
             if (sender != null && sender.ranks(Affiliation.MEMBER) && message.isAttention()) {

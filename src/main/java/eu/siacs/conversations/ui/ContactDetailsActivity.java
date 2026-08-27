@@ -104,6 +104,7 @@ import eu.siacs.conversations.xmpp.OnUpdateBlocklist;
 import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import eu.siacs.conversations.xmpp.manager.DiscoManager;
+import eu.siacs.conversations.xmpp.manager.BlockingManager;
 import eu.siacs.conversations.xmpp.manager.PresenceManager;
 import eu.siacs.conversations.xmpp.manager.RosterManager;
 import im.conversations.android.xmpp.model.stanza.Presence;
@@ -499,7 +500,7 @@ public class ContactDetailsActivity extends OmemoActivity
             return true;
         }
         final XmppConnection connection = contact.getAccount().getXmppConnection();
-        if (connection != null && connection.getFeatures().blocking()) {
+        if (connection != null && connection.getManager(BlockingManager.class).hasFeature()) {
             if (this.contact.isBlocked()) {
                 block.setVisible(false);
             } else {

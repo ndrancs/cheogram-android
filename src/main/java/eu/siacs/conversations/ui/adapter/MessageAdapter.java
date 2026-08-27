@@ -72,6 +72,7 @@ import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.base.Joiner;
+import com.google.common.base.Objects;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
@@ -122,7 +123,6 @@ import eu.siacs.conversations.entities.Roster;
 import eu.siacs.conversations.entities.RtpSessionStatus;
 import eu.siacs.conversations.entities.Transferable;
 import eu.siacs.conversations.persistance.FileBackend;
-import eu.siacs.conversations.services.MessageArchiveService;
 import eu.siacs.conversations.services.NotificationService;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.ui.Activities;
@@ -151,6 +151,7 @@ import eu.siacs.conversations.xmpp.mam.MamReference;
 import eu.siacs.conversations.xml.Element;
 import kotlin.coroutines.Continuation;
 
+import eu.siacs.conversations.xmpp.manager.MessageArchiveManager;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1122,6 +1123,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
     }
 
     private void loadMoreMessages(final Conversation conversation) {
+        final var connection = conversation.getAccount().getXmppConnection();
         conversation.setLastClearHistory(0, null);
         activity.xmppConnectionService.updateConversation(conversation);
         conversation.setHasMessagesLeftOnServer(true);
@@ -1131,9 +1133,9 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             timestamp = System.currentTimeMillis();
         }
         conversation.messagesLoaded.set(true);
-        MessageArchiveService.Query query =
-                activity.xmppConnectionService
-                        .getMessageArchiveService()
+        final var query =
+                connection
+                        .getManager(MessageArchiveManager.class)
                         .query(conversation, new MamReference(0), timestamp, false);
         if (query != null) {
             Toast.makeText(activity, R.string.fetching_history_from_server, Toast.LENGTH_LONG)
@@ -1841,7 +1843,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         if (c instanceof Conversation conversation && c.getMode() == Conversational.MODE_MULTI) {
             final var reactions = reaction.getValue();
             final var mucOptions = conversation.getMucOptions();
-            final var users = mucOptions.findUsers(reactions);
+            final var users = mucOptions.getUsersOrStubs(reactions);
             if (users.isEmpty()) {
                 return true;
             }

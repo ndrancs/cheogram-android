@@ -75,11 +75,9 @@ public class PublishProfilePictureActivity extends XmppActivity
                 () -> {
                     if (mInitialAccountSetup) {
                         Intent intent =
-                                new Intent(
-                                        getApplicationContext(), StartConversationActivity.class);
-                        StartConversationActivity.addInviteUri(intent, getIntent());
+                                StartConversationActivity.startOrConversationsActivity(
+                                        this, account);
                         intent.putExtra("init", true);
-                        intent.putExtra(EXTRA_ACCOUNT, account.getJid().asBareJid().toString());
                         startActivity(intent);
                     }
                     Toast.makeText(
@@ -129,8 +127,8 @@ public class PublishProfilePictureActivity extends XmppActivity
                 v -> {
                     if (mInitialAccountSetup) {
                         final Intent intent =
-                                new Intent(
-                                        getApplicationContext(), StartConversationActivity.class);
+                                StartConversationActivity.startOrConversationsActivity(
+                                        this, account);
                         intent.putExtra("init", true);
                         StartConversationActivity.addInviteUri(intent, getIntent());
                         if (account != null) {

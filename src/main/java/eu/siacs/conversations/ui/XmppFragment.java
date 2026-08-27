@@ -29,9 +29,7 @@
 
 package eu.siacs.conversations.ui;
 
-import android.app.Activity;
-import android.app.Fragment;
-
+import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.LifecycleRegistry;
 import androidx.lifecycle.LifecycleOwner;
@@ -47,13 +45,6 @@ public abstract class XmppFragment extends Fragment implements OnBackendConnecte
 
 	abstract protected void refresh();
 	public void refreshForNewCaps(final Set<Jid> newCapsJids) { }
-
-	protected void runOnUiThread(Runnable runnable) {
-		final Activity activity = getActivity();
-		if (activity != null) {
-			activity.runOnUiThread(runnable);
-		}
-	}
 
 	@Override
 	public void onStart() {
@@ -93,4 +84,15 @@ public abstract class XmppFragment extends Fragment implements OnBackendConnecte
 	public Lifecycle getLifecycle() {
 		return lifecycle;
 	}
+
+    protected void runOnUiThread(final Runnable runnable) {
+        requireActivity().runOnUiThread(runnable);
+    }
+
+    public XmppActivity requireXmppActivity() {
+        if (getActivity() instanceof XmppActivity xmppActivity) {
+            return xmppActivity;
+        }
+        throw new IllegalStateException("Fragment is not hosted by XmppActivity");
+    }
 }

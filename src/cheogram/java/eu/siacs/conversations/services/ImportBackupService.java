@@ -130,7 +130,7 @@ public class ImportBackupService extends Service {
 
     public void loadBackupFiles(final OnBackupFilesLoaded onBackupFilesLoaded) {
         executor.execute(() -> {
-            final List<Jid> accounts = mDatabaseBackend.getAccountJids(false);
+            final var accounts = mDatabaseBackend.getAccountAddresses(false);
             final ArrayList<BackupFile> backupFiles = new ArrayList<>();
             final Set<String> apps = new HashSet<>(Arrays.asList("Conversations", "Quicksy", getString(R.string.app_name)));
             final List<File> directories = new ArrayList<>();
@@ -233,7 +233,7 @@ public class ImportBackupService extends Service {
             final BackupFileHeader backupFileHeader = BackupFileHeader.read(dataInputStream);
             Log.d(Config.LOGTAG, backupFileHeader.toString());
 
-            if (mDatabaseBackend.getAccountJids(false).contains(backupFileHeader.getJid())) {
+            if (mDatabaseBackend.getAccountAddresses(false).contains(backupFileHeader.getJid())) {
                 synchronized (mOnBackupProcessedListeners) {
                     for (OnBackupProcessed l : mOnBackupProcessedListeners) {
                         l.onAccountAlreadySetup();

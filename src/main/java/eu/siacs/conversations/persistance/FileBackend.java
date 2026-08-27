@@ -476,8 +476,8 @@ public class FileBackend {
         if (drawable != null || cacheOnly) {
             return drawDrawable(drawable);
         }
-        Bitmap bitmap = null;
         final String mime = attachment.getMime();
+        final Bitmap bitmap;
         if ("application/pdf".equals(mime)) {
             bitmap = cropCenterSquarePdf(attachment.getUri(), size);
             drawOverlay(
@@ -495,17 +495,19 @@ public class FileBackend {
                             : R.drawable.play_video_white,
                     0.75f);
         } else {
-            bitmap = cropCenterSquare(attachment.getUri(), size);
-            if (bitmap != null && "image/gif".equals(mime)) {
-                Bitmap withGifOverlay = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+            final var preview = cropCenterSquare(attachment.getUri(), size);
+            if (preview != null && "image/gif".equals(mime)) {
+                Bitmap withGifOverlay = preview.copy(Bitmap.Config.ARGB_8888, true);
                 drawOverlay(
                         withGifOverlay,
                         paintOverlayBlack(withGifOverlay)
                                 ? R.drawable.play_gif_black
                                 : R.drawable.play_gif_white,
                         1.0f);
-                bitmap.recycle();
+                preview.recycle();
                 bitmap = withGifOverlay;
+            } else {
+                bitmap = preview;
             }
         }
         if (key != null && bitmap != null) {
@@ -895,7 +897,7 @@ public class FileBackend {
         return pos > 0 ? filename.substring(pos + 1) : null;
     }
 
-    private void copyImageToPrivateStorage(File file, Uri image, int sampleSize)
+    private void copyImageToPrivateStorage(final File file, final Uri image, int sampleSize)
             throws FileCopyException, ImageCompressionException {
         final File parent = file.getParentFile();
         if (parent != null && parent.mkdirs()) {
@@ -989,22 +991,15 @@ public class FileBackend {
         copyImageToPrivateStorage(file, image, 0);
     }
 
-    public void copyImageToPrivateStorage(Message message, Uri image)
+    public void copyImageToPrivateStorage(final Message message, final Uri image)
             throws FileCopyException, ImageCompressionException {
-        final String filename;
-        switch (Config.IMAGE_FORMAT) {
-            case JPEG:
-                filename = String.format("%s.%s", message.getUuid(), "jpg");
-                break;
-            case PNG:
-                filename = String.format("%s.%s", message.getUuid(), "png");
-                break;
-            case WEBP:
-                filename = String.format("%s.%s", message.getUuid(), "webp");
-                break;
-            default:
-                throw new IllegalStateException("Unknown image format");
-        }
+        final String filename =
+                switch (Config.IMAGE_FORMAT) {
+                    case JPEG -> String.format("%s.%s", message.getUuid(), "jpg");
+                    case PNG -> String.format("%s.%s", message.getUuid(), "png");
+                    case WEBP -> String.format("%s.%s", message.getUuid(), "webp");
+                    default -> throw new IllegalStateException("Unknown image format");
+                };
         setupRelativeFilePath(message, filename);
         final File tmp = getFile(message);
         copyImageToPrivateStorage(tmp, image);
@@ -2101,14 +2096,7 @@ public class FileBackend {
         }
     }
 
-    private static class Dimensions {
-        public final int width;
-        public final int height;
-
-        Dimensions(int height, int width) {
-            this.width = width;
-            this.height = height;
-        }
+    private record Dimensions(int height, int width) {
 
         public int getMin() {
             return Math.min(width, height);
@@ -2129,14 +2117,14 @@ public class FileBackend {
         }
     }
 
-    public static class ImageCompressionException extends Exception {
+    public static class ImageCompressionException extends IllegalStateException {
 
         ImageCompressionException(String message) {
             super(message);
         }
     }
 
-    public static class FileCopyException extends Exception {
+    public static class FileCopyException extends IllegalStateException {
         private final int resId;
 
         private FileCopyException(@StringRes int resId) {
