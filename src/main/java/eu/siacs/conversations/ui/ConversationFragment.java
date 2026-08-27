@@ -1493,7 +1493,7 @@ public class ConversationFragment extends XmppFragment
                 menuOngoingCall.setVisible(false);
                 menuArchiveChat.setTitle("Leave " + (conversation.getMucOptions().isPrivateAndNonAnonymous() ? "group chat" : "Channel"));
             } else {
-                final XmppConnectionService service = requireXmppActivity().xmppConnectionService;
+                final XmppConnectionService service = getXmppConnectionService();
                 final Optional<OngoingRtpSession> ongoingRtpSession =
                         service == null
                                 ? Optional.absent()
@@ -2937,9 +2937,10 @@ public class ConversationFragment extends XmppFragment
             }
         }
         if (writeGranted(grantResults, permissions)) {
-            if (requireXmppActivity().xmppConnectionService != null) {
-                requireXmppActivity().xmppConnectionService.getDrawableCache().evictAll();
-                requireXmppActivity().xmppConnectionService.restartFileObserver();
+            final var service = getXmppConnectionService();
+            if (service != null) {
+                service.getDrawableCache().evictAll();
+                service.restartFileObserver();
             }
             refresh();
         }
@@ -4870,12 +4871,7 @@ public class ConversationFragment extends XmppFragment
 
     @Override
     public void onTypingStarted() {
-        final XmppConnectionService service;
-        if (getActivity() instanceof XmppActivity xa) {
-            service = xa.xmppConnectionService;
-        } else {
-            service = null;
-        }
+        final var service = getXmppConnectionService();
         if (service == null) {
             return;
         }
@@ -4889,12 +4885,7 @@ public class ConversationFragment extends XmppFragment
 
     @Override
     public void onTypingStopped() {
-        final XmppConnectionService service;
-        if (getActivity() instanceof XmppActivity xa) {
-            service = xa.xmppConnectionService;
-        } else {
-            service = null;
-        }
+        final var service = getXmppConnectionService();
         if (service == null) {
             return;
         }
@@ -4906,7 +4897,7 @@ public class ConversationFragment extends XmppFragment
 
     @Override
     public void onTextDeleted() {
-        final XmppConnectionService service = requireXmppActivity().xmppConnectionService;
+        final var service = getXmppConnectionService();
         if (service == null) {
             return;
         }

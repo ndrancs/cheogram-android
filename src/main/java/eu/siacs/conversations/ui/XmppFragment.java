@@ -36,54 +36,55 @@ import androidx.lifecycle.LifecycleOwner;
 
 import java.util.Set;
 
+import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.ui.interfaces.OnBackendConnected;
 import eu.siacs.conversations.xmpp.Jid;
 
 public abstract class XmppFragment extends Fragment implements OnBackendConnected, LifecycleOwner {
 
-	protected LifecycleRegistry lifecycle = new LifecycleRegistry(this);
+    protected LifecycleRegistry lifecycle = new LifecycleRegistry(this);
 
-	abstract protected void refresh();
-	public void refreshForNewCaps(final Set<Jid> newCapsJids) { }
+    abstract protected void refresh();
+    public void refreshForNewCaps(final Set<Jid> newCapsJids) { }
 
-	@Override
-	public void onStart() {
-		super.onStart();
-		lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_START);
-	}
+    @Override
+    public void onStart() {
+        super.onStart();
+        lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_START);
+    }
 
-	@Override
-	public void onResume() {
-		super.onResume();
-		lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
-	}
+    @Override
+    public void onResume() {
+        super.onResume();
+        lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
+    }
 
-	@Override
-	public void onPause() {
-		lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE);
-		super.onPause();
-	}
+    @Override
+    public void onPause() {
+        lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE);
+        super.onPause();
+    }
 
-	@Override
-	public void onStop() {
-		lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_STOP);
-		super.onStop();
-	}
+    @Override
+    public void onStop() {
+        lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_STOP);
+        super.onStop();
+    }
 
-	@Override
-	public void onDestroy() {
-		if (lifecycle.getCurrentState().isAtLeast(Lifecycle.State.CREATED)) {
-			try {
-				lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
-			} catch (IllegalStateException e) {  }
-		}
-		super.onDestroy();
-	}
+    @Override
+    public void onDestroy() {
+        if (lifecycle.getCurrentState().isAtLeast(Lifecycle.State.CREATED)) {
+            try {
+                lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
+            } catch (IllegalStateException e) {  }
+        }
+        super.onDestroy();
+    }
 
-	@Override
-	public Lifecycle getLifecycle() {
-		return lifecycle;
-	}
+    @Override
+    public Lifecycle getLifecycle() {
+        return lifecycle;
+    }
 
     protected void runOnUiThread(final Runnable runnable) {
         requireActivity().runOnUiThread(runnable);
@@ -94,5 +95,12 @@ public abstract class XmppFragment extends Fragment implements OnBackendConnecte
             return xmppActivity;
         }
         throw new IllegalStateException("Fragment is not hosted by XmppActivity");
+    }
+
+    public XmppConnectionService getXmppConnectionService() {
+        if (getActivity() instanceof XmppActivity xa) {
+            return xa.xmppConnectionService;
+        }
+        return null;
     }
 }
