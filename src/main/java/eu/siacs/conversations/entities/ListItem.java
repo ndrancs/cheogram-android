@@ -50,7 +50,21 @@ public interface ListItem extends Comparable<ListItem>, AvatarService.Avatar {
 
     @Override
     default int compareTo(final ListItem another) {
-        return this.getDisplayName().compareToIgnoreCase(another.getDisplayName());
+        if (getAddress().isDomainJid() && !another.getAddress().isDomainJid()) {
+            return -1;
+        } else if (!getAddress().isDomainJid() && another.getAddress().isDomainJid()) {
+            return 1;
+        }
+
+        final var anotherName =
+            another.getDisplayName() == null ? "" : another.getDisplayName();
+        final var displayNameScore = getDisplayName().compareToIgnoreCase(anotherName);
+
+        if (displayNameScore == 0) {
+            return getAddress().compareTo(another.getAddress());
+        }
+
+        return displayNameScore;
     }
 
     private boolean matchInItem(final String needle) {

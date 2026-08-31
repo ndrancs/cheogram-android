@@ -644,25 +644,6 @@ public class Contact implements ListItem, Blockable, MucOptions.IdentifiableUser
         return item;
     }
 
-    @Override
-    public int compareTo(@NonNull final ListItem another) {
-        if (getAddress().isDomainJid() && !another.getAddress().isDomainJid()) {
-            return -1;
-        } else if (!getAddress().isDomainJid() && another.getAddress().isDomainJid()) {
-            return 1;
-        }
-
-        final var anotherName =
-            another.getDisplayName() == null ? "" : another.getDisplayName();
-        final var displayNameScore = getDisplayName().compareToIgnoreCase(anotherName);
-
-        if (displayNameScore == 0) {
-            return getAddress().compareTo(another.getAddress());
-        }
-
-        return displayNameScore;
-    }
-
     public String getServer() {
         return getAddress().getDomain().toString();
     }
