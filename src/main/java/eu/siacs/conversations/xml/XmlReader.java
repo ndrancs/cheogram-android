@@ -121,10 +121,7 @@ public class XmlReader implements Closeable {
         final Element element = ExtensionFactory.create(name, namespace);
         element.setAttributes(currentTag.getAttributes());
         Tag nextTag = this.readTag();
-        if (nextTag == null) {
-            throw new IOException("interrupted mid tag");
-        }
-        while (!nextTag.isEnd(element.getName())) {
+        while (nextTag != null && !nextTag.isEnd(element.getName())) {
             if (nextTag.isNo()) {
                 if (nextTag.getName() != null) element.addChild(new TextNode(nextTag.getName()));
             } else {
@@ -132,6 +129,9 @@ public class XmlReader implements Closeable {
                 element.addChild(child);
             }
             nextTag = this.readTag();
+        }
+        if (nextTag == null) {
+            throw new IOException("interrupted mid tag");
         }
         return element;
     }
