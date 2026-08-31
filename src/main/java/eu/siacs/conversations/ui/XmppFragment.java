@@ -91,8 +91,12 @@ public abstract class XmppFragment extends Fragment implements OnBackendConnecte
     }
 
     public XmppActivity requireXmppActivity() {
-        if (getActivity() instanceof XmppActivity xmppActivity) {
+        final var activity = getActivity();
+        if (activity instanceof XmppActivity xmppActivity) {
             return xmppActivity;
+        }
+        if (activity == null) {
+            throw new IllegalStateException("Fragment is not hosted by XmppActivity: null");
         }
         throw new IllegalStateException("Fragment is not hosted by XmppActivity");
     }
