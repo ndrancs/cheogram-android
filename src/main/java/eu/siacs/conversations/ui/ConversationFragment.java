@@ -1023,9 +1023,9 @@ public class ConversationFragment extends XmppFragment
                         Log.d(Config.LOGTAG, "attachImageToConversation.onSuccess");
                         prepareFileToast.cancel();
                         if (next == null) {
-                            runOnUiThread(() -> messageSent());
+                            messageSent();
                         } else {
-                            runOnUiThread(next);
+                            next.run();
                         }
                     }
 
