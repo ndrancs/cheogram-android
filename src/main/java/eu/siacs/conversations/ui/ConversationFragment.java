@@ -2381,7 +2381,14 @@ public class ConversationFragment extends XmppFragment
 
     @Override
     public boolean onOptionsItemSelected(final MenuItem item) {
-        final var activity = requireXmppActivity();
+        final XmppActivity activity;
+        try {
+            activity = requireXmppActivity();
+        } catch (IllegalStateException e) {
+            // We've come detached, so just do nothing rather than crash
+            // probably a race condition
+            return super.onOptionsItemSelected(item);
+        }
         if (MenuDoubleTabUtil.shouldIgnoreTap()) {
             return false;
         } else if (conversation == null) {
