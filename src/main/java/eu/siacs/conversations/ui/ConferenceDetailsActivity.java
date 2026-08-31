@@ -839,25 +839,6 @@ public class ConferenceDetailsActivity extends XmppActivity
             this.binding.notificationStatusButton.setImageResource(
                     R.drawable.ic_notifications_none_24dp);
         }
-        final List<User> users = new ArrayList<>(mucOptions.getUsers());
-        users.add(mucOptions.getSelf());
-        Collections.sort(
-                users,
-                (a, b) -> {
-                    if (b.outranks(a.getAffiliation())) {
-                        return 1;
-                    } else if (a.outranks(b.getAffiliation())) {
-                        return -1;
-                    } else {
-                        if (a.getAvatar() != null && b.getAvatar() == null) {
-                            return -1;
-                        } else if (a.getAvatar() == null && b.getAvatar() != null) {
-                            return 1;
-                        } else {
-                            return a.getNick().compareToIgnoreCase(b.getNick());
-                        }
-                    }
-                });
         this.binding.users.post(
                 () -> {
                     final var list =
