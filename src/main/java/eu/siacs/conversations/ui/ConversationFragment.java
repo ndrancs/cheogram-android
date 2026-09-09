@@ -1645,7 +1645,7 @@ public class ConversationFragment extends XmppFragment
                 protected void onQuery(@Nullable CharSequence query) {
                     if (!requireXmppActivity().xmppConnectionService.getBooleanPreference("message_autocomplete", R.bool.message_autocomplete)) return;
 
-                    final var allUsers = conversation.getMucOptions().getUsers();
+                    final var allUsers = new ArrayList<>(conversation.getMucOptions().getUsers());
                     if (!conversation.getMucOptions().getUsersByRole(Role.MODERATOR).isEmpty()) {
                         allUsers.add(
                                 new MucOptions.User(

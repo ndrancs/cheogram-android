@@ -1111,16 +1111,18 @@ public class MucOptions {
             if (contact != null) {
                 return contact.getDisplayName();
             } else {
-                final String resource = this.resource();
-                if (resource != null) {
-                    return resource;
+                final var n = getNick();
+                if (n != null) {
+                    return n;
                 }
                 if (realJid != null) {
                     return JidHelper.localPartOrFallback(realJid);
-                } else {
+                } else if (fullJid != null) {
                     return fullJid.toString();
                 }
             }
+
+            return "?";
         }
 
         public Jid getRealJid() {
