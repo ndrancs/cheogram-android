@@ -1225,7 +1225,7 @@ public class MucOptions {
                     this.occupantId,
                     this.role,
                     this.affiliation,
-                    new HashSet<>(),
+                    this.hats,
                     true);
         }
 
@@ -1285,7 +1285,7 @@ public class MucOptions {
                     getOccupantId(),
                     Role.NONE,
                     getAffiliation(),
-                    new HashSet<>(),
+                    this.hats,
                     false);
         }
     }
