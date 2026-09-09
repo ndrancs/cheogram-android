@@ -414,8 +414,6 @@ public class MultiUserChatManager extends AbstractManager {
         final Jid jid = account.getJid();
         final var conversation = mucOptions.getConversation();
 
-        mucOptions.setError(MucOptions.Error.NONE);
-		  
         final Element nick = presence.findChild("nick", Namespace.NICK);
         Element hats = presence.findChild("hats", "urn:xmpp:hats:0");
         if (hats == null) {
