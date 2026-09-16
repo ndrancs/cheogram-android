@@ -4,6 +4,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.graphics.drawable.Drawable;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.text.Html;
@@ -11,6 +12,7 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ImageSpan;
 import android.text.style.ClickableSpan;
+import android.text.style.TypefaceSpan;
 import android.util.Base64;
 import android.util.Log;
 import android.util.Pair;
@@ -30,6 +32,11 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Longs;
 
 import org.json.JSONException;
+
+import org.xml.sax.Attributes;
+import org.xml.sax.ContentHandler;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -1125,6 +1132,7 @@ public class Message extends AbstractEntity
             spannableBody = new SpannableStringBuilder(MessageUtils.filterLtrRtl(getBody(includeReplyTo && getInReplyTo() != null)).trim());
             spannableBody.setSpan(PLAIN_TEXT_SPAN, 0, spannableBody.length(), 0); // Let adapter know it can do more formatting
         } else {
+            final var codeStarts = new ArrayList<Integer>();
             SpannableStringBuilder spannable = new SpannableStringBuilder(Html.fromHtml(
                 MessageUtils.filterLtrRtl(html.toString().replace("<code>", "<tt>").replace("</code>", "</tt>")).trim(),
                 Html.FROM_HTML_MODE_COMPACT,
@@ -1146,7 +1154,76 @@ public class Message extends AbstractEntity
                        return fallbackImg;
                    }
                 },
-                (opening, tag, output, xmlReader) -> {}
+                (opening, tag, output, xmlReader) -> {
+                    if (tag.equals("code") || tag.equals("pre")) {
+                        if (opening) {
+                            codeStarts.add(output.length());
+                            if (tag.equals("pre")) {
+                                final var handler = xmlReader.getContentHandler();
+
+                                xmlReader.setContentHandler(new DefaultHandler() {
+                                    int preDepth = 1;
+
+                                    @Override
+                                    public void startElement(
+                                            String uri,
+                                            String localName,
+                                            String qName,
+                                            Attributes atts) throws SAXException {
+
+                                        if ("pre".equalsIgnoreCase(qName)) {
+                                            preDepth++;
+                                            return;
+                                        }
+
+                                        handler.startElement(uri, localName, qName, atts);
+                                    }
+
+                                    @Override
+                                    public void endElement(
+                                            String uri,
+                                            String localName,
+                                            String qName) throws SAXException {
+                                        if ("pre".equalsIgnoreCase(qName)) {
+                                            preDepth--;
+                                            if (preDepth < 1) {
+                                                xmlReader.setContentHandler(handler);
+                                            } else {
+                                                return;
+                                            }
+                                        }
+
+                                        handler.endElement(uri, localName, qName);
+                                    }
+
+                                    @Override
+                                    public void characters(char[] ch, int start, int length)
+                                            throws SAXException {
+
+                                        if (preDepth < 0) {
+                                            handler.characters(ch, start, length);
+                                            return;
+                                        }
+
+                                        // Preserve the characters exactly as received.
+                                        for (int i = 0; i < length; i++) {
+                                            output.append(ch[i + start]);
+                                        }
+                                    }
+                                });
+                            }
+
+                        } else {
+                            final var start = codeStarts.remove(codeStarts.size() - 1).intValue();
+                            output.setSpan(
+                                new TypefaceSpan(Typeface.MONOSPACE),
+                                start,
+                                output.length(),
+                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                            );
+                        }
+                    }
+                }
             ));
 
             // Make images clickable and long-clickable with BetterLinkMovementMethod
