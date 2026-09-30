@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Point;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -23,6 +24,7 @@ import eu.siacs.conversations.databinding.ActivityEasyInviteBinding;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.services.BarcodeProvider;
 import eu.siacs.conversations.utils.EasyOnboardingInvite;
+import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.manager.EasyOnboardingManager;
 import java.util.concurrent.TimeoutException;
@@ -41,6 +43,20 @@ public class EasyOnboardingInviteActivity extends XmppActivity {
         configureActionBar(getSupportActionBar(), true);
         Activities.setStatusAndNavigationBarColors(this, binding.getRoot());
         this.binding.shareButton.setOnClickListener(v -> share());
+
+        this.binding.useMyselfButton.setOnClickListener(v -> {
+            final Intent intent = new Intent(this, UriHandlerActivity.class);
+            intent.setAction(Intent.ACTION_VIEW);
+            intent.setData(
+                    Uri.parse(
+                            easyOnboardingInvite
+                                    .getUri()
+                                    .replace("roster;", "register;")
+                                    .replaceFirst(":[^@]+@", ":")));
+            startActivity(intent);
+            finish();
+        });
+
         if (bundle != null && bundle.containsKey("invite")) {
             this.easyOnboardingInvite = bundle.getParcelable("invite");
             if (this.easyOnboardingInvite != null) {
@@ -136,6 +152,15 @@ public class EasyOnboardingInviteActivity extends XmppActivity {
                 BarcodeProvider.create2dBarcodeBitmap(
                         invite.getShareableLink(), width, black, white);
         binding.qrCode.setImageBitmap(bitmap);
+
+        final XmppUri xmppUri = new XmppUri(invite.getUri());
+        if (xmppUri.isAction(XmppUri.ACTION_ROSTER)
+                && !"y".equals(
+                        xmppUri.getParameter(XmppUri.PARAMETER_IBR))) {
+            binding.useMyselfButton.setVisibility(View.INVISIBLE);
+        } else {
+            binding.useMyselfButton.setVisibility(View.VISIBLE);
+        }
     }
 
     @Override
