@@ -40,6 +40,16 @@ public class DownloadableFile extends File {
         }
     }
 
+    public String getExtension() {
+        String path = this.getName();
+        int start = path.lastIndexOf('.');
+        if (start > 0 && start < path.length() - 1) {
+            return path.substring(start + 1);
+        } else {
+            return null;
+        }
+    }
+
     public void setExpectedSize(long size) {
         this.expectedSize = size;
     }

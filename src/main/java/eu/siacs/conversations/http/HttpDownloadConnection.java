@@ -495,6 +495,7 @@ public class HttpDownloadConnection implements Transferable {
             mostRecentCall = client.newCall(request);
             try (final Response response = mostRecentCall.execute()) {
                 throwOnInvalidCode(response);
+                final String contentType = response.header("Content-Type");
                 final String contentRange = response.header("Content-Range");
                 final boolean serverResumed =
                         tryResume
@@ -528,6 +529,23 @@ public class HttpDownloadConnection implements Transferable {
                                     "Content-Length in GET response did not match expected size");
                         }
                     }
+						  if ((Strings.isNullOrEmpty(file.getExtension()) || file.getExtension() == "null") && contentType != null) {
+                        final String fileExtension = MimeUtils.guessExtensionFromMimeType(contentType);
+                        if (fileExtension != null) {
+                            mXmppConnectionService
+                                    .getFileBackend()
+                                    .setupRelativeFilePath(
+                                            message,
+                                            String.format("%s.%s", message.getUuid(), fileExtension),
+                                            contentType);
+                            Log.d(
+                                    Config.LOGTAG,
+                                    "rewriting name after not finding extension in url but in content"
+                                            + " type");
+                            setupFile();
+                        }
+                    }
+
                     final var directory = file.getParentFile();
                     if (directory != null && directory.mkdirs()) {
                         Log.d(Config.LOGTAG, "create directory " + directory.getAbsolutePath());
