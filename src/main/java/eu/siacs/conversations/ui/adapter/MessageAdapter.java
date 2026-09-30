@@ -1572,7 +1572,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             setTextColor(viewHolder.inReplyTo(), bubbleColor);
         }
 
-        if (appSettings.showLinkPreviews()) {
+        if (appSettings.showLinkPreviews() && !muted) {
             final var descriptions = message.getLinkDescriptions();
             viewHolder.linkDescriptions().setAdapter(new ArrayAdapter<>(activity, 0, descriptions) {
                 @Override
