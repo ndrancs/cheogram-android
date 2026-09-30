@@ -5075,18 +5075,7 @@ public class ConversationFragment extends XmppFragment
         if (message.getStatus() <= Message.STATUS_RECEIVED
                 && (contact == null || !contact.isSelf())) {
             if (message.getConversation().getMode() == Conversation.MODE_MULTI) {
-                final Jid cp = message.getCounterpart();
-                if (cp == null || cp.isBareJid()) {
-                    return;
-                }
-                final String occupantId = message.getOccupantId();
-                final User userByOccupantId =
-                        occupantId != null
-                                ? conversation.getMucOptions().getUser(occupantId)
-                                : null;
-                User u = userByOccupantId != null ? userByOccupantId : conversation.getMucOptions().getUser(cp);
-                if (u == null) u = conversation.getMucOptions().getUserOrStub(message);
-                final var user = u;
+                final var user = conversation.getMucOptions().getUserOrStub(message);
                 popupMenu.inflate(R.menu.muc_details_context);
                 final Menu menu = popupMenu.getMenu();
                 MucDetailsContextMenuHelper.configureMucDetailsContextMenu(
