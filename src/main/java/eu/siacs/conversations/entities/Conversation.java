@@ -3194,6 +3194,10 @@ public class Conversation extends AbstractEntity
                     error = null;
                     return true;
                 }
+
+                 public String toString() {
+                      return error + " " + viewType + " " + el;
+                 }
             }
 
             class Field extends Item {
