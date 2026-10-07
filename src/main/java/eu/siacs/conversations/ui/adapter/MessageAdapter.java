@@ -1553,6 +1553,17 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         } else {
             viewHolder.inReplyToBox().setVisibility(View.VISIBLE);
             viewHolder.inReplyTo().setText(UIHelper.getMessageDisplayName(message.getInReplyTo()));
+            var body = getSpannableBody(message.getInReplyTo());
+            final var processMarkup = body.getSpans(0, body.length(), Message.PlainTextSpan.class).length > 0;
+            if (body.length() > Config.MAX_DISPLAY_MESSAGE_CHARS / 4) {
+                 body = new SpannableStringBuilder(body, 0, Config.MAX_DISPLAY_MESSAGE_CHARS / 4);
+                 body.append("…");
+            }
+            if (processMarkup) StylingHelper.format(body, viewHolder.inReplyToQuote().getCurrentTextColor());
+            Linkify.addLinks(body, message.getConversation().getAccount(), message.getConversation().getAddress());
+            FixedURLSpan.fix(body);
+            applyQuoteSpan(viewHolder.inReplyToQuote(), body, 0, body.length(), bubbleColor, true);
+            viewHolder.inReplyToQuote().setText(body);
             final var replyToClickListener = (View.OnClickListener) (v) -> {
                 final Message inReplyTo = message.getInReplyTo();
                 if (inReplyTo == null || inReplyTo.getUuid() == null) return;
