@@ -1134,7 +1134,7 @@ public class Message extends AbstractEntity
         } else {
             final var codeStarts = new ArrayList<Integer>();
             SpannableStringBuilder spannable = new SpannableStringBuilder(Html.fromHtml(
-                MessageUtils.filterLtrRtl(html.toString().replace("<code>", "<tt>").replace("</code>", "</tt>")).trim(),
+                MessageUtils.filterLtrRtl(html.toString()).trim(),
                 Html.FROM_HTML_MODE_COMPACT,
                 (source) -> {
                    try {
@@ -1212,7 +1212,6 @@ public class Message extends AbstractEntity
                                     }
                                 });
                             }
-
                         } else {
                             final var start = codeStarts.remove(codeStarts.size() - 1).intValue();
                             output.setSpan(
