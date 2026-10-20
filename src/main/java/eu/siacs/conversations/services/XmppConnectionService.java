@@ -278,6 +278,11 @@ public class XmppConnectionService extends Service {
             "eu.siacs.conversations.UNIFIED_PUSH_RENEW";
     public static final String ACTION_QUICK_LOG = "eu.siacs.conversations.QUICK_LOG";
 
+    public static final String ACTION_APPROVE_LOGIN_NOTIFICATION =
+        "eu.siacs.conversations.APPROVE_LOGIN_NOTIFICATION";
+    public static final String ACTION_REJECT_LOGIN_NOTIFICATION =
+        "eu.siacs.conversations.REJECT_LOGIN_NOTIFICATION";
+
     private static final String SETTING_LAST_ACTIVITY_TS = "last_activity_timestamp";
 
     public final CountDownLatch restoredFromDatabaseLatch = new CountDownLatch(1);
@@ -988,6 +993,20 @@ public class XmppConnectionService extends Service {
                     stopSelf();
                 }
                 return START_NOT_STICKY;
+            case ACTION_APPROVE_LOGIN_NOTIFICATION: {
+                final var account = findAccountByUuid(intent.getStringExtra("account"));
+                final var packet = mMessageGenerator.loginRequestApprove(intent);
+                sendMessagePacket(account, packet);
+                mNotificationService.cancelLoginApproval(intent.getStringExtra("thread"), intent.getStringExtra("from"));
+                break;
+            }
+            case ACTION_REJECT_LOGIN_NOTIFICATION: {
+                final var account = findAccountByUuid(intent.getStringExtra("account"));
+                final var packet = mMessageGenerator.loginRequestReject(intent);
+                sendMessagePacket(account, packet);
+                mNotificationService.cancelLoginApproval(intent.getStringExtra("thread"), intent.getStringExtra("from"));
+                break;
+            }
         }
         sendScheduledMessages();
         final var extras =  intent == null ? null : intent.getExtras();

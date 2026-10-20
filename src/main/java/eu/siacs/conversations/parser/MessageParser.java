@@ -641,6 +641,13 @@ public class MessageParser extends AbstractParser
             mXmppConnectionService.updateConversationUi();
         }
 
+        final var confirm = packet.findChild("confirm", "http://jabber.org/protocol/http-auth");
+        if (confirm != null && thread != null) {
+            final var contact = account.getRoster().getContact(from);
+            mXmppConnectionService.getNotificationService().requestLoginApproval(thread.getContent(), account, contact, confirm);
+            return;
+        }
+
         // Basic visibility for voice requests
         if (body == null && html == null && pgpEncrypted == null && axolotlEncrypted == null && !isMucStatusMessage) {
             final Element formEl = packet.findChild("x", "jabber:x:data");

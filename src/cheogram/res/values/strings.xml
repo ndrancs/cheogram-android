@@ -57,4 +57,8 @@
     <string name="pref_create_backup_warning">Full backups are meant for restore after a device loss, or for migrating to a new device. You cannot restore a backup to another app while still being connected with this one!</string>
     <string name="pref_ring_from_strangers">Ring calls from strangers</string>
     <string name="pref_ring_from_strangers_summary">A stranger is someone not in your contacts to whom you have never sent a message</string>
+    <string name="login_approvals_channel_name">Login requests</string>
+    <string name="login_request_title">Login request</string>
+    <string name="approve_login">Approve</string>
+    <string name="reject_login">Reject</string>
 </resources>

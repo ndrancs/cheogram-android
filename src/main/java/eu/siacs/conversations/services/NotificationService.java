@@ -120,6 +120,8 @@ public class NotificationService {
     private static final int DELIVERY_FAILED_NOTIFICATION_ID = NOTIFICATION_ID_MULTIPLIER * 13;
     public static final int ONGOING_VIDEO_TRANSCODING_NOTIFICATION_ID =
             NOTIFICATION_ID_MULTIPLIER * 14;
+    private static final int LOGIN_APPROVAL_REQUEST_ACTION_ID = NOTIFICATION_ID_MULTIPLIER * 15;
+    private static final int LOGIN_REJECT_REQUEST_ACTION_ID = NOTIFICATION_ID_MULTIPLIER * 16;
     private final XmppConnectionService mXmppConnectionService;
     private final LinkedHashMap<String, ArrayList<Message>> notifications = new LinkedHashMap<>();
     private final HashMap<Conversation, AtomicInteger> mBacklogMessageCounter = new HashMap<>();
@@ -134,6 +136,7 @@ public class NotificationService {
     private static final String INCOMING_CALLS_NOTIFICATION_CHANNEL_PREFIX =
             "incoming_calls_channel#";
     public static final String MESSAGES_NOTIFICATION_CHANNEL = "messages";
+    private static final String LOGIN_APPROVAL_CHANNEL = "login_approvals";
 
     NotificationService(final XmppConnectionService service) {
         this.mXmppConnectionService = service;
@@ -292,6 +295,23 @@ public class NotificationService {
                         .build());
         deliveryFailedChannel.setGroup("chats");
         notificationManager.createNotificationChannel(deliveryFailedChannel);
+
+        final NotificationChannel loginApprovalsChannel =
+            new NotificationChannel(
+                LOGIN_APPROVAL_CHANNEL,
+                c.getString(R.string.login_approvals_channel_name),
+                NotificationManager.IMPORTANCE_HIGH);
+        loginApprovalsChannel.setShowBadge(false);
+        loginApprovalsChannel.setLightColor(LED_COLOR);
+        loginApprovalsChannel.enableLights(true);
+        loginApprovalsChannel.setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .build());
+        loginApprovalsChannel.enableVibration(true);
+        notificationManager.createNotificationChannel(loginApprovalsChannel);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.R)
@@ -461,6 +481,61 @@ public class NotificationService {
         } else {
             return nowTime > startTime && nowTime < endTime;
         }
+    }
+
+    private PendingIntent createLoginApprovalIntent(final Account account, final String from, final String action, final int id, final String thread, final Element confirm) {
+        return pendingServiceIntent(
+                    mXmppConnectionService,
+                    action,
+                    generateRequestCode(thread, id),
+                    ImmutableMap.of("account", account.getUuid(), "from", from, "thread", thread, "method", confirm.getAttribute("method"), "url", confirm.getAttribute("url"), "id", confirm.getAttribute("id")));
+    }
+
+    public void requestLoginApproval(
+            final String thread,
+            final Account account,
+            final Contact contact,
+            final Element confirm) {
+        final var from = contact.getAddress().asBareJid().toString();
+        final var approve = createLoginApprovalIntent(account, from, XmppConnectionService.ACTION_APPROVE_LOGIN_NOTIFICATION, LOGIN_APPROVAL_REQUEST_ACTION_ID, thread, confirm);
+        final var reject = createLoginApprovalIntent(account, from, XmppConnectionService.ACTION_REJECT_LOGIN_NOTIFICATION, LOGIN_REJECT_REQUEST_ACTION_ID, thread, confirm);
+
+        final Builder mBuilder = new Builder(mXmppConnectionService, LOGIN_APPROVAL_CHANNEL);
+        mBuilder.setContentTitle(mXmppConnectionService.getString(R.string.login_request_title) + " : " + confirm.getAttribute("id"))
+                    .setContentText("" + confirm.getAttribute("method") + " " + confirm.getAttribute("url"))
+                .setSmallIcon(R.drawable.ic_notification)
+                .setLargeIcon(
+                        FileBackend.drawDrawable(
+                                mXmppConnectionService
+                                        .getAvatarService()
+                                        .get(
+                                                contact,
+                                                AvatarService.getSystemUiAvatarSize(mXmppConnectionService))))
+                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE);
+        setNotificationColor(mBuilder, account);
+
+          mBuilder.addAction(
+            new NotificationCompat.Action.Builder(
+                            R.drawable.ic_call_end_24dp,
+                            mXmppConnectionService.getString(R.string.reject_login),
+                            reject)
+                    .build());
+        mBuilder.addAction(
+            new NotificationCompat.Action.Builder(
+                            R.drawable.ic_check_24dp,
+                            mXmppConnectionService.getString(R.string.approve_login),
+                            approve)
+                    .build());
+
+        notify(LOGIN_APPROVAL_CHANNEL + from + "/" + thread, generateRequestCode(thread, LOGIN_APPROVAL_REQUEST_ACTION_ID), mBuilder.build());
+    }
+
+     public void cancelLoginApproval(final String thread, final String from) {
+        cancel(
+            LOGIN_APPROVAL_CHANNEL + from + "/" + thread,
+            generateRequestCode(thread, LOGIN_APPROVAL_REQUEST_ACTION_ID));
     }
 
     public void pushFromBacklog(final Message message) {

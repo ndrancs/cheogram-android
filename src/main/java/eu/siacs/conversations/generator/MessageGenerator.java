@@ -1,5 +1,6 @@
 package eu.siacs.conversations.generator;
 
+import android.content.Intent;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.crypto.axolotl.AxolotlService;
 import eu.siacs.conversations.crypto.axolotl.XmppAxolotlMessage;
@@ -313,6 +314,35 @@ public class MessageGenerator extends AbstractGenerator {
         propose.setAttribute("id", sessionId);
         propose.addChild("description", Namespace.JINGLE_APPS_RTP);
         packet.addExtension(new Store());
+        return packet;
+    }
+
+    private im.conversations.android.xmpp.model.stanza.Message loginRequest(Intent intent, im.conversations.android.xmpp.model.stanza.Message.Type typ) {
+        final im.conversations.android.xmpp.model.stanza.Message packet =
+            new im.conversations.android.xmpp.model.stanza.Message();
+        packet.setType(typ);
+        packet.setTo(Jid.of(intent.getStringExtra("from")));
+        final var thread = packet.addChild("thread");
+        thread.setContent(intent.getStringExtra("thread"));
+        final var confirm = packet.addChild("confirm", "http://jabber.org/protocol/http-auth");
+        confirm.setAttribute("id", intent.getStringExtra("id"));
+        confirm.setAttribute("url", intent.getStringExtra("url"));
+        confirm.setAttribute("method", intent.getStringExtra("method"));
+        return packet;
+    }
+
+    public im.conversations.android.xmpp.model.stanza.Message loginRequestApprove(Intent intent) {
+        return loginRequest(intent, im.conversations.android.xmpp.model.stanza.Message.Type.NORMAL);
+    }
+
+    public im.conversations.android.xmpp.model.stanza.Message loginRequestReject(Intent intent) {
+        final var packet = loginRequest(intent, im.conversations.android.xmpp.model.stanza.Message.Type.NORMAL);
+        final var error = packet.addChild("error");
+        error.setAttribute("code", "401");
+        error.setAttribute("type", "auth");
+        error.addChild("not-authorized", "urn:ietf:params:xml:ns:xmpp-stanzas");
+        final var text = error.addChild("text", "urn:ietf:params:xml:ns:xmpp-stanzas");
+        text.setContent("User rejected");
         return packet;
     }
 }
