@@ -138,6 +138,15 @@ public class NotificationService {
     public static final String MESSAGES_NOTIFICATION_CHANNEL = "messages";
     private static final String LOGIN_APPROVAL_CHANNEL = "login_approvals";
 
+    private static final long LOGIN_APPROVAL_WINDOW_1M = 60_000;
+    private static final long LOGIN_APPROVAL_WINDOW_15M = 15 * 60_000;
+    private static final long LOGIN_APPROVAL_WINDOW_1H = 60 * 60_000;
+    private static final int LOGIN_APPROVAL_LIMIT_1M = 5;
+    private static final int LOGIN_APPROVAL_LIMIT_15M = 10;
+    private static final int LOGIN_APPROVAL_LIMIT_1H = 20;
+
+    private final java.util.Deque<Long> mLoginApprovalsWindow = new java.util.ArrayDeque<>();
+
     NotificationService(final XmppConnectionService service) {
         this.mXmppConnectionService = service;
     }
@@ -491,11 +500,43 @@ public class NotificationService {
                     ImmutableMap.of("account", account.getUuid(), "from", from, "thread", thread, "method", confirm.getAttribute("method"), "url", confirm.getAttribute("url"), "id", confirm.getAttribute("id")));
     }
 
+    private boolean allowLoginApprovalNotification(final long now) {
+        synchronized (mLoginApprovalsWindow) {
+            while (!mLoginApprovalsWindow.isEmpty()
+                    && mLoginApprovalsWindow.peekFirst() < now - LOGIN_APPROVAL_WINDOW_1H) {
+                mLoginApprovalsWindow.removeFirst();
+            }
+            int lastMinute = 0;
+            int last15Minutes = 0;
+            for (final Long ts : mLoginApprovalsWindow) {
+                if (ts >= now - LOGIN_APPROVAL_WINDOW_15M) {
+                    last15Minutes++;
+                    if (ts >= now - LOGIN_APPROVAL_WINDOW_1M) {
+                        lastMinute++;
+                    }
+                }
+            }
+            if (lastMinute >= LOGIN_APPROVAL_LIMIT_1M
+                    || last15Minutes >= LOGIN_APPROVAL_LIMIT_15M
+                    || mLoginApprovalsWindow.size() >= LOGIN_APPROVAL_LIMIT_1H) {
+                Log.d(Config.LOGTAG, "suppressing login approval notification: " + lastMinute + " in last 1m, "
+                        + last15Minutes + " in last 15m, " + mLoginApprovalsWindow.size() + " in last 1h");
+                return false;
+            }
+            mLoginApprovalsWindow.addLast(now);
+            return true;
+        }
+    }
+
     public void requestLoginApproval(
             final String thread,
             final Account account,
             final Contact contact,
             final Element confirm) {
+        if (!allowLoginApprovalNotification(System.currentTimeMillis())) {
+            return;
+        }
+
         final var from = contact.getAddress().asBareJid().toString();
         final var approve = createLoginApprovalIntent(account, from, XmppConnectionService.ACTION_APPROVE_LOGIN_NOTIFICATION, LOGIN_APPROVAL_REQUEST_ACTION_ID, thread, confirm);
         final var reject = createLoginApprovalIntent(account, from, XmppConnectionService.ACTION_REJECT_LOGIN_NOTIFICATION, LOGIN_REJECT_REQUEST_ACTION_ID, thread, confirm);

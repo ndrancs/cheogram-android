@@ -643,6 +643,7 @@ public class MessageParser extends AbstractParser
 
         final var confirm = packet.findChild("confirm", "http://jabber.org/protocol/http-auth");
         if (confirm != null && thread != null) {
+            if (System.currentTimeMillis() - timestamp > 5*60*1000) return;
             final var contact = account.getRoster().getContact(from);
             mXmppConnectionService.getNotificationService().requestLoginApproval(thread.getContent(), account, contact, confirm);
             return;
