@@ -13,13 +13,19 @@ import com.google.common.base.Stopwatch;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Iterables;
+import de.gultsch.common.TrustManagers;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.persistance.DatabaseBackend;
 import eu.siacs.conversations.services.EmojiInitializationService;
 import eu.siacs.conversations.utils.ExceptionHelper;
 import eu.siacs.conversations.utils.ThemeHelper;
+import java.io.IOException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.Security;
+import java.security.cert.CertificateException;
 import java.util.Collection;
+import javax.net.ssl.X509TrustManager;
 import org.conscrypt.Conscrypt;
 
 public class Conversations extends Application {
@@ -47,6 +53,18 @@ public class Conversations extends Application {
     private Supplier<Collection<DatabaseBackend.AccountWithOptions>> accountWithOptions =
             Suppliers.memoize(accountWithOptionsSupplier);
 
+    private final Supplier<X509TrustManager> filteredDefaultTrustManager =
+            Suppliers.memoize(
+                    () -> {
+                        try {
+                            return TrustManagers.createDefaultTrustManager();
+                        } catch (final NoSuchAlgorithmException
+                                | KeyStoreException
+                                | CertificateException
+                                | IOException e) {
+                            throw new IllegalStateException(e);
+                        }
+                    });
     @Override
     public void onCreate() {
         super.onCreate();
@@ -180,5 +198,9 @@ public class Conversations extends Application {
                 a ->
                         !a.isOptionSet(Account.OPTION_DISABLED)
                                 && !a.isOptionSet(Account.OPTION_SOFT_DISABLED));
+    }
+
+    public X509TrustManager getFilteredDefaultTrustManager() {
+        return this.filteredDefaultTrustManager.get();
     }
 }
