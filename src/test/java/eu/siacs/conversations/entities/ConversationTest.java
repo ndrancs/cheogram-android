@@ -62,6 +62,39 @@ public class ConversationTest {
     }
 
     @Test
+    public void threadDisplayUsesWebxdcNameBeforeFileName() {
+        final var message = new Message(
+            withoutOccupantId,
+            "",
+            Message.ENCRYPTION_NONE,
+            Message.STATUS_RECEIVED
+        );
+        message.getFileParams().setName("app.xdc");
+        message.getFileParams().setMediaType("application/webxdc+zip");
+
+        final var thread = new Conversation.Thread("thread-id");
+        thread.first = message;
+
+        Assert.assertEquals("My Widget", thread.getDisplay(m -> "My Widget"));
+    }
+
+    @Test
+    public void threadDisplayFallsBackToFileName() {
+        final var message = new Message(
+            withoutOccupantId,
+            "",
+            Message.ENCRYPTION_NONE,
+            Message.STATUS_RECEIVED
+        );
+        message.getFileParams().setName("app.xdc");
+
+        final var thread = new Conversation.Thread("thread-id");
+        thread.first = message;
+
+        Assert.assertEquals("app.xdc", thread.getDisplay());
+    }
+
+    @Test
     public void getMucOccupantsCacheReturnsCache() throws Exception {
         var cache = withOccupantId.getMucOccupantCache();
         Assert.assertNotNull("Should return cache when mucOptions is null", cache);

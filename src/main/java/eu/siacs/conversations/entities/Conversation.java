@@ -4245,11 +4245,24 @@ public class Conversation extends AbstractEntity
         }
 
         public String getDisplay() {
+            return getDisplay(null);
+        }
+
+        public String getDisplay(final Function<Message, String> webxdcNameResolver) {
             final String s = getSubject();
             if (s != null) return s;
 
             if (first != null) {
-                return first.getBody();
+                final String body = first.getBody();
+                if (body != null && !body.trim().isEmpty()) return body;
+
+                if (webxdcNameResolver != null) {
+                    final String webxdcName = webxdcNameResolver.apply(first);
+                    if (webxdcName != null) return webxdcName;
+                }
+
+                final String fileName = first.getFileParams().getName();
+                if (fileName != null) return fileName;
             }
 
             return "";

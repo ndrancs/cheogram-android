@@ -35,6 +35,7 @@ import androidx.core.content.ContextCompat;
 import androidx.databinding.DataBindingUtil;
 
 import com.cheogram.android.Util;
+import com.cheogram.android.WebxdcPage;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.color.MaterialColors;
@@ -63,6 +64,7 @@ import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.ListItem;
+import eu.siacs.conversations.entities.Message;
 import eu.siacs.conversations.entities.MucOptions;
 import eu.siacs.conversations.entities.MucOptions.User;
 import eu.siacs.conversations.services.XmppConnectionService;
@@ -989,6 +991,23 @@ public class ConferenceDetailsActivity extends XmppActivity
     class ThreadAdapter extends ArrayAdapter<Conversation.Thread> {
         ThreadAdapter() { super(ConferenceDetailsActivity.this, 0); }
 
+        private String getWebxdcName(final Message message) {
+            final var fileParams = message.getFileParams();
+            if (!"application/webxdc+zip".equals(fileParams.getMediaType())
+                    || fileParams.getCids().isEmpty()) return null;
+            final WebxdcPage webxdc = new WebxdcPage(
+                ConferenceDetailsActivity.this,
+                fileParams.getCids().get(0),
+                message
+            );
+            try {
+                final String name = webxdc.getName();
+                return "Widget".equals(name) ? null : name;
+            } finally {
+                webxdc.close();
+            }
+        }
+
         @Override
         public View getView(int position, View view, @NonNull ViewGroup parent) {
             final ThreadRowBinding binding = DataBindingUtil.inflate(LayoutInflater.from(parent.getContext()), R.layout.thread_row, parent, false);
@@ -997,7 +1016,7 @@ public class ConferenceDetailsActivity extends XmppActivity
             binding.threadIdenticon.setColor(UIHelper.getColorForName(item.getThreadId()));
             binding.threadIdenticon.setHash(UIHelper.identiconHash(item.getThreadId()));
 
-            binding.threadSubject.setText(item.getDisplay());
+            binding.threadSubject.setText(item.getDisplay(this::getWebxdcName));
 
             return binding.getRoot();
         }
