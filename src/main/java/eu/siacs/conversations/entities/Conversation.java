@@ -181,6 +181,7 @@ import eu.siacs.conversations.ui.util.SoftKeyboardUtils;
 import eu.siacs.conversations.utils.Emoticons;
 import eu.siacs.conversations.utils.JidHelper;
 import eu.siacs.conversations.utils.MessageUtils;
+import eu.siacs.conversations.utils.OnboardingUtils;
 import eu.siacs.conversations.utils.PhoneNumberUtilWrapper;
 import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.xml.Element;
@@ -2150,6 +2151,12 @@ public class Conversation extends AbstractEntity
             show();
             CommandSession session = new CommandSession(command.getAttribute("name"), command.getAttribute("node"), xmppConnectionService);
 
+            if (xmppConnectionService.isOnboarding()
+                    && "jabber:iq:register".equals(command.getAttribute("node"))
+                    && OnboardingUtils.getSelectedGateway(xmppConnectionService.getPreferences()) != null) {
+                OnboardingUtils.markResume(xmppConnectionService.getPreferences());
+            }
+
             final var packet = new Iq(Iq.Type.SET);
             packet.setTo(command.getAttributeAsJid("jid"));
             final Element c = packet.addChild("command", Namespace.COMMANDS);
@@ -3430,6 +3437,7 @@ public class Conversation extends AbstractEntity
             protected Iq response = null;
             protected Element responseElement = null;
             protected boolean expectingRemoval = false;
+            private boolean resumed = false;
             protected List<Field> reported = null;
             protected SparseArray<Item> items = new SparseArray<>();
             protected XmppConnectionService xmppConnectionService;
@@ -3487,15 +3495,13 @@ public class Conversation extends AbstractEntity
                         xmppConnectionService.createContact(getAccount().getRoster().getContact(iq.getFrom()));
                     }
 
-                    if (xmppConnectionService.isOnboarding() && mNode.equals("jabber:iq:register") && !"canceled".equals(command.getAttribute("status")) && xmppConnectionService.getPreferences().contains("onboarding_action")) {
-                        xmppConnectionService.getPreferences().edit().putBoolean("onboarding_continued", true).commit();
-                    }
-
+                    final boolean suppressCancel = isCancelSuppressed();
                     Element actions = command.findChild("actions", "http://jabber.org/protocol/commands");
                     if (actions != null) {
                         for (Element action : actions.getChildren()) {
                             if (!"http://jabber.org/protocol/commands".equals(action.getNamespace())) continue;
                             if ("execute".equals(action.getName())) continue;
+                            if (suppressCancel && "cancel".equals(action.getName())) continue;
 
                             actionsAdapter.add(Pair.create(action.getName(), action.getName()));
                         }
@@ -3521,6 +3527,7 @@ public class Conversation extends AbstractEntity
                                 actionsAdapter.clear();
 
                                 for (Option action : actionList.getOptions()) {
+                                    if (suppressCancel && "cancel".equals(action.getValue())) continue;
                                     actionsAdapter.add(Pair.create(action.getValue(), action.toString()));
                                 }
                             }
@@ -3571,17 +3578,17 @@ public class Conversation extends AbstractEntity
                     if (responseElement == null && command.getAttribute("status") != null && (command.getAttribute("status").equals("completed") || command.getAttribute("status").equals("canceled"))) {
                         if ("jabber:iq:register".equals(mNode) && "canceled".equals(command.getAttribute("status"))) {
                             if (xmppConnectionService.isOnboarding()) {
-                                if (xmppConnectionService.getPreferences().contains("onboarding_action")) {
-                                    xmppConnectionService.deleteAccount(getAccount());
-                                } else {
-                                    if (xmppConnectionService.getPreferences().getBoolean("onboarding_continued", false)) {
-                                        removeSession(this);
-                                        return;
-                                    } else {
-                                        xmppConnectionService.getPreferences().edit().putString("onboarding_action", "cancel").commit();
-                                        xmppConnectionService.deleteAccount(getAccount());
-                                    }
+                                final boolean continued = OnboardingUtils.isContinued(xmppConnectionService.getPreferences());
+                                if (continued) {
+                                    // They already committed to this onboarding flow. Do not destroy
+                                    // their account just because a command session went away.
+                                    removeSession(this);
+                                    return;
                                 }
+                                if (!OnboardingUtils.isCanceled(xmppConnectionService.getPreferences())) {
+                                    OnboardingUtils.markCanceled(xmppConnectionService.getPreferences());
+                                }
+                                xmppConnectionService.deleteAccount(getAccount());
                             }
                             xmppConnectionService.archiveConversation(Conversation.this);
                         }
@@ -3620,15 +3627,19 @@ public class Conversation extends AbstractEntity
 
                 Data dataForm = null;
                 if (responseElement != null && responseElement.getName().equals("x") && responseElement.getNamespace().equals("jabber:x:data")) dataForm = Data.parse(responseElement);
-                if (mNode.equals("jabber:iq:register") &&
-                    xmppConnectionService.getPreferences().contains("onboarding_action") &&
+                if (xmppConnectionService.isOnboarding() &&
+                    mNode.equals("jabber:iq:register") &&
                     dataForm != null && dataForm.getFieldByName("gateway-jid") != null) {
 
-
-                    dataForm.put("gateway-jid", xmppConnectionService.getPreferences().getString("onboarding_action", ""));
-                    execute();
+                    final String gateway = OnboardingUtils.getSelectedGateway(xmppConnectionService.getPreferences());
+                    if (gateway != null) {
+                        dataForm.put("gateway-jid", gateway);
+                        if (!resumed && OnboardingUtils.isResumePending(xmppConnectionService.getPreferences())) {
+                            resumed = true;
+                            execute();
+                        }
+                    }
                 }
-                xmppConnectionService.getPreferences().edit().remove("onboarding_action").commit();
                 notifyDataSetChanged();
             }
 
@@ -3846,6 +3857,12 @@ public class Conversation extends AbstractEntity
                 return execute(actionsAdapter.getItem(actionPosition).first);
             }
 
+            private boolean isCancelSuppressed() {
+                return mNode.equals("jabber:iq:register")
+                        && xmppConnectionService.isOnboarding()
+                        && OnboardingUtils.isContinued(xmppConnectionService.getPreferences());
+            }
+
             public synchronized boolean execute(String action) {
                 if (!"cancel".equals(action) && executing) {
                     loadingHasBeenLong = true;
@@ -3887,10 +3904,11 @@ public class Conversation extends AbstractEntity
                     }
 
                     if (mNode.equals("jabber:iq:register") && xmppConnectionService.isOnboarding() && form.getFieldByName("gateway-jid") != null) {
-                        if (form.getValue("gateway-jid") == null) {
-                            xmppConnectionService.getPreferences().edit().remove("onboarding_action").commit();
+                        final String gateway = form.getValue("gateway-jid");
+                        if (gateway == null || gateway.isEmpty()) {
+                            OnboardingUtils.clearSelectedGateway(xmppConnectionService.getPreferences());
                         } else {
-                            xmppConnectionService.getPreferences().edit().putString("onboarding_action", form.getValue("gateway-jid")).commit();
+                            OnboardingUtils.setSelectedGateway(xmppConnectionService.getPreferences(), gateway);
                         }
                     }
 

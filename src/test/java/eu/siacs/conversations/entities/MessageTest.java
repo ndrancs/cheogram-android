@@ -24,7 +24,7 @@ public class MessageTest {
     public void extractLinksIgnoresInvalidUris() {
         final var conversation = mock(Conversational.class);
         when(conversation.getUuid()).thenReturn("test-uuid");
-        when(conversation.getJid()).thenReturn(Jid.ofLocalAndDomain("test", "example.com"));
+        when(conversation.getAddress()).thenReturn(Jid.ofLocalAndDomain("test", "example.com"));
 
         final var message = new Message(conversation, "https://example.com?q=%s", Message.ENCRYPTION_NONE);
         Assert.assertEquals(0, message.getLinks().size());

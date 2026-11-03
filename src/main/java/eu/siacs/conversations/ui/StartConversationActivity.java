@@ -88,6 +88,7 @@ import eu.siacs.conversations.ui.util.PendingItem;
 import eu.siacs.conversations.ui.util.SoftKeyboardUtils;
 import eu.siacs.conversations.ui.widget.SwipeRefreshListFragment;
 import eu.siacs.conversations.utils.AccountUtils;
+import eu.siacs.conversations.utils.OnboardingUtils;
 import eu.siacs.conversations.utils.UIHelper;
 import eu.siacs.conversations.utils.XmppUri;
 import eu.siacs.conversations.utils.XEP0392Helper;
@@ -1147,8 +1148,8 @@ public class StartConversationActivity extends XmppActivity
                 break;
         }
 
-        final boolean onboardingCancel = xmppConnectionService.getPreferences().getString("onboarding_action", "").equals("cancel");
-        if (onboardingCancel) xmppConnectionService.getPreferences().edit().remove("onboarding_action").commit();
+        final boolean onboardingCancel = OnboardingUtils.isCanceled(xmppConnectionService.getPreferences());
+        if (onboardingCancel) OnboardingUtils.clearCanceled(xmppConnectionService.getPreferences());
 
         if ((xmppConnectionService.isOnboarding() || (intent != null && intent.getBooleanExtra("init", false))) && !onboardingCancel && !xmppConnectionService.getAccounts().isEmpty()) {
             Account selectedAccount = xmppConnectionService.getAccounts().get(0);

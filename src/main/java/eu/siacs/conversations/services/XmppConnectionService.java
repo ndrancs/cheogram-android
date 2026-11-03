@@ -164,6 +164,7 @@ import eu.siacs.conversations.utils.FileUtils;
 import eu.siacs.conversations.utils.MessageUtils;
 import eu.siacs.conversations.utils.Emoticons;
 import eu.siacs.conversations.utils.MimeUtils;
+import eu.siacs.conversations.utils.OnboardingUtils;
 import eu.siacs.conversations.utils.PhoneHelper;
 import eu.siacs.conversations.utils.QuickLoader;
 import eu.siacs.conversations.utils.ReplacingSerialSingleThreadExecutor;
@@ -3122,7 +3123,7 @@ public class XmppConnectionService extends Service {
     }
 
     public void deleteAccount(final Account account) {
-        getPreferences().edit().remove("onboarding_continued").commit();
+        OnboardingUtils.clearProgress(getPreferences());
         final boolean connected = account.getStatus() == Account.State.ONLINE;
         synchronized (this.conversations) {
             if (connected) {

@@ -38,7 +38,24 @@ public class MagicCreateActivity extends XmppActivity implements TextWatcher {
 
     @Override
     protected void onBackendConnected() {
+        updateBackNavigation();
+    }
 
+    private void updateBackNavigation() {
+        if (xmppConnectionService == null) {
+            return;
+        }
+        configureActionBar(
+                getSupportActionBar(),
+                this.domain == null && !xmppConnectionService.isOnboarding());
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (xmppConnectionService != null && xmppConnectionService.isOnboarding()) {
+            return;
+        }
+        super.onBackPressed();
     }
 
     @Override
