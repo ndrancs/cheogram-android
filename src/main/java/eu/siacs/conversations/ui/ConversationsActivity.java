@@ -538,7 +538,12 @@ public class ConversationsActivity extends XmppActivity
 
         if (useSavedState != null) {
             mainFilter = useSavedState.getLong("mainFilter", DRAWER_ALL_CHATS);
-            selectedTag = (HashSet<Tag>) useSavedState.getSerializable("selectedTag");
+            final var savedSelectedTag = useSavedState.getStringArrayList("selectedTag");
+            selectedTag = savedSelectedTag == null
+                    ? new HashSet<>()
+                    : savedSelectedTag.stream()
+                            .map(Tag::new)
+                            .collect(Collectors.toCollection(HashSet::new));
         }
         refreshUiReal();
         if (useSavedState != null) binding.drawer.setSavedInstance(useSavedState);
@@ -1411,7 +1416,11 @@ public class ConversationsActivity extends XmppActivity
             savedInstanceState.putBoolean("dialler_integration_fallback_in_flight", true);
         }
         savedInstanceState.putLong("mainFilter", mainFilter);
-        savedInstanceState.putSerializable("selectedTag", selectedTag);
+        savedInstanceState.putStringArrayList(
+                "selectedTag",
+                selectedTag.stream()
+                        .map(Tag::getName)
+                        .collect(Collectors.toCollection(ArrayList::new)));
         if (binding.drawer != null) savedInstanceState = binding.drawer.saveInstanceState(savedInstanceState);
         if (accountHeader != null) savedInstanceState = accountHeader.saveInstanceState(savedInstanceState);
         super.onSaveInstanceState(savedInstanceState);
