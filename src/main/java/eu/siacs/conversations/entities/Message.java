@@ -581,7 +581,7 @@ public class Message extends AbstractEntity
         } else if (this.conversation instanceof Conversation c
                 && c.getMode() == Conversational.MODE_MULTI) {
             return c.getMucOptions().getUserOrStub(this).getContact();
-        } else if (this.counterpart != null) {
+        } else if (this.trueCounterpart != null) {
             return this.conversation
                     .getAccount()
                     .getRoster()
