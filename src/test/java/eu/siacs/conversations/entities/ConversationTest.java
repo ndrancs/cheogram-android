@@ -5,10 +5,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -35,30 +32,16 @@ import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.xml.Element;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
-import im.conversations.android.xmpp.model.disco.info.Feature;
-import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import junit.framework.Assert;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = Build.VERSION_CODES.TIRAMISU, application = Conversations.class)
 @ConscryptMode(ConscryptMode.Mode.OFF)
 public class ConversationTest {
-    private static final InfoQuery INFO_QUERY_WITH_OCCUPANT_ID = new InfoQuery();
-    private static final InfoQuery INFO_QUERY_WITHOUT_OCCUPANT_ID = new InfoQuery();
-
     private Conversation withOccupantId;
     private Conversation withoutOccupantId;
-    private Conversation nullMucOptions;
-
-    @BeforeClass
-    public static void setupClass() {
-        final var occupantIdFeature = new Feature();
-        occupantIdFeature.setVar(Namespace.OCCUPANT_ID);
-        INFO_QUERY_WITH_OCCUPANT_ID.addChild(occupantIdFeature);
-    }
-
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         final var account = mock(Account.class);
         when(account.getJid()).thenReturn(Jid.ofLocalAndDomain("testAccount", "example.org"));
 
@@ -68,7 +51,6 @@ public class ConversationTest {
             Jid.ofLocalAndDomain("testMuc", "example.org"),
             Conversation.MODE_MULTI
         );
-        withOccupantId.getMucOptions().updateConfiguration(INFO_QUERY_WITH_OCCUPANT_ID);
 
         withoutOccupantId = new Conversation(
             "Test MUC",
@@ -76,22 +58,12 @@ public class ConversationTest {
             Jid.ofLocalAndDomain("testMuc", "example.org"),
             Conversation.MODE_MULTI
         );
-        withoutOccupantId.getMucOptions().updateConfiguration(INFO_QUERY_WITHOUT_OCCUPANT_ID);
 
-        nullMucOptions = new Conversation(
-            "Test MUC",
-            account,
-            Jid.ofLocalAndDomain("testMuc", "example.org"),
-            Conversation.MODE_MULTI
-        );
-        final var mucOptionsField = Conversation.class.getDeclaredField("mucOptions");
-        mucOptionsField.setAccessible(true);
-        ((AtomicReference<?>) mucOptionsField.get(nullMucOptions)).set(null);
     }
 
     @Test
-    public void getMucOccupantsCacheReturnsCacheWhenMucOptionsIsNull() throws Exception {
-        var cache = nullMucOptions.getMucOccupantCache();
+    public void getMucOccupantsCacheReturnsCache() throws Exception {
+        var cache = withOccupantId.getMucOccupantCache();
         Assert.assertNotNull("Should return cache when mucOptions is null", cache);
     }
 
@@ -143,13 +115,13 @@ public class ConversationTest {
         final var mucJid = Jid.ofLocalAndDomain("operations", "conference.soprani.ca");
         final var mucContact = mock(Contact.class);
         when(mucContact.isApp()).thenReturn(false);
-        when(mucContact.getJid()).thenReturn(mucJid);
+        when(mucContact.getAddress()).thenReturn(mucJid);
         when(roster.getContact(mucJid)).thenReturn(mucContact);
 
         final var appJid = Jid.ofDomain("jmp.chat");
         final var appContact = mock(Contact.class);
         when(appContact.isApp()).thenReturn(true);
-        when(appContact.getJid()).thenReturn(appJid);
+        when(appContact.getAddress()).thenReturn(appJid);
         when(roster.getContact(appJid)).thenReturn(appContact);
 
         final var muc = new Conversation("MUC", account, mucJid, Conversation.MODE_MULTI);

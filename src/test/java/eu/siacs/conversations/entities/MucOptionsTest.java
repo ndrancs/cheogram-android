@@ -16,6 +16,7 @@ import org.robolectric.annotation.ConscryptMode;
 import android.os.Build;
 import eu.siacs.conversations.Conversations;
 import eu.siacs.conversations.xmpp.Jid;
+import im.conversations.android.model.Bookmark;
 import junit.framework.Assert;
 
 @RunWith(RobolectricTestRunner.class)
@@ -45,7 +46,7 @@ public class MucOptionsTest {
         when(conversation.getAttribute("mucNick")).thenReturn("testMucNick");
         when(conversation.getAttribute("affiliation")).thenReturn(null);
         when(conversation.getAttribute("role")).thenReturn(null);
-        when(conversation.getJid()).thenReturn(Jid.ofLocalAndDomain("testMuc", "example.org"));
+        when(conversation.getAddress()).thenReturn(Jid.ofLocalAndDomain("testMuc", "example.org"));
         when(conversation.getBookmark()).thenReturn(bookmark);
 
         mucOptions = new MucOptions(conversation);

@@ -1,6 +1,8 @@
 package eu.siacs.conversations.entities;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import org.robolectric.annotation.ConscryptMode;
 import android.os.Build;
 import eu.siacs.conversations.Conversations;
 import eu.siacs.conversations.xmpp.Jid;
+import im.conversations.android.model.Bookmark;
 import junit.framework.Assert;
 
 @RunWith(RobolectricTestRunner.class)
@@ -31,17 +34,16 @@ public class ContactCompareToTest {
         final var contact = new Contact(
             null, systemName, null, null,
             Jid.of(jid), 0, null, null,
-            null, null, 0, null, null, null
+            null, null, null, null, null
         );
         contact.setAccount(account);
         return contact;
     }
 
     private Bookmark bookmark(String name, String jid) {
-        final var account = mock(Account.class);
-        when(account.getJid()).thenReturn(Jid.of("test@example.org"));
-        final var bookmark = new Bookmark(account, Jid.of(jid));
-        bookmark.setBookmarkName(name);
+        final var bookmark = mock(Bookmark.class, CALLS_REAL_METHODS);
+        doReturn(name).when(bookmark).getDisplayName();
+        doReturn(Jid.of(jid)).when(bookmark).getAddress();
         return bookmark;
     }
 
