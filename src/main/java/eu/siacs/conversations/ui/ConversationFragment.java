@@ -3252,9 +3252,11 @@ public class ConversationFragment extends XmppFragment
 
     public void addReaction(final Message message) {
         requireXmppActivity().addReaction(emoji -> {
+            final var draft = new SpannableStringBuilder(binding.textinput.getText());
             setupReply(message);
             binding.textinput.setText(emoji.toInsert());
             sendMessage();
+            binding.textinput.setText(draft);
         });
     }
 
