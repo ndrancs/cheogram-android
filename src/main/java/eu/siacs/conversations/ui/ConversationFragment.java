@@ -3187,21 +3187,25 @@ public class ConversationFragment extends XmppFragment
     }
 
     private void updateThreadFromLastMessage() {
-        if (this.conversation != null && !this.conversation.getUserSelectedThread() && TextUtils.isEmpty(binding.textinput.getText())) {
-            Message message = getLastVisibleMessage();
-            if (message == null) {
-                newThread();
-            } else {
-                if (conversation.getMode() == Conversation.MODE_MULTI) {
-                    if (requireXmppActivity().xmppConnectionService == null) return;
-                    if (message.getStatus() < Message.STATUS_SEND) {
-                        if (!requireXmppActivity().xmppConnectionService.getBooleanPreference("follow_thread_in_channel", R.bool.follow_thread_in_channel)) return;
-                    }
-                }
-
-                setThread(message.getThread());
+        final var activity = getActivity();
+        if (binding == null || !(activity instanceof XmppActivity xmppActivity)
+                || this.conversation == null || this.conversation.getUserSelectedThread()
+                || !TextUtils.isEmpty(binding.textinput.getText())) {
+            return;
+        }
+        Message message = getLastVisibleMessage();
+        if (message == null) {
+            newThread();
+            return;
+        }
+        if (conversation.getMode() == Conversation.MODE_MULTI) {
+            if (xmppActivity.xmppConnectionService == null) return;
+            if (message.getStatus() < Message.STATUS_SEND) {
+                if (!xmppActivity.xmppConnectionService.getBooleanPreference("follow_thread_in_channel", R.bool.follow_thread_in_channel)) return;
             }
         }
+
+        setThread(message.getThread());
     }
 
     private String getLastVisibleMessageUuid() {
