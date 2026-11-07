@@ -89,6 +89,28 @@ public class MucOptionsTest {
     }
 
     @Test
+    public void testOfflineUserUsesContactNameWhenInContactList() throws Exception {
+        final var realJid = Jid.ofLocalAndDomain("realUser", "example.org");
+        final var contact = mock(Contact.class);
+        when(contact.getDisplayName()).thenReturn("Contact Name");
+        when(conversation.getAccount().getRoster().getContactFromContactList(realJid))
+            .thenReturn(contact);
+        final var user = new MucOptions.User(
+            mucOptions,
+            Jid.of("testMuc@example.org/testNick"),
+            realJid,
+            null,
+            null,
+            im.conversations.android.xmpp.model.muc.Role.NONE,
+            im.conversations.android.xmpp.model.muc.Affiliation.NONE,
+            new HashSet<>()
+        );
+
+        final var offlineUser = user.asOfflineUser();
+
+        Assert.assertEquals("Contact Name", offlineUser.getDisplayName());
+    }
+    @Test
     public void testSetAvatarCachesAvatar() throws Exception {
         when(conversation.setCachedOccupantAvatar(CACHE_KEY, "newAvatar")).thenReturn(true);
         user.setAvatar("newAvatar");
