@@ -89,6 +89,31 @@ public class MucOptionsTest {
     }
 
     @Test
+    public void testOfflineUserPreservesNickFromResource() throws Exception {
+        final var realJid = Jid.ofLocalAndDomain("anonUser", "example.org");
+        // Roster.getContact() creates a placeholder whose display name is the JID's local part.
+        final var placeholderContact = mock(Contact.class);
+        when(placeholderContact.getDisplayName()).thenReturn("anonUser");
+        when(conversation.getAccount().getRoster().getContact(realJid))
+            .thenReturn(placeholderContact);
+        final var user = new MucOptions.User(
+            mucOptions,
+            Jid.of("testMuc@example.org/testNick"),
+            realJid,
+            null,
+            null,
+            im.conversations.android.xmpp.model.muc.Role.NONE,
+            im.conversations.android.xmpp.model.muc.Affiliation.NONE,
+            new HashSet<>()
+        );
+
+        final var offlineUser = user.asOfflineUser();
+
+        Assert.assertEquals("testNick", offlineUser.getNick());
+        Assert.assertEquals("testNick", offlineUser.getDisplayName());
+    }
+
+    @Test
     public void testOfflineUserUsesContactNameWhenInContactList() throws Exception {
         final var realJid = Jid.ofLocalAndDomain("realUser", "example.org");
         final var contact = mock(Contact.class);

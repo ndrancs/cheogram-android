@@ -1181,7 +1181,7 @@ public class MucOptions {
                             null,
                             this.realJid,
                             this.occupantId,
-                            this.nick,
+                            getNick(),
                             Role.NONE,
                             this.affiliation,
                             this.hats);
