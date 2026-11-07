@@ -1567,16 +1567,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             final var replyToClickListener = (View.OnClickListener) (v) -> {
                 final Message inReplyTo = message.getInReplyTo();
                 if (inReplyTo == null || inReplyTo.getUuid() == null) return;
-                final var replyConversation = mConversationFragment.getConversation();
-                activity.xmppConnectionService.jumpToMessage(replyConversation, inReplyTo.getUuid(), new XmppConnectionService.JumpToMessageListener() {
-                    @Override
-                    public void onSuccess() {
-                        activity.runOnUiThread(() -> mConversationFragment.refresh());
-                    }
-
-                    @Override
-                    public void onNotFound() {}
-                });
+                mConversationFragment.jumpToMessage(inReplyTo.getUuid());
             };
             viewHolder.inReplyTo().setOnClickListener(replyToClickListener);
             viewHolder.inReplyToQuote().setOnClickListener(replyToClickListener);

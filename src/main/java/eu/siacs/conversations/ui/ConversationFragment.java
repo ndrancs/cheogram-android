@@ -1888,6 +1888,19 @@ public class ConversationFragment extends XmppFragment
     }
 
 
+    public void jumpToMessage(final String uuid) {
+        if (uuid == null || binding == null) {
+            return;
+        }
+        final Runnable postSelectionRunnable = () -> highlightMessage(uuid);
+        updateSelection(
+                uuid,
+                binding.messagesView.getHeight() / 2,
+                postSelectionRunnable,
+                false,
+                false);
+    }
+
     private void highlightMessage(String uuid) {
         binding.messagesView.postDelayed(() -> {
             int actualIndex = getIndexOfExtended(uuid, messageList);
@@ -4064,10 +4077,9 @@ public class ConversationFragment extends XmppFragment
                 conversation.startCommand(commandFor(Jid.of("cheogram.com/CHEOGRAM%jabber:iq:register"), "jabber:iq:register"), requireXmppActivity().xmppConnectionService);
             }
         }
-        String messageUuid = extras.getString(ConversationsActivity.EXTRA_MESSAGE_UUID);
+        final String messageUuid = extras.getString(ConversationsActivity.EXTRA_MESSAGE_UUID);
         if (messageUuid != null) {
-            Runnable postSelectionRunnable = () -> highlightMessage(messageUuid);
-            updateSelection(messageUuid, binding.messagesView.getHeight() / 2, postSelectionRunnable, false, false);
+            jumpToMessage(messageUuid);
         }
     }
 
