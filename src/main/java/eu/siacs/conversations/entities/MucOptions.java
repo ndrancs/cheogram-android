@@ -543,12 +543,14 @@ public class MucOptions {
 
     public User getUserOrStub(final IdentifiableUser identifiableUser) {
         final var existing = getUser(identifiableUser);
-        if (existing != null) {
+        final var address = identifiableUser.mucUserAddress();
+        if (existing != null
+                && (existing.getNick() != null || address == null || !address.isFullJid())) {
             return existing;
         }
         return new Stub(
                 this,
-                identifiableUser.mucUserAddress(),
+                address,
                 identifiableUser.mucUserRealAddress(),
                 identifiableUser.mucUserOccupantId());
     }

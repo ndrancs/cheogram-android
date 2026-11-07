@@ -5158,7 +5158,7 @@ public class ConversationFragment extends XmppFragment
                 final var mucOptions = c.getMucOptions();
                 if (mucOptions.participating()) {
                     final var user = mucOptions.getUserOrStub(message);
-                    if (user.resource() != null) {
+                    if (user.getNick() != null) {
                         if (user instanceof MucOptions.Stub) {
                             Toast.makeText(
                                             requireActivity(),
@@ -5170,11 +5170,6 @@ public class ConversationFragment extends XmppFragment
                                     .show();
                         }
                         highlightInConference(user.getNick());
-                    } else {
-                        final var counterpart = message.getCounterpart();
-                        if (counterpart != null && counterpart.isFullJid()) {
-                            highlightInConference(counterpart.getResource());
-                        }
                     }
                 } else {
                     Toast.makeText(

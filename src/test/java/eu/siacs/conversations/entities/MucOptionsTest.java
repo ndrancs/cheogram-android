@@ -135,6 +135,33 @@ public class MucOptionsTest {
 
         Assert.assertEquals("Contact Name", offlineUser.getDisplayName());
     }
+
+    @Test
+    public void testGetUserOrStubUsesNickFromMessageAddress() throws Exception {
+        final var realJid = Jid.ofLocalAndDomain("anonUser", "example.org");
+        final var offlineUser = new MucOptions.User(
+            mucOptions,
+            null,
+            realJid,
+            null,
+            null,
+            im.conversations.android.xmpp.model.muc.Role.NONE,
+            im.conversations.android.xmpp.model.muc.Affiliation.NONE,
+            new HashSet<>()
+        );
+        mucOptions.updateUser(offlineUser, null);
+
+        final var identifiableUser = mock(MucOptions.IdentifiableUser.class);
+        when(identifiableUser.mucUserAddress())
+            .thenReturn(Jid.of("testMuc@example.org/testNick"));
+        when(identifiableUser.mucUserRealAddress()).thenReturn(realJid);
+
+        final var user = mucOptions.getUserOrStub(identifiableUser);
+
+        Assert.assertTrue(user instanceof MucOptions.Stub);
+        Assert.assertEquals("testNick", user.getNick());
+    }
+
     @Test
     public void testSetAvatarCachesAvatar() throws Exception {
         when(conversation.setCachedOccupantAvatar(CACHE_KEY, "newAvatar")).thenReturn(true);
