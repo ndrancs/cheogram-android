@@ -1339,6 +1339,7 @@ public class JingleRtpConnection extends AbstractJingleConnection
             return;
         }
         processCandidates(contentMap.contents.entrySet());
+        addIceCandidatesFromBlackLog();
     }
 
     private void sendSessionAccept() {
