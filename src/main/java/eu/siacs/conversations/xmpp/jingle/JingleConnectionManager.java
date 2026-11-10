@@ -1111,14 +1111,18 @@ public class JingleConnectionManager extends AbstractConnectionManager {
     }
 
     void setTerminalSessionState(
-            AbstractJingleConnection.Id id, final RtpEndUserState state, final Set<Media> media) {
+            AbstractJingleConnection.Id id,
+            final RtpEndUserState state,
+            final Set<Media> media,
+            final String extraState) {
         this.terminatedSessions.put(
-                PersistableSessionId.of(id), new TerminatedRtpSession(state, media));
+                PersistableSessionId.of(id), new TerminatedRtpSession(state, media, extraState));
     }
 
     void setTerminalSessionState(final RtpSessionProposal proposal, final RtpEndUserState state) {
         this.terminatedSessions.put(
-                PersistableSessionId.of(proposal), new TerminatedRtpSession(state, proposal.media));
+                PersistableSessionId.of(proposal),
+                new TerminatedRtpSession(state, proposal.media, null));
     }
 
     public TerminatedRtpSession getTerminalSessionState(final Jid with, final String sessionId) {
@@ -1159,10 +1163,13 @@ public class JingleConnectionManager extends AbstractConnectionManager {
     public static class TerminatedRtpSession {
         public final RtpEndUserState state;
         public final Set<Media> media;
+        public final String extraState;
 
-        TerminatedRtpSession(RtpEndUserState state, Set<Media> media) {
+        TerminatedRtpSession(
+                RtpEndUserState state, Set<Media> media, final String extraState) {
             this.state = state;
             this.media = media;
+            this.extraState = extraState;
         }
     }
 

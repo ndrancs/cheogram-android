@@ -856,6 +856,7 @@ public class RtpSessionActivity extends XmppActivity
             return;
         }
         final RtpEndUserState state = terminatedRtpSession.state;
+        this.extraState = terminatedRtpSession.extraState;
         resetIntent(account, with, terminatedRtpSession.state, terminatedRtpSession.media);
         updateButtonConfiguration(state);
         updateStateDisplay(state);

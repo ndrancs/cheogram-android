@@ -86,7 +86,13 @@ public class JingleRtpConnection extends AbstractJingleConnection
                     State.SESSION_INITIALIZED_PRE_APPROVED,
                     State.SESSION_ACCEPTED);
     private static final long BUSY_TIME_OUT = 30;
+    private static final int MAX_ICE_GATHERING_RETRIES = 3;
+    private static final long ICE_GATHERING_RETRY_DELAY_SECONDS = 1;
+    private static final long ICE_GATHERING_TIMEOUT_SECONDS = 3;
+    private static final long ICE_GATHERING_RETRY_TIMEOUT_SECONDS = 5;
+    private static final long ICE_GATHERING_MAX_TIMEOUT_SECONDS = 7;
 
+    private int iceGatheringRetries = 0;
     private final WebRTCWrapper webRTCWrapper = new WebRTCWrapper(this);
     private final Queue<
                     Map.Entry<String, DescriptionTransport<RtpDescription, IceUdpTransportInfo>>>
@@ -1387,8 +1393,42 @@ public class JingleRtpConnection extends AbstractJingleConnection
         try {
             this.webRTCWrapper.setRemoteDescription(sdp).get();
             addIceCandidatesFromBlackLog();
-            org.webrtc.SessionDescription webRTCSessionDescription =
-                    this.webRTCWrapper.setLocalDescription(includeCandidates).get();
+            final long iceGatheringTimeout = getIceGatheringTimeoutSeconds();
+            final org.webrtc.SessionDescription webRTCSessionDescription =
+                    this.webRTCWrapper
+                            .setLocalDescription(
+                                    includeCandidates, iceGatheringTimeout, TimeUnit.SECONDS)
+                            .get();
+            final boolean hasUsableCandidate =
+                    includeCandidates
+                            ? hasIceCandidates(webRTCSessionDescription)
+                            : this.webRTCWrapper
+                                    .awaitFirstIceCandidate(
+                                            iceGatheringTimeout, TimeUnit.SECONDS)
+                                    .get();
+            if (!hasUsableCandidate) {
+                if (retryIceGathering("session-accept")) {
+                    jingleConnectionManager.schedule(
+                            () -> {
+                                synchronized (JingleRtpConnection.this) {
+                                    if (isTerminated()) {
+                                        Log.d(
+                                                Config.LOGTAG,
+                                                "not retrying ICE gathering for session-accept"
+                                                        + " because session is terminated");
+                                        return;
+                                    }
+                                    sendSessionAccept(media, offer, iceServers);
+                                }
+                            },
+                            ICE_GATHERING_RETRY_DELAY_SECONDS,
+                            TimeUnit.SECONDS);
+                    return;
+                }
+                failNoIceCandidates();
+                return;
+            }
+            this.iceGatheringRetries = 0;
             prepareSessionAccept(webRTCSessionDescription, includeCandidates);
         } catch (final Exception e) {
             failureToAcceptSession(e);
@@ -1870,14 +1910,113 @@ public class JingleRtpConnection extends AbstractJingleConnection
             return;
         }
         try {
-            org.webrtc.SessionDescription webRTCSessionDescription =
-                    this.webRTCWrapper.setLocalDescription(includeCandidates).get();
+            final long iceGatheringTimeout = getIceGatheringTimeoutSeconds();
+            final org.webrtc.SessionDescription webRTCSessionDescription =
+                    this.webRTCWrapper
+                            .setLocalDescription(
+                                    includeCandidates, iceGatheringTimeout, TimeUnit.SECONDS)
+                            .get();
+            final boolean hasUsableCandidate =
+                    includeCandidates
+                            ? hasIceCandidates(webRTCSessionDescription)
+                            : this.webRTCWrapper
+                                    .awaitFirstIceCandidate(
+                                            iceGatheringTimeout, TimeUnit.SECONDS)
+                                    .get();
+            if (!hasUsableCandidate) {
+                if (retryIceGathering("session-initiate")) {
+                    jingleConnectionManager.schedule(
+                            () -> {
+                                synchronized (JingleRtpConnection.this) {
+                                    if (isTerminated()) {
+                                        Log.d(
+                                                Config.LOGTAG,
+                                                "not retrying ICE gathering for session-initiate"
+                                                        + " because session is terminated");
+                                        return;
+                                    }
+                                    sendSessionInitiate(media, targetState, iceServers);
+                                }
+                            },
+                            ICE_GATHERING_RETRY_DELAY_SECONDS,
+                            TimeUnit.SECONDS);
+                    return;
+                }
+                failNoIceCandidates();
+                return;
+            }
+            this.iceGatheringRetries = 0;
             prepareSessionInitiate(webRTCSessionDescription, includeCandidates, targetState);
         } catch (final Exception e) {
             setExtraState("Unable to setLocalDescription");
             // TODO sending the error text is worthwhile as well. Especially for FailureToSet
             // exceptions
             failureToInitiateSession(e, targetState);
+        }
+    }
+
+    private static boolean hasIceCandidates(
+            final org.webrtc.SessionDescription sessionDescription) {
+        try {
+            return !parseCandidates(SessionDescription.parse(sessionDescription.description))
+                    .isEmpty();
+        } catch (final RuntimeException e) {
+            Log.w(Config.LOGTAG, "unable to inspect local session description for candidates", e);
+            return false;
+        }
+    }
+
+    private long getIceGatheringTimeoutSeconds() {
+        if (this.iceGatheringRetries == 0) {
+            return ICE_GATHERING_TIMEOUT_SECONDS;
+        }
+        return Math.min(
+                ICE_GATHERING_RETRY_TIMEOUT_SECONDS + (this.iceGatheringRetries - 1L),
+                ICE_GATHERING_MAX_TIMEOUT_SECONDS);
+    }
+
+    private boolean retryIceGathering(final String action) {
+        if (this.iceGatheringRetries >= MAX_ICE_GATHERING_RETRIES) {
+            return false;
+        }
+        this.iceGatheringRetries++;
+        Log.w(
+                Config.LOGTAG,
+                id.account.getJid().asBareJid()
+                        + ": no local ICE candidates while preparing "
+                        + action
+                        + ". retrying with a "
+                        + getIceGatheringTimeoutSeconds()
+                        + "s gather timeout ("
+                        + this.iceGatheringRetries
+                        + "/"
+                        + MAX_ICE_GATHERING_RETRIES
+                        + ")");
+        this.webRTCWrapper.close();
+        return true;
+    }
+
+    private void failNoIceCandidates() {
+        if (isTerminated()) {
+            return;
+        }
+        final String message =
+                "No local ICE candidates after "
+                        + MAX_ICE_GATHERING_RETRIES
+                        + " retries. Check network/VPN.";
+        Log.w(Config.LOGTAG, id.account.getJid().asBareJid() + ": " + message);
+        // Set this before transitioning: the terminal transition triggers the UI update and
+        // finish() removes the connection from the manager shortly afterwards.
+        setExtraState(message);
+        webRTCWrapper.close();
+        if (isInState(
+                State.SESSION_INITIALIZED,
+                State.SESSION_INITIALIZED_PRE_APPROVED,
+                State.SESSION_ACCEPTED)) {
+            sendSessionTerminate(
+                    Reason.CONNECTIVITY_ERROR, "Unable to gather local ICE candidates");
+        } else {
+            sendRetract(Reason.CONNECTIVITY_ERROR);
         }
     }
 
@@ -2885,7 +3024,8 @@ public class JingleRtpConnection extends AbstractJingleConnection
             this.cancelRingingTimeout();
             this.callIntegration.verifyDisconnected();
             this.webRTCWrapper.verifyClosed();
-            this.jingleConnectionManager.setTerminalSessionState(id, getEndUserState(), getMedia());
+            this.jingleConnectionManager.setTerminalSessionState(
+                    id, getEndUserState(), getMedia(), extraState());
             super.finish();
             try {
                 File log = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Cheogram/calls/" + id.getWith().asBareJid() + "." + id.getSessionId() + "." + created + ".log");

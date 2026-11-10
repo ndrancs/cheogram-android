@@ -117,7 +117,8 @@ public class WebRTCWrapper {
     private TrackWrapper<VideoTrack> localVideoTrack = null;
     private VideoTrack remoteVideoTrack = null;
 
-    private final SettableFuture<Void> iceGatheringComplete = SettableFuture.create();
+    private SettableFuture<Void> iceGatheringComplete = SettableFuture.create();
+    private SettableFuture<Void> firstIceCandidate = SettableFuture.create();
     private final PeerConnection.Observer peerConnectionObserver =
             new PeerConnection.Observer() {
                 @Override
@@ -161,6 +162,7 @@ public class WebRTCWrapper {
 
                 @Override
                 public void onIceCandidate(IceCandidate iceCandidate) {
+                    firstIceCandidate.set(null);
                     if (readyToReceivedIceCandidates.get()) {
                         eventCallback.onIceCandidate(iceCandidate);
                     } else {
@@ -276,6 +278,13 @@ public class WebRTCWrapper {
         Preconditions.checkNotNull(media);
         Preconditions.checkArgument(
                 !media.isEmpty(), "media can not be empty when initializing peer connection");
+        // A new PeerConnection starts a new gathering phase. Reset the state that belongs to the
+        // previous connection so a retry does not immediately see a completed (possibly empty)
+        // gathering from the previous attempt.
+        this.iceGatheringComplete = SettableFuture.create();
+        this.firstIceCandidate = SettableFuture.create();
+        this.iceCandidates.clear();
+        this.readyToReceivedIceCandidates.set(false);
         final boolean setUseHardwareAcousticEchoCanceler =
                 !HARDWARE_AEC_BLACKLIST.contains(Build.MODEL);
         Log.d(
@@ -448,6 +457,9 @@ public class WebRTCWrapper {
             return;
         }
         setIsReadyToReceiveIceCandidates(false);
+        this.iceGatheringComplete = SettableFuture.create();
+        this.firstIceCandidate = SettableFuture.create();
+        this.iceCandidates.clear();
         peerConnection.restartIce();
     }
 
@@ -597,6 +609,11 @@ public class WebRTCWrapper {
 
     synchronized ListenableFuture<SessionDescription> setLocalDescription(
             final boolean waitForCandidates) {
+        return setLocalDescription(waitForCandidates, 2, TimeUnit.SECONDS);
+    }
+
+    synchronized ListenableFuture<SessionDescription> setLocalDescription(
+            final boolean waitForCandidates, final long timeout, final TimeUnit timeUnit) {
         this.setIsReadyToReceiveIceCandidates(false);
         return Futures.transformAsync(
                 getPeerConnectionFuture(),
@@ -611,7 +628,9 @@ public class WebRTCWrapper {
                                 @Override
                                 public void onSetSuccess() {
                                     if (waitForCandidates) {
-                                        final var delay = getIceGatheringCompleteOrTimeout();
+                                        final var delay =
+                                                getIceGatheringCompleteOrTimeout(
+                                                        timeout, timeUnit);
                                         final var delayedSessionDescription =
                                                 Futures.transformAsync(
                                                         delay,
@@ -637,19 +656,49 @@ public class WebRTCWrapper {
                 MoreExecutors.directExecutor());
     }
 
-    private ListenableFuture<Void> getIceGatheringCompleteOrTimeout() {
+    private ListenableFuture<Void> getIceGatheringCompleteOrTimeout(
+            final long timeout, final TimeUnit timeUnit) {
         return Futures.catching(
                 Futures.withTimeout(
                         iceGatheringComplete,
-                        2,
-                        TimeUnit.SECONDS,
+                        timeout,
+                        timeUnit,
                         JingleConnectionManager.SCHEDULED_EXECUTOR_SERVICE),
                 TimeoutException.class,
                 ex -> {
                     Log.d(
                             EXTENDED_LOGGING_TAG,
-                            "timeout while waiting for ICE gathering to complete");
+                            "timeout after "
+                                    + timeout
+                                    + " "
+                                    + timeUnit
+                                    + " while waiting for ICE gathering to complete");
                     return null;
+                },
+                MoreExecutors.directExecutor());
+    }
+
+    ListenableFuture<Boolean> awaitFirstIceCandidate(
+            final long timeout, final TimeUnit timeUnit) {
+        return Futures.catching(
+                Futures.transform(
+                        Futures.withTimeout(
+                                firstIceCandidate,
+                                timeout,
+                                timeUnit,
+                                JingleConnectionManager.SCHEDULED_EXECUTOR_SERVICE),
+                        candidate -> true,
+                        MoreExecutors.directExecutor()),
+                TimeoutException.class,
+                ex -> {
+                    Log.d(
+                            EXTENDED_LOGGING_TAG,
+                            "timeout after "
+                                    + timeout
+                                    + " "
+                                    + timeUnit
+                                    + " while waiting for the first ICE candidate");
+                    return false;
                 },
                 MoreExecutors.directExecutor());
     }
